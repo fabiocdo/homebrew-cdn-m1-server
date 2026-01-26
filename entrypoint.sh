@@ -3,26 +3,72 @@ set -e
 
 PKG_DIR="/data/pkg"
 MEDIA_DIR="/data/_media"
-ICONS_DIR="/data/_media/icons"
+GENERATE_JSON_PERIOD="${GENERATE_JSON_PERIOD:-3}"
+GREEN="\033[0;32m"
+RESET="\033[0m"
 
 generate() {
   echo "[+] Generating index.json..."
-  mkdir -p "$PKG_DIR" "$ICONS_DIR"
-  python3 /generate-index.py
+  mkdir -p "$PKG_DIR" "$MEDIA_DIR"
+  RUN_MODE=watch python3 /generate-index.py
+}
+
+move_only() {
+  RUN_MODE=move python3 /generate-index.py
 }
 
 # Initial generation
 if [ -d "$PKG_DIR" ]; then
-  generate
+  RUN_MODE=init python3 /generate-index.py
 fi
 
 # Automatic watcher
 if [ -d "$PKG_DIR" ]; then
-  inotifywait -m -e create -e delete -e move -e close_write "$PKG_DIR" | while read _; do
-    echo "[*] Change detected in pkg/"
-    generate
+  last_moved_from=""
+  debounce_pid=""
+
+  schedule_generate() {
+    if [ -n "$debounce_pid" ] && kill -0 "$debounce_pid" 2>/dev/null; then
+      kill "$debounce_pid" 2>/dev/null || true
+      wait "$debounce_pid" 2>/dev/null || true
+    fi
+    (
+      sleep "$GENERATE_JSON_PERIOD"
+      debounce_pid=""
+      generate
+    ) &
+    debounce_pid="$!"
+  }
+
+  inotifywait -m -r -e create -e delete -e move -e close_write --format "%w%f|%e" "$PKG_DIR" | while IFS="|" read -r path events; do
+    case "$events" in
+      *MOVED_FROM*)
+        last_moved_from="$path"
+        ;;
+      *MOVED_TO*)
+        if [ -n "$last_moved_from" ]; then
+          printf "${GREEN}[*] Change detected: MOVED_FROM: %s -> MOVED_TO: %s${RESET}\n" "$last_moved_from" "$path"
+          last_moved_from=""
+        else
+          printf "${GREEN}[*] Moved: %s${RESET}\n" "$path"
+        fi
+        move_only
+        schedule_generate
+        ;;
+      *CREATE*|*DELETE*)
+        printf "${GREEN}[*] Change detected: %s %s${RESET}\n" "$events" "$path"
+        move_only
+        schedule_generate
+        ;;
+      *)
+        printf "${GREEN}[*] Change detected: %s %s${RESET}\n" "$events" "$path"
+        move_only
+        schedule_generate
+        ;;
+    esac
   done &
 fi
 
-echo "[+] Starting NGINX..."
+
+printf "${GREEN}[+] Starting NGINX...${RESET}\n"
 exec nginx -g "daemon off;"

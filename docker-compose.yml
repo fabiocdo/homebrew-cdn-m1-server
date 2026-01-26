@@ -8,7 +8,8 @@ services:
     ports:
       - "8080:80"
     volumes:
-      - ${CDN_DATA_DIR:-~/homebrew-store-cdn}:/data
+      - ${CDN_DATA_DIR:-/opt/cdn}:/data
     environment:
       - BASE_URL=http://localhost:8080
+      - GENERATE_JSON_PERIOD=3
     restart: unless-stopped
