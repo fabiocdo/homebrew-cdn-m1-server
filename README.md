@@ -18,6 +18,45 @@ index generation and icon extraction.
 
 ## Quick start
 
+### Option A: Docker Run (from Docker Hub)
+
+```bash
+docker run -d \
+  --name homebrew-store-cdn \
+  -p 8080:80 \
+  -e BASE_URL=http://127.0.0.1:8080 \
+  -e GENERATE_JSON_PERIOD=2 \
+  -v /opt/cdn:/data \
+  fabiocdo/homebrew-store-cdn:latest
+```
+
+### Option B: Docker Compose (from Docker Hub)
+
+Create a `docker-compose.yml`:
+
+```yaml
+services:
+  homebrew-store-cdn:
+    image: fabiocdo/homebrew-store-cdn:latest
+    container_name: homebrew-store-cdn
+    ports:
+      - "8080:80"
+    environment:
+      - BASE_URL=http://127.0.0.1:8080
+      - GENERATE_JSON_PERIOD=2
+    volumes:
+      - /opt/cdn:/data
+    restart: unless-stopped
+```
+
+Run:
+
+```bash
+docker compose up -d
+```
+
+### Option C: Build locally
+
 1) Edit `.env`:
 
 ```
@@ -33,7 +72,7 @@ docker compose build
 docker compose up -d
 ```
 
-3) Open:
+Open:
 
 - http://127.0.0.1:8080
 - http://127.0.0.1:8080/index.json
@@ -107,7 +146,7 @@ Fields:
 | --- | --- |-------------------------|
 | `BASE_URL` | Base URL written in `index.json`. | `http://127.0.0.1:8080` |
 | `CDN_DATA_DIR` | Host path mapped to `/data`. | `/opt/cdn`              |
-| `GENERATE_JSON_PERIOD` | Delay (seconds) before regenerating `index.json` after changes. | `2`                     |
+| `GENERATE_JSON_PERIOD` | Delay (seconds) before regenerating `index.json` after changes. | `5`                     |
 
 ## Logs
 
