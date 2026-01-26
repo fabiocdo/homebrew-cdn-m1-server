@@ -1,0 +1,14 @@
+name: homebrew-store-cdn
+
+services:
+  homebrew-store-cdn:
+    build: .
+    image: homebrew-store-cdn:latest
+    container_name: homebrew-store-cdn
+    ports:
+      - "8080:80"
+    volumes:
+      - ${CDN_DATA_DIR:-~/homebrew-store-cdn}:/data
+    environment:
+      - BASE_URL=http://localhost:8080
+    restart: unless-stopped
