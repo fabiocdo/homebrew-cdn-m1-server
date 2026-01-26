@@ -7,11 +7,12 @@ import sys
 import tempfile
 from urllib.parse import quote
 
-BASE_URL = os.environ.get("BASE_URL", "http://SERVER_IP:8080")
+BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:8080")
 DATA_DIR = pathlib.Path("/data")
 PKG_DIR = DATA_DIR / "pkg"
 OUT = DATA_DIR / "index.json"
 MEDIA_DIR = DATA_DIR / "_media"
+CACHE_DIR = DATA_DIR / "_cache"
 PKGTOOL = os.environ.get("PKGTOOL", "/usr/local/bin/pkgtool")
 PKG_PASSCODE = os.environ.get("PKG_PASSCODE")
 DOTNET_GLOBALIZATION_ENV = "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"
@@ -20,6 +21,7 @@ APP_DIR = PKG_DIR / "app"
 YELLOW = "\033[0;33m"
 RESET = "\033[0m"
 RUN_MODE = os.environ.get("RUN_MODE", "full")
+CACHE_PATH = CACHE_DIR / "index-cache.json"
 
 apps = []
 
@@ -119,6 +121,42 @@ def region_from_content_id(content_id):
     return region_map.get(prefix, prefix)
 
 
+def load_cache():
+    try:
+        if CACHE_PATH.exists():
+            return json.loads(CACHE_PATH.read_text())
+    except Exception:
+        pass
+    return {"version": 1, "pkgs": {}}
+
+
+def save_cache(cache):
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    CACHE_PATH.write_text(json.dumps(cache, indent=2))
+
+
+def build_data(info, pkg_path):
+    title = info.get("TITLE", pkg_path.stem)
+    titleid = info.get("TITLE_ID", pkg_path.stem)
+    version = info.get("VERSION", "1.00")
+    category = info.get("CATEGORY")
+    content_id = info.get("CONTENT_ID")
+    app_type = parse_sfo_int(info.get("APP_TYPE"))
+    apptype = map_apptype(category, app_type)
+    region = region_from_content_id(content_id)
+
+    return {
+        "title": title,
+        "titleid": titleid,
+        "version": version,
+        "category": category,
+        "content_id": content_id,
+        "app_type": app_type,
+        "apptype": apptype,
+        "region": region,
+    }
+
+
 def ensure_pkg_location(pkg_path, apptype):
     if apptype not in APPTYPE_DIRS:
         return pkg_path
@@ -210,26 +248,59 @@ if RUN_MODE == "init":
         marker_path.write_text("Place PKG files in this directory or its subfolders.\n")
         print(f"[*] Created marker file {marker_path}")
 
+cache = load_cache()
+new_cache_pkgs = {}
+
 for pkg in PKG_DIR.rglob("*.pkg"):
     if any(part.startswith("_") for part in pkg.parts):
         continue
-    info, icon_entry = read_pkg_info(pkg)
-    title = info.get("TITLE", pkg.stem)
-    titleid = info.get("TITLE_ID", pkg.stem)
-    version = info.get("VERSION", "1.00")
-    category = info.get("CATEGORY")
-    content_id = info.get("CONTENT_ID")
-    app_type = parse_sfo_int(info.get("APP_TYPE"))
+    rel_pre = pkg.relative_to(PKG_DIR).as_posix()
+    try:
+        stat = pkg.stat()
+    except Exception:
+        continue
+
+    cache_entry = cache["pkgs"].get(rel_pre)
+    cache_hit = (
+        cache_entry
+        and cache_entry.get("size") == stat.st_size
+        and cache_entry.get("mtime") == stat.st_mtime
+        and isinstance(cache_entry.get("data"), dict)
+    )
+
+    if cache_hit:
+        data = cache_entry["data"]
+        icon_entry = cache_entry.get("icon_entry")
+    else:
+        info, icon_entry = read_pkg_info(pkg)
+        data = build_data(info, pkg)
+        cache_entry = {
+            "size": stat.st_size,
+            "mtime": stat.st_mtime,
+            "data": data,
+            "icon_entry": icon_entry,
+        }
+
+    title = data["title"]
+    titleid = data["titleid"]
+    version = data["version"]
+    base_category = data.get("category")
+    apptype = data["apptype"]
+    region = data.get("region")
+
+    pkg = ensure_pkg_location(pkg, apptype)
+    rel = pkg.relative_to(PKG_DIR).as_posix()
+    new_cache_pkgs[rel] = cache_entry
+
+    if RUN_MODE == "move":
+        continue
+
     if APP_DIR in pkg.parents:
         apptype = "app"
         category = "ap"
     else:
-        apptype = map_apptype(category, app_type)
-    region = region_from_content_id(content_id)
+        category = base_category
 
-    pkg = ensure_pkg_location(pkg, apptype)
-    if RUN_MODE == "move":
-        continue
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
     icon_out = MEDIA_DIR / f"{titleid}.png"
     if icon_entry is not None and not icon_out.exists():
@@ -257,7 +328,12 @@ for pkg in PKG_DIR.rglob("*.pkg"):
     apps.append(app)
 
 if RUN_MODE == "move":
+    cache["pkgs"] = new_cache_pkgs
+    save_cache(cache)
     sys.exit(0)
+
+cache["pkgs"] = new_cache_pkgs
+save_cache(cache)
 
 with open(OUT, "w") as f:
     json.dump({"apps": apps}, f, indent=2)

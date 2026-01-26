@@ -3,13 +3,14 @@ set -e
 
 PKG_DIR="/data/pkg"
 MEDIA_DIR="/data/_media"
+CACHE_DIR="/data/_cache"
 GENERATE_JSON_PERIOD="${GENERATE_JSON_PERIOD:-5}"
 GREEN="\033[0;32m"
 RESET="\033[0m"
 
 generate() {
   echo "[+] Generating index.json..."
-  mkdir -p "$PKG_DIR" "$MEDIA_DIR"
+  mkdir -p "$PKG_DIR" "$MEDIA_DIR" "$CACHE_DIR"
   RUN_MODE=watch python3 /generate-index.py
 }
 
@@ -18,7 +19,7 @@ move_only() {
 }
 
 # Initial generation
-mkdir -p "$PKG_DIR" "$MEDIA_DIR"
+mkdir -p "$PKG_DIR" "$MEDIA_DIR" "$CACHE_DIR"
 RUN_MODE=init python3 /generate-index.py
 
 # Automatic watcher

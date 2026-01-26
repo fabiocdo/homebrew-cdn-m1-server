@@ -92,6 +92,8 @@ The host directory mapped to `/data` must follow this layout:
 |   |-- Game Name [CUSA12345].pkg
 |-- _media/                # Auto-generated icons
 |   |-- CUSA12345.png
+|-- _cache/                # Auto-generated cache
+|   |-- index-cache.json
 |-- index.json             # Auto-generated index
 ```
 
@@ -100,6 +102,8 @@ Notes:
 - The tool ignores any PKG located inside folders that start with `_`.
 - The `_PUT_YOUR_PKGS_HERE` file is a marker created on container startup.
 - Auto-created folders and the marker are only created during container startup.
+- `_cache/index-cache.json` stores metadata to speed up subsequent runs.
+- The cache is updated whenever PKGs are processed, including change events.
 
 ## Package organization
 
