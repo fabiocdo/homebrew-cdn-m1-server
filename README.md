@@ -24,15 +24,15 @@ index generation and icon extraction.
 docker run -d \
   --name homebrew-store-cdn \
   -p 8080:80 \
-  -e BASE_URL=http://127.0.0.1:8080 \
-  -e GENERATE_JSON_PERIOD=2 \
-  -v /opt/cdn:/data \
+-e BASE_URL=http://127.0.0.1:8080 \
+-e GENERATE_JSON_PERIOD=2 \
+  -v ./data:/data \
   fabiocdo/homebrew-store-cdn:latest
 ```
 
 ### Option B: Docker Compose (from Docker Hub)
 
-Create a `docker-compose.yml`:
+Create a `docker-compose.yml` (see example folder):
 
 ```yaml
 services:
@@ -45,7 +45,7 @@ services:
       - BASE_URL=http://127.0.0.1:8080
       - GENERATE_JSON_PERIOD=2
     volumes:
-      - /opt/cdn:/data
+      - ./data:/data
     restart: unless-stopped
 ```
 
@@ -57,11 +57,11 @@ docker compose up -d
 
 ### Option C: Build locally
 
-1) Edit `.env`:
+1) Edit `.env` (see example folder):
 
 ```
-BASE_URL=http://127.0.0.1:8080
-CDN_DATA_DIR=/opt/cdn
+BASE_URL=http://<YOUR_SERVER_IP_ADDRESS>
+CDN_DATA_DIR=<PATH_TO_HOST_DATA_DIRECTORY>
 GENERATE_JSON_PERIOD=2
 ```
 
@@ -99,6 +99,7 @@ Notes:
 - `index.json` and `_media/*.png` are generated automatically.
 - The tool ignores any PKG located inside folders that start with `_`.
 - The `_PUT_YOUR_PKGS_HERE` file is a marker created on container startup.
+- Auto-created folders and the marker are only created during container startup.
 
 ## Package organization
 
@@ -145,16 +146,8 @@ Fields:
 | Variable | Description | Default                 |
 | --- | --- |-------------------------|
 | `BASE_URL` | Base URL written in `index.json`. | `http://127.0.0.1:8080` |
-| `CDN_DATA_DIR` | Host path mapped to `/data`. | `/opt/cdn`              |
-| `GENERATE_JSON_PERIOD` | Delay (seconds) before regenerating `index.json` after changes. | `5`                     |
-
-## Logs
-
-The container prints:
-
-- `Moved: <from> -> <to>` when files are organized.
-- `Change detected: <EVENT> <PATH>` for other events.
-- `index.json generated` after each update.
+| `CDN_DATA_DIR` | Host path mapped to `/data`. | `./data`                |
+| `GENERATE_JSON_PERIOD` | Delay (seconds) before regenerating `index.json` after changes. | `2`                     |
 
 ## Nginx behavior
 
