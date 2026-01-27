@@ -22,6 +22,10 @@ log() {
   printf "%s\n" "$*"
 }
 
+clear_console(){
+  printf "\033c\n"
+}
+
 hostport="${BASE_URL#*://}"
 hostport="${hostport%%/*}"
 host="${hostport%%:*}"
@@ -30,12 +34,12 @@ if [ "$host" = "$hostport" ]; then
   port="80"
 fi
 
-clear
-log "[] Starting NGINX..."
+clear_console
+log "[·] Starting NGINX..."
 nginx
-log "[] Started NGINX on ${host}:${port}."
+log "[·] Started NGINX on ${host}:${port}."
 
-log "[] Starting Auto Indexer:
+log "[·] Starting Auto Indexer:
 SERVER URL: \"$BASE_URL\"
 AUTO_GENERATE_JSON_PERIOD: \"$AUTO_GENERATE_JSON_PERIOD\"
 AUTO_RENAME_PKGS: \"$AUTO_RENAME_PKGS\"
