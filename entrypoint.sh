@@ -119,7 +119,7 @@ log ""
 initialize_dir
 
 log ""
-exec python3 -u /generate-index.py \
+exec python3 -u /scripts/auto_indexer.py \
   --base-url "$BASE_URL" \
   --auto-generate-json-period "$AUTO_GENERATE_JSON_PERIOD" \
   --auto-rename-pkgs "$AUTO_RENAME_PKGS" \

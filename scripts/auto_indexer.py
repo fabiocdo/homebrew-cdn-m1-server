@@ -10,21 +10,19 @@ import tempfile
 import threading
 from urllib.parse import quote
 
-DATA_DIR = pathlib.Path("/data")
+import settings
+from log_utils import log
+
+DATA_DIR = pathlib.Path(settings.PATHS["default_data_dir"])
 PKG_DIR = DATA_DIR / "pkg"
 OUT = DATA_DIR / "index.json"
 MEDIA_DIR = DATA_DIR / "_media"
 CACHE_DIR = DATA_DIR / "_cache"
-DOTNET_GLOBALIZATION_ENV = "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"
-APPTYPE_DIRS = ["game", "dlc", "update", "app"]
-APP_DIR = PKG_DIR / "app"
-GREEN = "\033[0;32m"
-YELLOW = "\033[0;33m"
-RED = "\033[0;31m"
-PINK = "\033[1;95m"
-RESET = "\033[0m"
 CACHE_PATH = CACHE_DIR / "index-cache.json"
-PKGTOOL = "/usr/local/bin/pkgtool"
+APP_DIR = PKG_DIR / "app"
+
+APPTYPE_DIRS = settings.PKG["apptype_dirs"]
+PKGTOOL = settings.PATHS["default_pkgtool"]
 PKG_PASSCODE = None
 
 def parse_bool(value):
@@ -77,30 +75,9 @@ def set_data_dir(path_value):
     APP_DIR = PKG_DIR / "app"
     CACHE_PATH = CACHE_DIR / "index-cache.json"
 
-def log(action, message):
-    if action == "created":
-        color = GREEN
-        prefix = "[+]"
-    elif action == "modified":
-        color = YELLOW
-        prefix = "[*]"
-    elif action == "deleted":
-        color = RED
-        prefix = "[-]"
-    elif action == "error":
-        color = PINK
-        prefix = "[!]"
-    elif action == "info":
-        color = RESET
-        prefix = "[·]"
-    else:
-        color = RESET
-        prefix = "[*]"
-    print(f"{color}{prefix} {message}{RESET}")
-
 def run_pkgtool(args):
     env = os.environ.copy()
-    env.setdefault(DOTNET_GLOBALIZATION_ENV, "1")
+    env.setdefault(settings.DOTNET["globalization_env"], "1")
     result = subprocess.run(
         [PKGTOOL] + args,
         check=True,

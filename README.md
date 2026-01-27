@@ -199,3 +199,10 @@ as shown in the quick start examples.
   In that case, the entry still appears in `index.json` using the filename.
 - If icons are missing, ensure the PKG contains `ICON0_PNG` or `PIC0_PNG`.
 - If you see `Duplicate target exists, skipping`, the cycle will not regenerate `index.json` until the conflict is resolved.
+
+## Developer notes
+
+- The indexer runs as `/scripts/auto_indexer.py` inside the container.
+- For local runs outside Docker, you can pass `--data-dir` to point to a writable path.
+- Shared constants live in `scripts/settings.py`.
+- Shared log helpers live in `scripts/log_utils.py`.

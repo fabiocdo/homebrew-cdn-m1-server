@@ -27,7 +27,7 @@ COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy scripts
 COPY entrypoint.sh /entrypoint.sh
-COPY generate-index.py /generate-index.py
+COPY scripts/ /scripts/
 RUN chmod +x /entrypoint.sh
 
 # Data volume
