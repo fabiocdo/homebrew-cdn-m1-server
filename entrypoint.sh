@@ -31,8 +31,8 @@ log "Starting NGINX on ${host}:${port}..."
 nginx
 log "Started NGINX on ${host}:${port}."
 
-log "Starting indexer: python3 /generate-index.py --base-url \"$BASE_URL\" --auto-generate-json-period \"$AUTO_GENERATE_JSON_PERIOD\" --auto-rename-pkgs \"$AUTO_RENAME_PKGS\" --auto-rename-template \"$AUTO_RENAME_TEMPLATE\" --auto-rename-title-mode \"$AUTO_RENAME_TITLE_MODE\""
-exec python3 /generate-index.py \
+log "Starting indexer: python3 -u /generate-index.py --base-url \"$BASE_URL\" --auto-generate-json-period \"$AUTO_GENERATE_JSON_PERIOD\" --auto-rename-pkgs \"$AUTO_RENAME_PKGS\" --auto-rename-template \"$AUTO_RENAME_TEMPLATE\" --auto-rename-title-mode \"$AUTO_RENAME_TITLE_MODE\""
+exec python3 -u /generate-index.py \
   --base-url "$BASE_URL" \
   --auto-generate-json-period "$AUTO_GENERATE_JSON_PERIOD" \
   --auto-rename-pkgs "$AUTO_RENAME_PKGS" \

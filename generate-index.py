@@ -34,6 +34,7 @@ def parse_bool(value):
 
 def parse_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--data-dir", default="/data")
     parser.add_argument("--base-url", required=True)
     parser.add_argument("--auto-generate-json-period", required=True, type=float)
     parser.add_argument("--auto-rename-pkgs", required=True)
@@ -46,6 +47,7 @@ def parse_args():
     return parser.parse_args()
 
 def apply_args(args):
+    set_data_dir(args.data_dir)
     global BASE_URL
     global AUTO_GENERATE_JSON_PERIOD
     global AUTO_RENAME_PKGS
@@ -57,6 +59,23 @@ def apply_args(args):
     AUTO_RENAME_PKGS = parse_bool(args.auto_rename_pkgs)
     AUTO_RENAME_TEMPLATE = args.auto_rename_template
     AUTO_RENAME_TITLE_MODE = args.auto_rename_title_mode
+
+def set_data_dir(path_value):
+    global DATA_DIR
+    global PKG_DIR
+    global OUT
+    global MEDIA_DIR
+    global CACHE_DIR
+    global APP_DIR
+    global CACHE_PATH
+
+    DATA_DIR = pathlib.Path(path_value)
+    PKG_DIR = DATA_DIR / "pkg"
+    OUT = DATA_DIR / "index.json"
+    MEDIA_DIR = DATA_DIR / "_media"
+    CACHE_DIR = DATA_DIR / "_cache"
+    APP_DIR = PKG_DIR / "app"
+    CACHE_PATH = CACHE_DIR / "index-cache.json"
 
 def log(action, message):
     if action == "created":
@@ -534,6 +553,9 @@ def build_index(move_only):
     return 0
 
 def watch_pkg_dir():
+    if shutil.which("inotifywait") is None:
+        log("error", "inotifywait not found; skipping watcher.")
+        return
     if not PKG_DIR.exists():
         return
 
