@@ -4,18 +4,54 @@ set -e
 PKG_DIR="/data/pkg"
 MEDIA_DIR="/data/_media"
 CACHE_DIR="/data/_cache"
-GENERATE_JSON_PERIOD="${GENERATE_JSON_PERIOD:-5}"
-GREEN="\033[0;32m"
-RESET="\033[0m"
+AUTO_GENERATE_JSON_PERIOD="${AUTO_GENERATE_JSON_PERIOD:-2}"
+GREEN="$(printf '\033[0;32m')"
+YELLOW="$(printf '\033[0;33m')"
+RED="$(printf '\033[0;31m')"
+PINK="$(printf '\033[1;95m')"
+RESET="$(printf '\033[0m')"
+
+log() {
+  action="$1"
+  shift
+  case "$action" in
+    created)
+      color="$GREEN"
+      prefix="[+]"
+      ;;
+    modified)
+      color="$YELLOW"
+      prefix="[*]"
+      ;;
+    deleted)
+      color="$RED"
+      prefix="[-]"
+      ;;
+    error)
+      color="$PINK"
+      prefix="[!]"
+      ;;
+    info)
+      color="$RESET"
+      prefix="[·]"
+      ;;
+    *)
+      color="$RESET"
+      prefix="[*]"
+      ;;
+  esac
+  printf "%s%s %s%s\n" "$color" "$prefix" "$*" "$RESET"
+}
 
 generate() {
-  echo "[+] Generating index.json..."
+  log info "Generating index.json..."
   mkdir -p "$PKG_DIR" "$MEDIA_DIR" "$CACHE_DIR"
   RUN_MODE=watch python3 /generate-index.py
 }
 
 move_only() {
   RUN_MODE=move python3 /generate-index.py
+  return $?
 }
 
 # Initial generation
@@ -33,7 +69,7 @@ if [ -d "$PKG_DIR" ]; then
       wait "$debounce_pid" 2>/dev/null || true
     fi
     (
-      sleep "$GENERATE_JSON_PERIOD"
+      sleep "$AUTO_GENERATE_JSON_PERIOD"
       debounce_pid=""
       generate
     ) &
@@ -47,28 +83,35 @@ if [ -d "$PKG_DIR" ]; then
         ;;
       *MOVED_TO*)
         if [ -n "$last_moved_from" ]; then
-          printf "${GREEN}[*] Moved: %s -> %s${RESET}\n" "$last_moved_from" "$path"
+          log modified "Moved: $last_moved_from -> $path"
           last_moved_from=""
         else
-          printf "${GREEN}[*] Moved: %s${RESET}\n" "$path"
+          log modified "Moved: $path"
         fi
-        move_only
-        schedule_generate
+        if move_only; then
+          schedule_generate
+        fi
         ;;
       *CREATE*|*DELETE*)
-        printf "${GREEN}[*] Change detected: %s %s${RESET}\n" "$events" "$path"
-        move_only
-        schedule_generate
+        if echo "$events" | grep -q "DELETE"; then
+          log deleted "Change detected: $events $path"
+        else
+          log created "Change detected: $events $path"
+        fi
+        if move_only; then
+          schedule_generate
+        fi
         ;;
       *)
-        printf "${GREEN}[*] Change detected: %s %s${RESET}\n" "$events" "$path"
-        move_only
-        schedule_generate
+        log modified "Change detected: $events $path"
+        if move_only; then
+          schedule_generate
+        fi
         ;;
     esac
   done &
 fi
 
 
-printf "${GREEN}[+] Starting NGINX...${RESET}\n"
+log info "Starting NGINX..."
 exec nginx -g "daemon off;"

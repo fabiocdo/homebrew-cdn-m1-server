@@ -1,6 +1,7 @@
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -18,12 +19,42 @@ PKG_PASSCODE = os.environ.get("PKG_PASSCODE")
 DOTNET_GLOBALIZATION_ENV = "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"
 APPTYPE_DIRS = ["game", "dlc", "update", "app"]
 APP_DIR = PKG_DIR / "app"
+GREEN = "\033[0;32m"
 YELLOW = "\033[0;33m"
+RED = "\033[0;31m"
+PINK = "\033[1;95m"
 RESET = "\033[0m"
 RUN_MODE = os.environ.get("RUN_MODE", "full")
 CACHE_PATH = CACHE_DIR / "index-cache.json"
+AUTO_RENAME_PKGS = os.environ.get("AUTO_RENAME_PKGS", "false").lower() == "true"
+AUTO_RENAME_TEMPLATE = os.environ.get(
+    "AUTO_RENAME_TEMPLATE",
+    "{title} [{titleid}][{apptype}]",
+)
+AUTO_RENAME_TITLE_MODE = os.environ.get("AUTO_RENAME_TITLE_MODE", "none").lower()
 
 apps = []
+
+def log(action, message):
+    if action == "created":
+        color = GREEN
+        prefix = "[+]"
+    elif action == "modified":
+        color = YELLOW
+        prefix = "[*]"
+    elif action == "deleted":
+        color = RED
+        prefix = "[-]"
+    elif action == "error":
+        color = PINK
+        prefix = "[!]"
+    elif action == "info":
+        color = RESET
+        prefix = "[·]"
+    else:
+        color = RESET
+        prefix = "[*]"
+    print(f"{color}{prefix} {message}{RESET}")
 
 def run_pkgtool(args):
     env = os.environ.copy()
@@ -131,8 +162,10 @@ def load_cache():
 
 
 def save_cache(cache):
+    log("info", "Generating index-cache.json...")
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     CACHE_PATH.write_text(json.dumps(cache, indent=2))
+    log("created", "Generated: index-cache.json")
 
 
 def build_data(info, pkg_path):
@@ -157,6 +190,102 @@ def build_data(info, pkg_path):
     }
 
 
+def sanitize_filename(value):
+    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-![]().'")
+    cleaned = []
+    for ch in value:
+        if ch.isalnum() or ch in allowed:
+            cleaned.append(ch)
+        else:
+            cleaned.append("_")
+    safe = "".join(cleaned)
+    safe = safe.replace("/", "_").replace("\\", "_").replace("-", "_").replace(":", "_").strip()
+    safe = "_".join(part for part in safe.split() if part)
+    while "__" in safe:
+        safe = safe.replace("__", "_")
+    return safe
+
+
+def format_title(value):
+    return " ".join(part.capitalize() for part in value.split())
+
+
+def render_rename(template, data):
+    safe = {}
+    for key, value in data.items():
+        if value is None:
+            safe[key] = ""
+        elif key == "title":
+            title_value = str(value)
+            if AUTO_RENAME_TITLE_MODE == "uppercase":
+                title_value = title_value.upper()
+            elif AUTO_RENAME_TITLE_MODE == "lowercase":
+                title_value = title_value.lower()
+            elif AUTO_RENAME_TITLE_MODE == "capitalize":
+                title_value = format_title(title_value)
+            title_value = re.sub(r"([A-Za-z])([0-9])", r"\1_\2", title_value)
+            safe[key] = sanitize_filename(title_value)
+        else:
+            safe[key] = sanitize_filename(str(value))
+    name = template.format_map(safe).strip()
+    if not name.lower().endswith(".pkg"):
+        name = f"{name}.pkg"
+    return name
+
+
+def maybe_rename_pkg(pkg_path, title, titleid, apptype, region, version, category, content_id, app_type):
+    if not AUTO_RENAME_PKGS:
+        return pkg_path
+    if not titleid:
+        return pkg_path
+    new_name = render_rename(
+        AUTO_RENAME_TEMPLATE,
+        {
+            "title": title,
+            "titleid": titleid,
+            "version": version or "1.00",
+            "category": category or "",
+            "content_id": content_id or "",
+            "app_type": app_type or "",
+            "apptype": apptype or "app",
+            "region": region or "UNK",
+        },
+    )
+    if pkg_path.name == new_name:
+        return pkg_path
+    target_path = pkg_path.with_name(new_name)
+    if target_path.exists():
+        return pkg_path
+    try:
+        pkg_path.rename(target_path)
+        log("modified", f"Renamed PKG to {target_path}")
+        return target_path
+    except Exception:
+        return pkg_path
+
+
+def build_target_path(pkg_path, apptype, title, titleid, region, version, category, content_id, app_type):
+    target_dir = pkg_path.parent
+    if apptype in APPTYPE_DIRS and apptype != "app" and APP_DIR not in pkg_path.parents:
+        target_dir = PKG_DIR / apptype
+    target_name = pkg_path.name
+    if AUTO_RENAME_PKGS and titleid:
+        target_name = render_rename(
+            AUTO_RENAME_TEMPLATE,
+            {
+                "title": title,
+                "titleid": titleid,
+                "version": version or "1.00",
+                "category": category or "",
+                "content_id": content_id or "",
+                "app_type": app_type or "",
+                "apptype": apptype or "app",
+                "region": region or "UNK",
+            },
+        )
+    return target_dir / target_name
+
+
 def ensure_pkg_location(pkg_path, apptype):
     if apptype not in APPTYPE_DIRS:
         return pkg_path
@@ -173,13 +302,13 @@ def ensure_pkg_location(pkg_path, apptype):
         return pkg_path
 
     if target_path.exists():
-        print(f"[!] Target already exists, skipping move: {target_path}")
+        log("error", f"Target already exists, skipping move: {target_path}")
         return pkg_path
 
     try:
         shutil.move(str(pkg_path), str(target_path))
     except Exception as e:
-        print(f"[!] Error moving PKG to {target_path}: {e}")
+        log("error", f"Error moving PKG to {target_path}: {e}")
         return pkg_path
 
     return target_path
@@ -209,7 +338,7 @@ def read_pkg_info(pkg_path):
                         icon_entry = entry_id
 
             if sfo_entry is None:
-                print(f"[!] PARAM_SFO not found in {pkg_path}")
+                log("error", f"PARAM_SFO not found in {pkg_path}")
                 return {}, None
 
             tmp_root = pathlib.Path(tmpdir)
@@ -238,18 +367,19 @@ if RUN_MODE == "init":
         apptype_path = PKG_DIR / apptype_dir
         if not apptype_path.exists():
             apptype_path.mkdir(parents=True, exist_ok=True)
-            print(f"[*] Created PKG directory {apptype_path}")
+            log("created", f"Created PKG directory {apptype_path}")
     if not APP_DIR.exists():
         APP_DIR.mkdir(parents=True, exist_ok=True)
-        print(f"[*] Created PKG directory {APP_DIR}")
+        log("created", f"Created PKG directory {APP_DIR}")
 
     marker_path = PKG_DIR / "_PUT_YOUR_PKGS_HERE"
     if not marker_path.exists():
         marker_path.write_text("Place PKG files in this directory or its subfolders.\n")
-        print(f"[*] Created marker file {marker_path}")
+        log("created", f"Created marker file {marker_path}")
 
 cache = load_cache()
 new_cache_pkgs = {}
+duplicate_found = False
 
 for pkg in PKG_DIR.rglob("*.pkg"):
     if any(part.startswith("_") for part in pkg.parts):
@@ -288,7 +418,31 @@ for pkg in PKG_DIR.rglob("*.pkg"):
     apptype = data["apptype"]
     region = data.get("region")
 
-    pkg = ensure_pkg_location(pkg, apptype)
+    target_path = build_target_path(
+        pkg,
+        apptype,
+        title,
+        titleid,
+        region,
+        version,
+        base_category,
+        data.get("content_id"),
+        data.get("app_type"),
+    )
+    if target_path.exists() and target_path.resolve() != pkg.resolve():
+        log("error", f"Duplicate target exists, skipping: {target_path}")
+        duplicate_found = True
+        continue
+    if target_path.resolve() != pkg.resolve():
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.move(str(pkg), str(target_path))
+            if target_path.name != pkg.name:
+                log("modified", f"Renamed PKG to {target_path}")
+            pkg = target_path
+        except Exception as e:
+            log("error", f"Error moving PKG to {target_path}: {e}")
+            continue
     rel = pkg.relative_to(PKG_DIR).as_posix()
     new_cache_pkgs[rel] = cache_entry
 
@@ -307,7 +461,7 @@ for pkg in PKG_DIR.rglob("*.pkg"):
         icon_bytes = read_icon_bytes(pkg, icon_entry)
         if icon_bytes:
             icon_out.write_bytes(icon_bytes)
-            print(f"[*] PKG {titleid} icon extracted to {icon_out}")
+            log("created", f"Extracted: {titleid} PKG icon to {icon_out}")
 
     pkg_rel = pkg.relative_to(PKG_DIR).as_posix()
     pkg_url = f"{BASE_URL}/pkg/{quote(pkg_rel, safe='/')}"
@@ -329,7 +483,11 @@ for pkg in PKG_DIR.rglob("*.pkg"):
 
 if RUN_MODE == "move":
     cache["pkgs"] = new_cache_pkgs
-    save_cache(cache)
+    if duplicate_found:
+        sys.exit(2)
+    sys.exit(0)
+
+if duplicate_found:
     sys.exit(0)
 
 cache["pkgs"] = new_cache_pkgs
@@ -338,4 +496,4 @@ save_cache(cache)
 with open(OUT, "w") as f:
     json.dump({"apps": apps}, f, indent=2)
 
-print(f"{YELLOW}[+] index.json generated{RESET}")
+log("created", "Generated: index.json")

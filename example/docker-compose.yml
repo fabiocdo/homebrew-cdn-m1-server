@@ -9,7 +9,6 @@ services:
       - "8080:80"
     volumes:
       - ${CDN_DATA_DIR:-./data}:/data
-    environment:
-      - BASE_URL=http://127.0.0.1:8080
-      - GENERATE_JSON_PERIOD=2
+    env_file:
+      - .env
     restart: unless-stopped
