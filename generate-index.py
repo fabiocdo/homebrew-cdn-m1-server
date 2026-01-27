@@ -228,6 +228,8 @@ def render_rename(template, data):
         else:
             safe[key] = sanitize_filename(str(value))
     name = template.format_map(safe).strip()
+    while "__" in name:
+        name = name.replace("__", "_")
     if not name.lower().endswith(".pkg"):
         name = f"{name}.pkg"
     return name

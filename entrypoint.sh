@@ -24,11 +24,11 @@ log() {
       prefix="[*]"
       ;;
     deleted)
-      color="$RED"
+      color="$PINK"
       prefix="[-]"
       ;;
     error)
-      color="$PINK"
+      color="$RED"
       prefix="[!]"
       ;;
     info)
