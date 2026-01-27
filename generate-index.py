@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from urllib.parse import quote
 
 DATA_DIR = pathlib.Path("/data")
@@ -33,8 +34,8 @@ def parse_bool(value):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["init", "move", "full"])
     parser.add_argument("--base-url", required=True)
+    parser.add_argument("--auto-generate-json-period", required=True, type=float)
     parser.add_argument("--auto-rename-pkgs", required=True)
     parser.add_argument("--auto-rename-template", required=True)
     parser.add_argument(
@@ -46,15 +47,16 @@ def parse_args():
 
 def apply_args(args):
     global BASE_URL
+    global AUTO_GENERATE_JSON_PERIOD
     global AUTO_RENAME_PKGS
     global AUTO_RENAME_TEMPLATE
     global AUTO_RENAME_TITLE_MODE
 
     BASE_URL = args.base_url
+    AUTO_GENERATE_JSON_PERIOD = args.auto_generate_json_period
     AUTO_RENAME_PKGS = parse_bool(args.auto_rename_pkgs)
     AUTO_RENAME_TEMPLATE = args.auto_rename_template
     AUTO_RENAME_TITLE_MODE = args.auto_rename_title_mode
-    return args.action
 
 def log(action, message):
     if action == "created":
@@ -383,6 +385,11 @@ def read_icon_bytes(pkg_path, icon_entry):
     except Exception:
         return None
 
+def ensure_base_dirs():
+    PKG_DIR.mkdir(parents=True, exist_ok=True)
+    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
 def init_layout():
     for apptype_dir in APPTYPE_DIRS:
         apptype_path = PKG_DIR / apptype_dir
@@ -522,14 +529,92 @@ def build_index(move_only):
     log("created", "Generated: index.json")
     return 0
 
+def watch_pkg_dir():
+    if not PKG_DIR.exists():
+        return
+
+    last_moved_from = ""
+    debounce_timer = None
+
+    def schedule_generate():
+        nonlocal debounce_timer
+        if debounce_timer and debounce_timer.is_alive():
+            debounce_timer.cancel()
+
+        def run():
+            nonlocal debounce_timer
+            debounce_timer = None
+            build_index(False)
+
+        debounce_timer = threading.Timer(AUTO_GENERATE_JSON_PERIOD, run)
+        debounce_timer.daemon = True
+        debounce_timer.start()
+
+    cmd = [
+        "inotifywait",
+        "-m",
+        "-r",
+        "-e",
+        "create",
+        "-e",
+        "delete",
+        "-e",
+        "move",
+        "-e",
+        "close_write",
+        "--format",
+        "%w%f|%e",
+        str(PKG_DIR),
+    ]
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+    if process.stdout is None:
+        return
+
+    for line in process.stdout:
+        line = line.strip()
+        if not line:
+            continue
+        if "|" not in line:
+            log("info", line)
+            continue
+        path, events = line.split("|", 1)
+        if "MOVED_FROM" in events:
+            last_moved_from = path
+            continue
+        if "MOVED_TO" in events:
+            if last_moved_from:
+                log("modified", f"Moved: {last_moved_from} -> {path}")
+                last_moved_from = ""
+            else:
+                log("modified", f"Moved: {path}")
+            if build_index(True) == 0:
+                schedule_generate()
+            continue
+        if "CREATE" in events or "DELETE" in events:
+            if "DELETE" in events:
+                log("deleted", f"Change detected: {events} {path}")
+            else:
+                log("created", f"Change detected: {events} {path}")
+            if build_index(True) == 0:
+                schedule_generate()
+            continue
+        log("modified", f"Change detected: {events} {path}")
+        if build_index(True) == 0:
+            schedule_generate()
+
 def main():
-    action = apply_args(parse_args())
-    if action == "init":
-        init_layout()
-        return build_index(False)
-    if action == "move":
-        return build_index(True)
-    return build_index(False)
+    apply_args(parse_args())
+    ensure_base_dirs()
+    init_layout()
+    build_index(False)
+    watch_pkg_dir()
+    return 0
 
 if __name__ == "__main__":
     sys.exit(main())
