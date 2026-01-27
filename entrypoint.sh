@@ -44,7 +44,7 @@ nginx
 log "[·] NGINX is running on ${host}:${port}."
 
 log ""
-log "[·] Starting Auto Indexer:"
+log "[·] Starting Auto Indexer with settings:"
 log_table "SERVER URL" "$BASE_URL"
 log_table "AUTO_GENERATE_JSON_PERIOD" "$AUTO_GENERATE_JSON_PERIOD"
 log_table "AUTO_RENAME_PKGS" "$AUTO_RENAME_PKGS"
