@@ -250,7 +250,11 @@ def render_rename(template, data):
             safe[key] = sanitize_filename(title_value)
         else:
             safe[key] = sanitize_filename(str(value))
-    name = template.format_map(safe).strip()
+    try:
+        name = template.format_map(safe).strip()
+    except ValueError as exc:
+        log("error", f"Invalid AUTO_RENAME_TEMPLATE: {exc}. Using fallback.")
+        name = "{title} [{titleid}][{apptype}]".format_map(safe).strip()
     if not name.lower().endswith(".pkg"):
         name = f"{name}.pkg"
     return name
