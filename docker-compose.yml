@@ -1,0 +1,19 @@
+name: homebrew-store-cdn
+
+services:
+  homebrew-store-cdn:
+    build: .
+    image: homebrew-store-cdn:local
+    container_name: homebrew-store-cdn
+    ports:
+      - "8080:80"
+    environment:
+      - BASE_URL=http://192.168.15.69:8080
+      - AUTO_GENERATE_JSON_PERIOD=2
+      - AUTO_RENAME_PKGS=true
+      - AUTO_RENAME_TEMPLATE={title}_[{titleid}]_[{region}]_[{apptype}]_[{version}]
+      - AUTO_RENAME_TITLE_MODE=uppercase
+    volumes:
+      - ./data:/data
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    restart: unless-stopped
