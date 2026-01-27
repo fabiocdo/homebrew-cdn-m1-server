@@ -10,6 +10,8 @@ DEFAULT_AUTO_GENERATE_JSON_PERIOD=2
 DEFAULT_AUTO_RENAME_PKGS="false"
 DEFAULT_AUTO_RENAME_TEMPLATE="{title} [{titleid}][{apptype}]"
 DEFAULT_AUTO_RENAME_TITLE_MODE="none"
+GRAY="$(printf '\033[0;90m')"
+RESET="$(printf '\033[0m')"
 
 # ENVIRONMENT VARIABLES
 use_default_if_unset() {
@@ -50,7 +52,7 @@ format_value() {
   value="$2"
   eval "is_default=\${${var}_IS_DEFAULT-}"
   if [ "$is_default" = "true" ]; then
-    printf "%s (DEFAULT)" "$value"
+    printf "%s %s(DEFAULT)%s" "$value" "$GRAY" "$RESET"
   else
     printf "%s" "$value"
   fi
