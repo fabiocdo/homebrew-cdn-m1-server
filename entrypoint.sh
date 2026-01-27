@@ -26,6 +26,10 @@ clear_console(){
   printf "\033c\n"
 }
 
+log_table() {
+  printf "%-28s %s\n" "$1" "$2"
+}
+
 hostport="${BASE_URL#*://}"
 hostport="${hostport%%/*}"
 host="${hostport%%:*}"
@@ -37,15 +41,14 @@ fi
 clear_console
 log "[·] Starting NGINX..."
 nginx
-log "[·] Started NGINX on ${host}:${port}."
+log "[·] NGINX is running on ${host}:${port}.\n"
 
-log "[·] Starting Auto Indexer:
-SERVER URL: \"$BASE_URL\"
-AUTO_GENERATE_JSON_PERIOD: \"$AUTO_GENERATE_JSON_PERIOD\"
-AUTO_RENAME_PKGS: \"$AUTO_RENAME_PKGS\"
-AUTO_RENAME_TEMPLATE: \"$AUTO_RENAME_TEMPLATE\"
-AUTO_RENAME_TITLE_MODE: \"$AUTO_RENAME_TITLE_MODE\"
-"
+log "[·] Starting Auto Indexer:"
+log_table "SERVER URL" "\"$BASE_URL\""
+log_table "AUTO_GENERATE_JSON_PERIOD" "\"$AUTO_GENERATE_JSON_PERIOD\""
+log_table "AUTO_RENAME_PKGS" "\"$AUTO_RENAME_PKGS\""
+log_table "AUTO_RENAME_TEMPLATE" "\"$AUTO_RENAME_TEMPLATE\""
+log_table "AUTO_RENAME_TITLE_MODE" "\"$AUTO_RENAME_TITLE_MODE\""
 
 exec python3 -u /generate-index.py \
   --base-url "$BASE_URL" \
