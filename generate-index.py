@@ -6,9 +6,21 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 from urllib.parse import quote
 
-BASE_URL = os.environ.get("BASE_URL", "http://127.0.0.1:8080")
+ENV_VARS = {
+    "BASE_URL": os.environ.get("BASE_URL", "http://127.0.0.1:8080"),
+    "AUTO_RENAME_PKGS": os.environ.get("AUTO_RENAME_PKGS", "false").lower() == "true",
+    "AUTO_RENAME_TEMPLATE": os.environ.get(
+        "AUTO_RENAME_TEMPLATE",
+        "{title} [{titleid}][{apptype}]",
+    ),
+    "AUTO_RENAME_TITLE_MODE": os.environ.get("AUTO_RENAME_TITLE_MODE", "none").lower(),
+}
+
+BASE_URL = ENV_VARS["BASE_URL"]
 DATA_DIR = pathlib.Path("/data")
 PKG_DIR = DATA_DIR / "pkg"
 OUT = DATA_DIR / "index.json"
@@ -24,16 +36,26 @@ YELLOW = "\033[0;33m"
 RED = "\033[0;31m"
 PINK = "\033[1;95m"
 RESET = "\033[0m"
-RUN_MODE = os.environ.get("RUN_MODE", "full")
 CACHE_PATH = CACHE_DIR / "index-cache.json"
-AUTO_RENAME_PKGS = os.environ.get("AUTO_RENAME_PKGS", "false").lower() == "true"
-AUTO_RENAME_TEMPLATE = os.environ.get(
-    "AUTO_RENAME_TEMPLATE",
-    "{title} [{titleid}][{apptype}]",
-)
-AUTO_RENAME_TITLE_MODE = os.environ.get("AUTO_RENAME_TITLE_MODE", "none").lower()
+AUTO_RENAME_PKGS = ENV_VARS["AUTO_RENAME_PKGS"]
+AUTO_RENAME_TEMPLATE = ENV_VARS["AUTO_RENAME_TEMPLATE"]
+AUTO_RENAME_TITLE_MODE = ENV_VARS["AUTO_RENAME_TITLE_MODE"]
+AUTO_GENERATE_JSON_PERIOD = float(os.environ.get("AUTO_GENERATE_JSON_PERIOD", "2"))
 
-apps = []
+def init_structure():
+    for apptype_dir in APPTYPE_DIRS:
+        apptype_path = PKG_DIR / apptype_dir
+        if not apptype_path.exists():
+            apptype_path.mkdir(parents=True, exist_ok=True)
+            log("created", f"Created PKG directory {apptype_path}")
+    if not APP_DIR.exists():
+        APP_DIR.mkdir(parents=True, exist_ok=True)
+        log("created", f"Created PKG directory {APP_DIR}")
+
+    marker_path = PKG_DIR / "_PUT_YOUR_PKGS_HERE"
+    if not marker_path.exists():
+        marker_path.write_text("Place PKG files in this directory or its subfolders.\n")
+        log("created", f"Created marker file {marker_path}")
 
 def log(action, message):
     if action == "created":
@@ -364,138 +386,210 @@ def read_icon_bytes(pkg_path, icon_entry):
     except Exception:
         return None
 
-if RUN_MODE == "init":
-    for apptype_dir in APPTYPE_DIRS:
-        apptype_path = PKG_DIR / apptype_dir
-        if not apptype_path.exists():
-            apptype_path.mkdir(parents=True, exist_ok=True)
-            log("created", f"Created PKG directory {apptype_path}")
-    if not APP_DIR.exists():
-        APP_DIR.mkdir(parents=True, exist_ok=True)
-        log("created", f"Created PKG directory {APP_DIR}")
+def generate_index(run_mode):
+    cache = load_cache()
+    new_cache_pkgs = {}
+    duplicate_found = False
+    apps = []
 
-    marker_path = PKG_DIR / "_PUT_YOUR_PKGS_HERE"
-    if not marker_path.exists():
-        marker_path.write_text("Place PKG files in this directory or its subfolders.\n")
-        log("created", f"Created marker file {marker_path}")
-
-cache = load_cache()
-new_cache_pkgs = {}
-duplicate_found = False
-
-for pkg in PKG_DIR.rglob("*.pkg"):
-    if any(part.startswith("_") for part in pkg.parts):
-        continue
-    rel_pre = pkg.relative_to(PKG_DIR).as_posix()
-    try:
-        stat = pkg.stat()
-    except Exception:
-        continue
-
-    cache_entry = cache["pkgs"].get(rel_pre)
-    cache_hit = (
-        cache_entry
-        and cache_entry.get("size") == stat.st_size
-        and cache_entry.get("mtime") == stat.st_mtime
-        and isinstance(cache_entry.get("data"), dict)
-    )
-
-    if cache_hit:
-        data = cache_entry["data"]
-        icon_entry = cache_entry.get("icon_entry")
-    else:
-        info, icon_entry = read_pkg_info(pkg)
-        data = build_data(info, pkg)
-        cache_entry = {
-            "size": stat.st_size,
-            "mtime": stat.st_mtime,
-            "data": data,
-            "icon_entry": icon_entry,
-        }
-
-    title = data["title"]
-    titleid = data["titleid"]
-    version = data["version"]
-    base_category = data.get("category")
-    apptype = data["apptype"]
-    region = data.get("region")
-
-    target_path = build_target_path(
-        pkg,
-        apptype,
-        title,
-        titleid,
-        region,
-        version,
-        base_category,
-        data.get("content_id"),
-        data.get("app_type"),
-    )
-    if target_path.exists() and target_path.resolve() != pkg.resolve():
-        log("error", f"Duplicate target exists, skipping: {target_path}")
-        duplicate_found = True
-        continue
-    if target_path.resolve() != pkg.resolve():
-        target_path.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            shutil.move(str(pkg), str(target_path))
-            if target_path.name != pkg.name:
-                log("modified", f"Renamed PKG to {target_path}")
-            pkg = target_path
-        except Exception as e:
-            log("error", f"Error moving PKG to {target_path}: {e}")
+    for pkg in PKG_DIR.rglob("*.pkg"):
+        if any(part.startswith("_") for part in pkg.parts):
             continue
-    rel = pkg.relative_to(PKG_DIR).as_posix()
-    new_cache_pkgs[rel] = cache_entry
+        rel_pre = pkg.relative_to(PKG_DIR).as_posix()
+        try:
+            stat = pkg.stat()
+        except Exception:
+            continue
 
-    if RUN_MODE == "move":
-        continue
+        cache_entry = cache["pkgs"].get(rel_pre)
+        cache_hit = (
+            cache_entry
+            and cache_entry.get("size") == stat.st_size
+            and cache_entry.get("mtime") == stat.st_mtime
+            and isinstance(cache_entry.get("data"), dict)
+        )
 
-    if APP_DIR in pkg.parents:
-        apptype = "app"
-        category = "ap"
-    else:
-        category = base_category
+        if cache_hit:
+            data = cache_entry["data"]
+            icon_entry = cache_entry.get("icon_entry")
+        else:
+            info, icon_entry = read_pkg_info(pkg)
+            data = build_data(info, pkg)
+            cache_entry = {
+                "size": stat.st_size,
+                "mtime": stat.st_mtime,
+                "data": data,
+                "icon_entry": icon_entry,
+            }
 
-    MEDIA_DIR.mkdir(parents=True, exist_ok=True)
-    icon_out = MEDIA_DIR / f"{titleid}.png"
-    if icon_entry is not None and not icon_out.exists():
-        icon_bytes = read_icon_bytes(pkg, icon_entry)
-        if icon_bytes:
-            icon_out.write_bytes(icon_bytes)
-            log("created", f"Extracted: {titleid} PKG icon to {icon_out}")
+        title = data["title"]
+        titleid = data["titleid"]
+        version = data["version"]
+        base_category = data.get("category")
+        apptype = data["apptype"]
+        region = data.get("region")
 
-    pkg_rel = pkg.relative_to(PKG_DIR).as_posix()
-    pkg_url = f"{BASE_URL}/pkg/{quote(pkg_rel, safe='/')}"
-    icon_url = f"{BASE_URL}/_media/{quote(f'{titleid}.png')}"
+        target_path = build_target_path(
+            pkg,
+            apptype,
+            title,
+            titleid,
+            region,
+            version,
+            base_category,
+            data.get("content_id"),
+            data.get("app_type"),
+        )
+        if target_path.exists() and target_path.resolve() != pkg.resolve():
+            log("error", f"Duplicate target exists, skipping: {target_path}")
+            duplicate_found = True
+            continue
+        if target_path.resolve() != pkg.resolve():
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                shutil.move(str(pkg), str(target_path))
+                if target_path.name != pkg.name:
+                    log("modified", f"Renamed PKG to {target_path}")
+                pkg = target_path
+            except Exception as e:
+                log("error", f"Error moving PKG to {target_path}: {e}")
+                continue
+        rel = pkg.relative_to(PKG_DIR).as_posix()
+        new_cache_pkgs[rel] = cache_entry
 
-    app = {
-        "id": titleid,
-        "name": title,
-        "version": version,
-        "apptype": apptype,
-        "pkg": pkg_url,
-        "icon": icon_url
-    }
-    if category:
-        app["category"] = category
-    if region:
-        app["region"] = region
-    apps.append(app)
+        if run_mode == "move":
+            continue
 
-if RUN_MODE == "move":
+        if APP_DIR in pkg.parents:
+            apptype = "app"
+            category = "ap"
+        else:
+            category = base_category
+
+        MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+        icon_out = MEDIA_DIR / f"{titleid}.png"
+        if icon_entry is not None and not icon_out.exists():
+            icon_bytes = read_icon_bytes(pkg, icon_entry)
+            if icon_bytes:
+                icon_out.write_bytes(icon_bytes)
+                log("created", f"Extracted: {titleid} PKG icon to {icon_out}")
+
+        pkg_rel = pkg.relative_to(PKG_DIR).as_posix()
+        pkg_url = f"{BASE_URL}/pkg/{quote(pkg_rel, safe='/')}"
+        icon_url = f"{BASE_URL}/_media/{quote(f'{titleid}.png')}"
+
+        app = {
+            "id": titleid,
+            "name": title,
+            "version": version,
+            "apptype": apptype,
+            "pkg": pkg_url,
+            "icon": icon_url
+        }
+        if category:
+            app["category"] = category
+        if region:
+            app["region"] = region
+        apps.append(app)
+
     cache["pkgs"] = new_cache_pkgs
+    if run_mode == "move":
+        if duplicate_found:
+            return 2
+        return 0
+
     if duplicate_found:
-        sys.exit(2)
-    sys.exit(0)
+        return 0
 
-if duplicate_found:
-    sys.exit(0)
+    save_cache(cache)
 
-cache["pkgs"] = new_cache_pkgs
-save_cache(cache)
+    with open(OUT, "w") as f:
+        json.dump({"apps": apps}, f, indent=2)
 
-with open(OUT, "w") as f:
-    json.dump({"apps": apps}, f, indent=2)
+    log("created", "Generated: index.json")
+    return 0
 
-log("created", "Generated: index.json")
+
+def watch_pkgs():
+    last_moved_from = ""
+    debounce_timer = None
+
+    def schedule_generate():
+        nonlocal debounce_timer
+        if debounce_timer is not None:
+            debounce_timer.cancel()
+        debounce_timer = threading.Timer(AUTO_GENERATE_JSON_PERIOD, generate_after_wait)
+        debounce_timer.daemon = True
+        debounce_timer.start()
+
+    def generate_after_wait():
+        log("info", "Generating index.json...")
+        generate_index("full")
+
+    try:
+        process = subprocess.Popen(
+            [
+                "inotifywait",
+                "-m",
+                "-r",
+                "-e",
+                "create",
+                "-e",
+                "delete",
+                "-e",
+                "move",
+                "-e",
+                "close_write",
+                "--format",
+                "%w%f|%e",
+                str(PKG_DIR),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
+    except FileNotFoundError:
+        log("error", "inotifywait not found. Is inotify-tools installed?")
+        return 1
+
+    if process.stdout is None:
+        log("error", "Failed to start inotifywait.")
+        return 1
+
+    for line in process.stdout:
+        line = line.strip()
+        if not line or "|" not in line:
+            continue
+        path, events = line.split("|", 1)
+        if "MOVED_FROM" in events:
+            last_moved_from = path
+            continue
+
+        if "MOVED_TO" in events:
+            if last_moved_from:
+                log("modified", f"Moved: {last_moved_from} -> {path}")
+                last_moved_from = ""
+            else:
+                log("modified", f"Moved: {path}")
+        elif "DELETE" in events:
+            log("deleted", f"Change detected: {events} {path}")
+        elif "CREATE" in events:
+            log("created", f"Change detected: {events} {path}")
+        else:
+            log("modified", f"Change detected: {events} {path}")
+
+        if generate_index("move") == 0:
+            schedule_generate()
+
+    return 0
+
+
+def main():
+    init_structure()
+    log("info", "Generating index.json...")
+    generate_index("full")
+    return watch_pkgs()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

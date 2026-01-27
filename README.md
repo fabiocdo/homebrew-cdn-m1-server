@@ -30,6 +30,7 @@ docker run -d \
   -e AUTO_RENAME_TEMPLATE="{title} [{titleid}][{apptype}]" \
   -e AUTO_RENAME_TITLE_MODE=none \
   -v ./data:/data \
+  -v ./nginx.conf:/etc/nginx/nginx.conf:ro \
   fabiocdo/homebrew-store-cdn:latest
 ```
 
@@ -52,6 +53,7 @@ services:
       - AUTO_RENAME_TITLE_MODE=none
     volumes:
       - ./data:/data
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
     restart: unless-stopped
 ```
 
@@ -63,22 +65,31 @@ docker compose up -d
 
 ### Option C: Build locally
 
-1) Edit `.env` (see example folder):
-
-```
-BASE_URL=http://<YOUR_SERVER_IP_ADDRESS>
-CDN_DATA_DIR=<PATH_TO_HOST_DATA_DIRECTORY>
-AUTO_GENERATE_JSON_PERIOD=2
-AUTO_RENAME_PKGS=false
-AUTO_RENAME_TEMPLATE={title} [{titleid}][{apptype}]
-AUTO_RENAME_TITLE_MODE=none
-```
+1) Edit the `environment:` and `volumes:` sections in your `docker-compose.yml`
+   (see example folder).
 
 2) Build and run:
 
 ```bash
 docker compose build
 docker compose up -d
+```
+
+### Option D: Run locally using the example compose file
+
+1) Copy the example compose file to the repo root:
+
+```bash
+cp example/docker-compose.yml ./docker-compose.yml
+```
+
+2) Edit the `environment:` and `volumes:` sections in `docker-compose.yml`
+   if needed.
+
+3) Build and run:
+
+```bash
+docker compose up -d --build
 ```
 
 Open:
@@ -166,11 +177,21 @@ Fields:
 | `AUTO_RENAME_TEMPLATE` | Template using `{title}`, `{titleid}`, `{region}`, `{apptype}`, `{version}`, `{category}`, `{content_id}`, `{app_type}`. | `{title} [{titleid}][{apptype}]` |
 | `AUTO_RENAME_TITLE_MODE` | Title transform mode for `{title}`: `none`, `uppercase`, `lowercase`, `capitalize`. | `none` |
 
+## Volume config
+
+| Volume | Description | Default |
+| --- | --- | --- |
+| `./data:/data` | Host data directory mapped to `/data`. | `./data` |
+| `./nginx.conf:/etc/nginx/nginx.conf:ro` | External Nginx config mounted read-only. | `./nginx.conf` |
+
 ## Nginx behavior
 
 - Serves `/data` directly.
 - Adds cache headers for `.pkg`, `.zip`, and image files.
 - Supports HTTP range requests for large downloads.
+  
+If you want to provide your own `nginx.conf`, mount it to `/etc/nginx/nginx.conf:ro`
+as shown in the quick start examples.
 
 ## Troubleshooting
 
