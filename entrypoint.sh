@@ -51,7 +51,7 @@ initialize_dir(){
     initialized_any="true"
   fi
   if [ "$initialized_any" != "true" ]; then
-    log "[·] Nothing to initialize."
+    log "[·] Great! Nothing to initialize!"
   fi
 }
 
