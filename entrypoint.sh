@@ -41,14 +41,16 @@ fi
 clear_console
 log "[·] Starting NGINX..."
 nginx
-log "[·] NGINX is running on ${host}:${port}.\n"
+log "[·] NGINX is running on ${host}:${port}."
 
+log ""
 log "[·] Starting Auto Indexer:"
 log_table "SERVER URL" "\"$BASE_URL\""
 log_table "AUTO_GENERATE_JSON_PERIOD" "\"$AUTO_GENERATE_JSON_PERIOD\""
 log_table "AUTO_RENAME_PKGS" "\"$AUTO_RENAME_PKGS\""
 log_table "AUTO_RENAME_TEMPLATE" "\"$AUTO_RENAME_TEMPLATE\""
 log_table "AUTO_RENAME_TITLE_MODE" "\"$AUTO_RENAME_TITLE_MODE\""
+log ""
 
 exec python3 -u /generate-index.py \
   --base-url "$BASE_URL" \
