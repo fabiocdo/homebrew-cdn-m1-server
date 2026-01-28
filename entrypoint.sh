@@ -161,12 +161,12 @@ build_content_lines_colored() {
   echo ""
   echo "$(format_kv_colored \
     "AUTO_MOVER_ENABLED" \
-    "$(color_value "AUTO_MOVER_ENABLED" "\033[1;93m")" \
-    "$(color_value "$(format_value AUTO_MOVER_ENABLED "$AUTO_MOVER_ENABLED")" "\033[1;93m")")"
+    "$(color_value "AUTO_MOVER_ENABLED" "\033[0;93m")" \
+    "$(color_value "$(format_value AUTO_MOVER_ENABLED "$AUTO_MOVER_ENABLED")" "\033[0;93m")")"
   echo "$(format_kv_colored \
     "AUTO_MOVER_EXCLUDED_DIRS" \
-    "$(color_value "AUTO_MOVER_EXCLUDED_DIRS" "\033[1;93m")" \
-    "$(color_value "$(format_value AUTO_MOVER_EXCLUDED_DIRS "$AUTO_MOVER_EXCLUDED_DIRS")" "\033[1;93m")")"
+    "$(color_value "AUTO_MOVER_EXCLUDED_DIRS" "\033[0;93m")" \
+    "$(color_value "$(format_value AUTO_MOVER_EXCLUDED_DIRS "$AUTO_MOVER_EXCLUDED_DIRS")" "\033[0;93m")")"
   echo ""
 }
 
