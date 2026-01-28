@@ -153,7 +153,7 @@ def apply(dry_result):
             touched_paths.extend([source, str(target)])
             log(
                 "warn",
-                "Quarantined file due to name conflict",
+                f"Moved file with error to {settings.DATA_DIR / '_errors'}",
                 module="AUTO_MOVER",
             )
     return {"moved": moved, "errors": errors, "touched_paths": touched_paths, "quarantined_paths": quarantined}
