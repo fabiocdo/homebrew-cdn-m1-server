@@ -5,10 +5,9 @@ import time
 LOGGER = logging.getLogger()
 COLORS = {
     "debug": "\033[0;90m",
-    "info": "\033[0;37m",
+    "info": "\033[0m",
     "warn": "\033[0;33m",
     "error": "\033[0;31m",
-    "default": "\033[0m",
 }
 LOG_LEVELS = {
     "debug": logging.DEBUG,
@@ -51,7 +50,7 @@ else:
 def log(action, message, module=None):
     level = LOG_LEVELS.get(action, logging.INFO)
     prefix = LOG_PREFIXES.get(action, "[*]")
-    color = COLORS.get(action, COLORS["default"])
+    color = COLORS.get(action, COLORS["info"])
     module_tag = f"[{module}] " if module else ""
     key = (action, module, message)
     now = time.monotonic()
