@@ -1,4 +1,5 @@
 import logging
+import time
 
 LOGGER = logging.getLogger()
 COLORS = {
@@ -25,6 +26,8 @@ LOG_PREFIXES = {
     "error": "[!]",
     "info": "[·]",
 }
+DEDUPE_WINDOW_SECONDS = 2.0
+_last_log_times = {}
 
 if not LOGGER.handlers:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -38,4 +41,10 @@ def log(action, message, module=None):
     else:
         color = COLORS.get(action, COLORS["default"])
     module_tag = f"[{module}] " if module else ""
+    key = (action, module, message)
+    now = time.monotonic()
+    last = _last_log_times.get(key)
+    if last is not None and (now - last) < DEDUPE_WINDOW_SECONDS:
+        return
+    _last_log_times[key] = now
     LOGGER.log(level, f"{color}{prefix} {module_tag}{message}\033[0m")
