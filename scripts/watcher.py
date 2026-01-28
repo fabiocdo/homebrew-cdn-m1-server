@@ -46,19 +46,13 @@ def watch(on_change):
         return
 
     log("info", f"Starting watcher on {settings.PKG_DIR}")
-    last_moved_from = ""
-
     cmd = [
         "inotifywait",
         "-q",
         "-m",
         "-r",
         "-e",
-        "create",
-        "-e",
         "delete",
-        "-e",
-        "move",
         "-e",
         "close_write",
         "--format",
@@ -83,22 +77,13 @@ def watch(on_change):
             log("info", line)
             continue
         path, events = line.split("|", 1)
-        if "MOVED_FROM" in events:
-            last_moved_from = path
-            continue
-        if "MOVED_TO" in events:
-            if last_moved_from:
-                last_moved_from = ""
+        if "DELETE" in events:
+            log("deleted", f"Deleted: {path}")
             on_change(schedule_index=True)
             continue
-        if "CREATE" in events or "DELETE" in events:
-            if "DELETE" in events:
-                log("deleted", f"Deleted: {path}")
-            else:
-                log("created", f"Created: {path}")
+        if "CLOSE_WRITE" in events:
             on_change(schedule_index=True)
             continue
-        on_change(schedule_index=True)
 
 
 def start():
