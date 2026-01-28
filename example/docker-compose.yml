@@ -11,7 +11,7 @@ services:
       - BASE_URL=http://127.0.0.1:8080
       - PKG_WATCHER_ENABLED=true
       - AUTO_INDEXER_ENABLED=true
-      - AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=2
+      - AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=3
       - AUTO_RENAMER_ENABLED=false
       - AUTO_RENAMER_TEMPLATE={title} [{titleid}][{apptype}]
       - AUTO_RENAMER_MODE=none

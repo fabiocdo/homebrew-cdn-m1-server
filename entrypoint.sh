@@ -8,7 +8,7 @@ export TERM
 DEFAULT_BASE_URL="http://127.0.0.1:8080"
 DEFAULT_PKG_WATCHER_ENABLED="true"
 DEFAULT_AUTO_INDEXER_ENABLED="true"
-DEFAULT_AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=2
+DEFAULT_AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=3
 DEFAULT_AUTO_RENAMER_ENABLED="false"
 DEFAULT_AUTO_RENAMER_TEMPLATE="{title} [{titleid}][{apptype}]"
 DEFAULT_AUTO_RENAMER_MODE="none"
@@ -129,13 +129,17 @@ log ""
 initialize_dir
 
 log ""
-exec python3 -u /scripts/watcher.py \
-  --base-url "$BASE_URL" \
-  --pkg-watcher-enabled "$PKG_WATCHER_ENABLED" \
-  --auto-indexer-enabled "$AUTO_INDEXER_ENABLED" \
-  --auto-indexer-debounce-time-seconds "$AUTO_INDEXER_DEBOUNCE_TIME_SECONDS" \
-  --auto-renamer-enabled "$AUTO_RENAMER_ENABLED" \
-  --auto-renamer-template "$AUTO_RENAMER_TEMPLATE" \
-  --auto-renamer-mode "$AUTO_RENAMER_MODE" \
-  --auto-mover-enabled "$AUTO_MOVER_ENABLED" \
-  --auto-mover-excluded-dirs "$AUTO_MOVER_EXCLUDED_DIRS"
+if [ "$PKG_WATCHER_ENABLED" = "true" ]; then
+  exec python3 -u /scripts/watcher.py \
+    --base-url "$BASE_URL" \
+    --pkg-watcher-enabled "$PKG_WATCHER_ENABLED" \
+    --auto-indexer-enabled "$AUTO_INDEXER_ENABLED" \
+    --auto-indexer-debounce-time-seconds "$AUTO_INDEXER_DEBOUNCE_TIME_SECONDS" \
+    --auto-renamer-enabled "$AUTO_RENAMER_ENABLED" \
+    --auto-renamer-template "$AUTO_RENAMER_TEMPLATE" \
+    --auto-renamer-mode "$AUTO_RENAMER_MODE" \
+    --auto-mover-enabled "$AUTO_MOVER_ENABLED" \
+    --auto-mover-excluded-dirs "$AUTO_MOVER_EXCLUDED_DIRS"
+fi
+log "[·] PKG watcher disabled; No PKG will be modified automatically."
+exec tail -f /dev/null

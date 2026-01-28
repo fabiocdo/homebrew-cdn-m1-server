@@ -27,7 +27,7 @@ docker run -d \
   -e BASE_URL=http://127.0.0.1:8080 \
   -e PKG_WATCHER_ENABLED=true \
   -e AUTO_INDEXER_ENABLED=true \
-  -e AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=2 \
+  -e AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=3 \
   -e AUTO_RENAMER_ENABLED=false \
   -e AUTO_RENAMER_TEMPLATE="{title} [{titleid}][{apptype}]" \
   -e AUTO_RENAMER_MODE=none \
@@ -53,7 +53,7 @@ services:
       - BASE_URL=http://127.0.0.1:8080
       - PKG_WATCHER_ENABLED=true
       - AUTO_INDEXER_ENABLED=true
-      - AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=2
+      - AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=3
       - AUTO_RENAMER_ENABLED=false
       - AUTO_RENAMER_TEMPLATE={title} [{titleid}][{apptype}]
       - AUTO_RENAMER_MODE=none
@@ -184,7 +184,7 @@ Fields:
 | `CDN_DATA_DIR`              | Host path mapped to `/data`.                                                                                             | `./data`                         |
 | `PKG_WATCHER_ENABLED` | Master switch for watcher-driven automations (rename, move, index).                                                   | `true`                           |
 | `AUTO_INDEXER_ENABLED`      | Enable auto-generated `index.json` and cache updates.                                                                    | `true`                           |
-| `AUTO_INDEXER_DEBOUNCE_TIME_SECONDS` | Delay (seconds) before regenerating `index.json` after changes.                                              | `2`                              |
+| `AUTO_INDEXER_DEBOUNCE_TIME_SECONDS` | Delay (seconds) before regenerating `index.json` after changes.                                              | `3`                              |
 | `AUTO_RENAMER_ENABLED`      | Enable PKG rename using `AUTO_RENAMER_TEMPLATE`.                                                                         | `false`                          |
 | `AUTO_RENAMER_TEMPLATE`     | Template using `{title}`, `{titleid}`, `{region}`, `{apptype}`, `{version}`, `{category}`, `{content_id}`, `{app_type}`. | `{title} [{titleid}][{apptype}]` |
 | `AUTO_RENAMER_MODE`         | Title transform mode for `{title}`: `none`, `uppercase`, `lowercase`, `capitalize`.                                      | `none`                           |

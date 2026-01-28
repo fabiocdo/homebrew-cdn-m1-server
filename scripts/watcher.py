@@ -108,9 +108,6 @@ def watch(on_change):
 def start():
     """Entry point for the indexer watcher."""
     parse_settings()
-    if not settings.PKG_WATCHER_ENABLED:
-        log("info", "Automation watcher disabled.")
-        return
     debounce_timer = None
     last_event_at = None
 
