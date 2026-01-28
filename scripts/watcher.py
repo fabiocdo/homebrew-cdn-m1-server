@@ -1,6 +1,7 @@
 import argparse
 import shutil
 import subprocess
+import time
 
 import settings
 from auto_indexer import run as run_indexer
