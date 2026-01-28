@@ -121,10 +121,7 @@ def dry_run(pkgs):
     return {
         "plan": plan,
         "blocked_sources": [str(path) for path in (blocked_sources | excluded_sources)],
-        "blocked_targets": [str(path) for path in blocked],
-        "conflicted_targets": [str(path) for path in conflicted],
-        "skipped_existing": len(blocked),
-        "skipped_conflicts": len(conflicted),
+        "skipped_conflict": [str(path) for path in (blocked | conflicted)],
         "skipped_excluded": len(excluded_sources),
     }
 
@@ -145,16 +142,10 @@ def apply(dry_result):
             "Renamed: " + "; ".join(f"{src} -> {dest}" for src, dest in renamed),
             module="AUTO_RENAMER",
         )
-    for target in dry_result.get("blocked_targets", []):
+    for target in dry_result.get("skipped_conflict", []):
         log(
             "warn",
-            f"Skipped rename. {target} target already exists",
-            module="AUTO_RENAMER",
-        )
-    for target in dry_result.get("conflicted_targets", []):
-        log(
-            "warn",
-            f"Skipped rename. {target} conflicting target",
+            "Skipped rename. A file with the same name already exists in the target directory",
             module="AUTO_RENAMER",
         )
 

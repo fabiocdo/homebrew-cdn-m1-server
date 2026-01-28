@@ -7,9 +7,8 @@ from utils.log_utils import log
 def dry_run(pkgs, skip_paths=None):
     """Plan moves and report which entries can be moved."""
     plan = []
-    skipped_existing = []
+    skipped_conflict = []
     skipped_excluded = []
-    skipped_combined = []
     skip_set = {str(path) for path in (skip_paths or [])}
 
     excluded = set()
@@ -38,18 +37,16 @@ def dry_run(pkgs, skip_paths=None):
             skipped_excluded.append(str(pkg))
             continue
         if str(pkg) in skip_set:
-            skipped_combined.append((str(pkg), str(target_path)))
             continue
         if target_path.exists():
-            skipped_existing.append(str(target_path))
+            skipped_conflict.append(str(target_path))
             continue
         plan.append((pkg, target_path))
 
     return {
         "plan": plan,
-        "skipped_existing": skipped_existing,
+        "skipped_conflict": skipped_conflict,
         "skipped_excluded": skipped_excluded,
-        "skipped_combined": skipped_combined,
     }
 
 
@@ -70,16 +67,10 @@ def apply(dry_result):
             "Moved: " + "; ".join(f"{src} -> {dest}" for src, dest in moved),
             module="AUTO_MOVER",
         )
-    for target in dry_result.get("skipped_existing", []):
+    for target in dry_result.get("skipped_conflict", []):
         log(
             "warn",
-            f"Skipped move. {target} target already exists",
-            module="AUTO_MOVER",
-        )
-    for source, target in dry_result.get("skipped_combined", []):
-        log(
-            "warn",
-            f"Skipped move. {source} -> {target} blocked by renamer",
+            "Skipped move. A file with the same name already exists in the target directory",
             module="AUTO_MOVER",
         )
     if errors:
