@@ -49,6 +49,7 @@ def watch(on_change):
 
     cmd = [
         "inotifywait",
+        "-q",
         "-m",
         "-r",
         "-e",
