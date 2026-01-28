@@ -6,9 +6,9 @@ export TERM
 
 # DEFAULT ENVIRONMENT VARIABLES
 DEFAULT_BASE_URL="http://127.0.0.1:8080"
+DEFAULT_LOG_LEVEL="info"
 DEFAULT_PKG_WATCHER_ENABLED="true"
 DEFAULT_AUTO_INDEXER_ENABLED="true"
-DEFAULT_LOG_LEVEL="info"
 DEFAULT_AUTO_RENAMER_ENABLED="false"
 DEFAULT_AUTO_RENAMER_TEMPLATE="{title} [{titleid}][{apptype}]"
 DEFAULT_AUTO_RENAMER_MODE="none"
@@ -27,14 +27,14 @@ use_default_if_unset() {
 }
 
 use_default_if_unset BASE_URL "$DEFAULT_BASE_URL"
+use_default_if_unset LOG_LEVEL "$DEFAULT_LOG_LEVEL"
 use_default_if_unset PKG_WATCHER_ENABLED "$DEFAULT_PKG_WATCHER_ENABLED"
 use_default_if_unset AUTO_INDEXER_ENABLED "$DEFAULT_AUTO_INDEXER_ENABLED"
-use_default_if_unset LOG_LEVEL "$DEFAULT_LOG_LEVEL"
 use_default_if_unset AUTO_RENAMER_ENABLED "$DEFAULT_AUTO_RENAMER_ENABLED"
-use_default_if_unset AUTO_RENAMER_TEMPLATE "$DEFAULT_AUTO_RENAMER_TEMPLATE"
-use_default_if_unset AUTO_RENAMER_MODE "$DEFAULT_AUTO_RENAMER_MODE"
-use_default_if_unset AUTO_RENAMER_EXCLUDED_DIRS "$DEFAULT_AUTO_RENAMER_EXCLUDED_DIRS"
 use_default_if_unset AUTO_MOVER_ENABLED "$DEFAULT_AUTO_MOVER_ENABLED"
+use_default_if_unset AUTO_RENAMER_MODE "$DEFAULT_AUTO_RENAMER_MODE"
+use_default_if_unset AUTO_RENAMER_TEMPLATE "$DEFAULT_AUTO_RENAMER_TEMPLATE"
+use_default_if_unset AUTO_RENAMER_EXCLUDED_DIRS "$DEFAULT_AUTO_RENAMER_EXCLUDED_DIRS"
 use_default_if_unset AUTO_MOVER_EXCLUDED_DIRS "$DEFAULT_AUTO_MOVER_EXCLUDED_DIRS"
 
 # CDN PATHs
@@ -118,14 +118,14 @@ log "NGINX is running on ${host}:${port}"
 log ""
 log "Starting Auto Indexer with settings:"
 log_table "BASE_URL" "$(format_value BASE_URL "$BASE_URL")"
+log_table "LOG_LEVEL" "$(format_value LOG_LEVEL "$LOG_LEVEL")"
 log_table "PKG_WATCHER_ENABLED" "$(format_value PKG_WATCHER_ENABLED "$PKG_WATCHER_ENABLED")"
 log_table "AUTO_INDEXER_ENABLED" "$(format_value AUTO_INDEXER_ENABLED "$AUTO_INDEXER_ENABLED")"
-log_table "LOG_LEVEL" "$(format_value LOG_LEVEL "$LOG_LEVEL")"
 log_table "AUTO_RENAMER_ENABLED" "$(format_value AUTO_RENAMER_ENABLED "$AUTO_RENAMER_ENABLED")"
-log_table "AUTO_RENAMER_TEMPLATE" "$(format_value AUTO_RENAMER_TEMPLATE "$AUTO_RENAMER_TEMPLATE")"
-log_table "AUTO_RENAMER_MODE" "$(format_value AUTO_RENAMER_MODE "$AUTO_RENAMER_MODE")"
-log_table "AUTO_RENAMER_EXCLUDED_DIRS" "$(format_value AUTO_RENAMER_EXCLUDED_DIRS "$AUTO_RENAMER_EXCLUDED_DIRS")"
 log_table "AUTO_MOVER_ENABLED" "$(format_value AUTO_MOVER_ENABLED "$AUTO_MOVER_ENABLED")"
+log_table "AUTO_RENAMER_MODE" "$(format_value AUTO_RENAMER_MODE "$AUTO_RENAMER_MODE")"
+log_table "AUTO_RENAMER_TEMPLATE" "$(format_value AUTO_RENAMER_TEMPLATE "$AUTO_RENAMER_TEMPLATE")"
+log_table "AUTO_RENAMER_EXCLUDED_DIRS" "$(format_value AUTO_RENAMER_EXCLUDED_DIRS "$AUTO_RENAMER_EXCLUDED_DIRS")"
 log_table "AUTO_MOVER_EXCLUDED_DIRS" "$(format_value AUTO_MOVER_EXCLUDED_DIRS "$AUTO_MOVER_EXCLUDED_DIRS")"
 log ""
 
@@ -135,13 +135,14 @@ log ""
 if [ "$PKG_WATCHER_ENABLED" = "true" ]; then
   exec python3 -u /scripts/watcher.py \
     --base-url "$BASE_URL" \
+    --log-level "$LOG_LEVEL" \
     --pkg-watcher-enabled "$PKG_WATCHER_ENABLED" \
     --auto-indexer-enabled "$AUTO_INDEXER_ENABLED" \
     --auto-renamer-enabled "$AUTO_RENAMER_ENABLED" \
-    --auto-renamer-template "$AUTO_RENAMER_TEMPLATE" \
-    --auto-renamer-mode "$AUTO_RENAMER_MODE" \
-    --auto-renamer-excluded-dirs "$AUTO_RENAMER_EXCLUDED_DIRS" \
     --auto-mover-enabled "$AUTO_MOVER_ENABLED" \
+    --auto-renamer-mode "$AUTO_RENAMER_MODE" \
+    --auto-renamer-template "$AUTO_RENAMER_TEMPLATE" \
+    --auto-renamer-excluded-dirs "$AUTO_RENAMER_EXCLUDED_DIRS" \
     --auto-mover-excluded-dirs "$AUTO_MOVER_EXCLUDED_DIRS"
 fi
 log "PKG watcher is disabled."

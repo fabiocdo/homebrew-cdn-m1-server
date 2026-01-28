@@ -24,6 +24,7 @@ CACHE_PATH = CACHE_DIR / "index-cache.json"
 
 # Runtime config (set by auto_indexer.py)
 BASE_URL = None
+LOG_LEVEL = None
 PKG_WATCHER_ENABLED = None
 AUTO_INDEXER_ENABLED = None
 AUTO_RENAMER_ENABLED = None
@@ -36,15 +37,16 @@ AUTO_MOVER_EXCLUDED_DIRS = None
 # CLI Arguments
 CLI_ARGS = [
     ("--base-url", {"required": True}),
+    ("--log-level", {"required": True}),
     ("--pkg-watcher-enabled", {"required": True}),
     ("--auto-indexer-enabled", {"required": True}),
     ("--auto-renamer-enabled", {"required": True}),
+    ("--auto-mover-enabled", {"required": True}),
     ("--auto-renamer-template", {"required": True}),
     (
         "--auto-renamer-mode",
         {"required": True, "choices": ["none", "uppercase", "lowercase", "capitalize"]},
     ),
     ("--auto-renamer-excluded-dirs", {"required": True}),
-    ("--auto-mover-enabled", {"required": True}),
     ("--auto-mover-excluded-dirs", {"required": True}),
 ]

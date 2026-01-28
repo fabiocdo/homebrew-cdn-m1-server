@@ -9,14 +9,14 @@ services:
       - "8080:80"
     environment:
       - BASE_URL=http://127.0.0.1:8080
+      - LOG_LEVEL=debug
       - PKG_WATCHER_ENABLED=true
       - AUTO_INDEXER_ENABLED=true
-      - LOG_LEVEL=debug
       - AUTO_RENAMER_ENABLED=false
-      - AUTO_RENAMER_TEMPLATE={title} [{titleid}][{apptype}]
-      - AUTO_RENAMER_MODE=none
-      - AUTO_RENAMER_EXCLUDED_DIRS=app
       - AUTO_MOVER_ENABLED=true
+      - AUTO_RENAMER_MODE=none
+      - AUTO_RENAMER_TEMPLATE={title} [{titleid}][{apptype}]
+      - AUTO_RENAMER_EXCLUDED_DIRS=app
       - AUTO_MOVER_EXCLUDED_DIRS=app
     volumes:
       - ./data:/data

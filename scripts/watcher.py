@@ -26,6 +26,7 @@ def parse_settings():
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
     settings.BASE_URL = args.base_url
+    settings.LOG_LEVEL = args.log_level
     settings.PKG_WATCHER_ENABLED = parse_bool(args.pkg_watcher_enabled)
     settings.AUTO_RENAMER_ENABLED = parse_bool(args.auto_renamer_enabled)
     settings.AUTO_RENAMER_TEMPLATE = args.auto_renamer_template
