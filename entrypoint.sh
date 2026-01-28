@@ -53,7 +53,7 @@ format_value() {
   is_default=""
   eval "is_default=\${${var}_IS_DEFAULT-}"
   if [ "$is_default" = "true" ]; then
-    printf "%s %s(DEFAULT)%s" "$value" "\033[0;90m" "\033[0m"
+    printf "%s %b(DEFAULT)%b" "$value" "\033[0;90m" "\033[0m"
   else
     printf "%s" "$value"
   fi
