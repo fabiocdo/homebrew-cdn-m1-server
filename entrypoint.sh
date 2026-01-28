@@ -1,117 +1,264 @@
 #!/bin/sh
 set -e
 
-PKG_DIR="/data/pkg"
-MEDIA_DIR="/data/_media"
-CACHE_DIR="/data/_cache"
-AUTO_GENERATE_JSON_PERIOD="${AUTO_GENERATE_JSON_PERIOD:-2}"
-GREEN="$(printf '\033[0;32m')"
-YELLOW="$(printf '\033[0;33m')"
-RED="$(printf '\033[0;31m')"
-PINK="$(printf '\033[1;95m')"
-RESET="$(printf '\033[0m')"
+TERM="${TERM:-xterm}"
+export TERM
+
+# DEFAULT ENVIRONMENT VARIABLES
+DEFAULT_BASE_URL="http://127.0.0.1:8080"
+DEFAULT_LOG_LEVEL="info"
+DEFAULT_PKG_WATCHER_ENABLED="true"
+DEFAULT_AUTO_INDEXER_ENABLED="true"
+DEFAULT_AUTO_RENAMER_ENABLED="false"
+DEFAULT_AUTO_RENAMER_TEMPLATE="{title} [{titleid}][{apptype}]"
+DEFAULT_AUTO_RENAMER_MODE="none"
+DEFAULT_AUTO_RENAMER_EXCLUDED_DIRS="app"
+DEFAULT_AUTO_MOVER_ENABLED="true"
+DEFAULT_AUTO_MOVER_EXCLUDED_DIRS="app"
+
+# ENVIRONMENT VARIABLES
+use_default_if_unset() {
+  var="$1"
+  eval "isset=\${$var+x}"
+  if [ -z "$isset" ]; then
+    eval "$var=\$2"
+    eval "${var}_IS_DEFAULT=true"
+  fi
+}
+
+use_default_if_unset BASE_URL "$DEFAULT_BASE_URL"
+use_default_if_unset LOG_LEVEL "$DEFAULT_LOG_LEVEL"
+use_default_if_unset PKG_WATCHER_ENABLED "$DEFAULT_PKG_WATCHER_ENABLED"
+use_default_if_unset AUTO_INDEXER_ENABLED "$DEFAULT_AUTO_INDEXER_ENABLED"
+use_default_if_unset AUTO_RENAMER_ENABLED "$DEFAULT_AUTO_RENAMER_ENABLED"
+use_default_if_unset AUTO_MOVER_ENABLED "$DEFAULT_AUTO_MOVER_ENABLED"
+use_default_if_unset AUTO_RENAMER_MODE "$DEFAULT_AUTO_RENAMER_MODE"
+use_default_if_unset AUTO_RENAMER_TEMPLATE "$DEFAULT_AUTO_RENAMER_TEMPLATE"
+use_default_if_unset AUTO_RENAMER_EXCLUDED_DIRS "$DEFAULT_AUTO_RENAMER_EXCLUDED_DIRS"
+use_default_if_unset AUTO_MOVER_EXCLUDED_DIRS "$DEFAULT_AUTO_MOVER_EXCLUDED_DIRS"
+
+# CDN PATHs
+DATA_DIR="/data"
+PKG_DIR="$DATA_DIR/pkg"
+MEDIA_DIR="$DATA_DIR/_media"
+CACHE_DIR="$DATA_DIR/_cache"
 
 log() {
-  action="$1"
-  shift
-  case "$action" in
-    created)
-      color="$GREEN"
-      prefix="[+]"
-      ;;
-    modified)
-      color="$YELLOW"
-      prefix="[*]"
-      ;;
-    deleted)
-      color="$PINK"
-      prefix="[-]"
-      ;;
-    error)
-      color="$RED"
-      prefix="[!]"
-      ;;
-    info)
-      color="$RESET"
-      prefix="[·]"
-      ;;
-    *)
-      color="$RESET"
-      prefix="[*]"
-      ;;
-  esac
-  printf "%s%s %s%s\n" "$color" "$prefix" "$*" "$RESET"
+  printf "%s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
 }
 
-generate() {
-  log info "Generating index.json..."
-  mkdir -p "$PKG_DIR" "$MEDIA_DIR" "$CACHE_DIR"
-  RUN_MODE=watch python3 /generate-index.py
+COLOR_GREEN="\033[0;92m"
+COLOR_BLUE="\033[1;94m"
+COLOR_YELLOW="\033[1;93m"
+
+clear_console(){
+  printf "\033c\n"
 }
 
-move_only() {
-  RUN_MODE=move python3 /generate-index.py
-  return $?
+format_value() {
+  var="$1"
+  value="$2"
+  is_default=""
+  eval "is_default=\${${var}_IS_DEFAULT-}"
+  value="$(printf "%s" "$value" | tr '[:lower:]' '[:upper:]')"
+  if [ "$is_default" = "true" ]; then
+    printf "%s %b(DEFAULT)%b" "$value" "\033[0;90m" "\033[0m"
+  else
+    printf "%s" "$value"
+  fi
 }
 
-# Initial generation
-mkdir -p "$PKG_DIR" "$MEDIA_DIR" "$CACHE_DIR"
-RUN_MODE=init python3 /generate-index.py
+color_value() {
+  value="$1"
+  color="$2"
+  printf "%b%s%b" "$color" "$value" "\033[0m"
+}
 
-# Automatic watcher
-if [ -d "$PKG_DIR" ]; then
-  last_moved_from=""
-  debounce_pid=""
+strip_ansi() {
+  printf "%s" "$1" | sed 's/\x1B\[[0-9;]*m//g'
+}
 
-  schedule_generate() {
-    if [ -n "$debounce_pid" ] && kill -0 "$debounce_pid" 2>/dev/null; then
-      kill "$debounce_pid" 2>/dev/null || true
-      wait "$debounce_pid" 2>/dev/null || true
+format_kv_plain() {
+  key="$1"
+  value="$2"
+  key_pad=$((BOX_KEY_WIDTH - ${#key}))
+  if [ "$key_pad" -lt 1 ]; then
+    key_pad=1
+  fi
+  printf "%s%*s%s\n" "$key" "$key_pad" "" "$value"
+}
+
+format_kv_colored() {
+  key_plain="$1"
+  key_display="$2"
+  value_display="$3"
+  key_pad=$((BOX_KEY_WIDTH - ${#key_plain}))
+  if [ "$key_pad" -lt 1 ]; then
+    key_pad=1
+  fi
+  printf "%s%*s%s\n" "$key_display" "$key_pad" "" "$value_display"
+}
+
+box_border() {
+  printf "%s\n" "$(printf "%*s" "$BOX_WIDTH" "" | tr ' ' '=')"
+}
+
+box_line() {
+  content="$1"
+  plain="$(strip_ansi "$content")"
+  pad=$((BOX_WIDTH - 6 - ${#plain}))
+  if [ "$pad" -lt 0 ]; then
+    pad=0
+  fi
+  printf "|| %s%*s ||\n" "$content" "$pad" ""
+}
+
+build_content_lines_plain() {
+  printf "%s\n" "HOMEBREW-STORE-CDN"
+  printf "\n"
+  format_kv_plain "BASE_URL" "$(format_value BASE_URL "$BASE_URL")"
+  format_kv_plain "LOG_LEVEL" "$(format_value LOG_LEVEL "$LOG_LEVEL")"
+  printf "\n"
+  format_kv_plain "PKG_WATCHER_ENABLED" "$(format_value PKG_WATCHER_ENABLED "$PKG_WATCHER_ENABLED")"
+  printf "\n"
+  format_kv_plain "AUTO_INDEXER_ENABLED" "$(format_value AUTO_INDEXER_ENABLED "$AUTO_INDEXER_ENABLED")"
+  printf "\n"
+  format_kv_plain "AUTO_RENAMER_ENABLED" "$(format_value AUTO_RENAMER_ENABLED "$AUTO_RENAMER_ENABLED")"
+  format_kv_plain "AUTO_RENAMER_MODE" "$(format_value AUTO_RENAMER_MODE "$AUTO_RENAMER_MODE")"
+  format_kv_plain "AUTO_RENAMER_TEMPLATE" "$(format_value AUTO_RENAMER_TEMPLATE "$AUTO_RENAMER_TEMPLATE")"
+  format_kv_plain "AUTO_RENAMER_EXCLUDED_DIRS" "$(format_value AUTO_RENAMER_EXCLUDED_DIRS "$AUTO_RENAMER_EXCLUDED_DIRS")"
+  printf "\n"
+  format_kv_plain "AUTO_MOVER_ENABLED" "$(format_value AUTO_MOVER_ENABLED "$AUTO_MOVER_ENABLED")"
+  format_kv_plain "AUTO_MOVER_EXCLUDED_DIRS" "$(format_value AUTO_MOVER_EXCLUDED_DIRS "$AUTO_MOVER_EXCLUDED_DIRS")"
+  printf "\n"
+}
+
+build_content_lines_colored() {
+  printf "%s\n" "HOMEBREW-STORE-CDN"
+  printf "\n"
+  format_kv_plain "BASE_URL" "$(format_value BASE_URL "$BASE_URL")"
+  format_kv_plain "LOG_LEVEL" "$(format_value LOG_LEVEL "$LOG_LEVEL")"
+  printf "\n"
+  format_kv_plain "PKG_WATCHER_ENABLED" "$(format_value PKG_WATCHER_ENABLED "$PKG_WATCHER_ENABLED")"
+  printf "\n"
+  format_kv_colored \
+    "AUTO_INDEXER_ENABLED" \
+    "$(color_value "AUTO_INDEXER_ENABLED" "$COLOR_GREEN")" \
+    "$(color_value "$(format_value AUTO_INDEXER_ENABLED "$AUTO_INDEXER_ENABLED")" "$COLOR_GREEN")"
+  printf "\n"
+  format_kv_colored \
+    "AUTO_RENAMER_ENABLED" \
+    "$(color_value "AUTO_RENAMER_ENABLED" "$COLOR_BLUE")" \
+    "$(color_value "$(format_value AUTO_RENAMER_ENABLED "$AUTO_RENAMER_ENABLED")" "$COLOR_BLUE")"
+  format_kv_colored \
+    "AUTO_RENAMER_MODE" \
+    "$(color_value "AUTO_RENAMER_MODE" "$COLOR_BLUE")" \
+    "$(color_value "$(format_value AUTO_RENAMER_MODE "$AUTO_RENAMER_MODE")" "$COLOR_BLUE")"
+  format_kv_colored \
+    "AUTO_RENAMER_TEMPLATE" \
+    "$(color_value "AUTO_RENAMER_TEMPLATE" "$COLOR_BLUE")" \
+    "$(color_value "$(format_value AUTO_RENAMER_TEMPLATE "$AUTO_RENAMER_TEMPLATE")" "$COLOR_BLUE")"
+  format_kv_colored \
+    "AUTO_RENAMER_EXCLUDED_DIRS" \
+    "$(color_value "AUTO_RENAMER_EXCLUDED_DIRS" "$COLOR_BLUE")" \
+    "$(color_value "$(format_value AUTO_RENAMER_EXCLUDED_DIRS "$AUTO_RENAMER_EXCLUDED_DIRS")" "$COLOR_BLUE")"
+  printf "\n"
+  format_kv_colored \
+    "AUTO_MOVER_ENABLED" \
+    "$(color_value "AUTO_MOVER_ENABLED" "$COLOR_YELLOW")" \
+    "$(color_value "$(format_value AUTO_MOVER_ENABLED "$AUTO_MOVER_ENABLED")" "$COLOR_YELLOW")"
+  format_kv_colored \
+    "AUTO_MOVER_EXCLUDED_DIRS" \
+    "$(color_value "AUTO_MOVER_EXCLUDED_DIRS" "$COLOR_YELLOW")" \
+    "$(color_value "$(format_value AUTO_MOVER_EXCLUDED_DIRS "$AUTO_MOVER_EXCLUDED_DIRS")" "$COLOR_YELLOW")"
+  printf "\n"
+}
+
+initialize_dir(){
+  log "Initializing directories and files..."
+  initialized_any="false"
+  create_path "$PKG_DIR/game" "game/" "$PKG_DIR/"
+  create_path "$PKG_DIR/dlc" "dlc/" "$PKG_DIR/"
+  create_path "$PKG_DIR/update" "update/" "$PKG_DIR/"
+  create_path "$PKG_DIR/app" "app/" "$PKG_DIR/"
+  create_path "$MEDIA_DIR" "_media/" "$DATA_DIR/"
+  create_path "$CACHE_DIR" "_cache/" "$DATA_DIR/"
+  create_path "$DATA_DIR/_errors" "_errors/" "$DATA_DIR/"
+  marker_path="$PKG_DIR/_PUT_YOUR_PKGS_HERE"
+  if [ ! -f "$marker_path" ]; then
+    printf "%s\n" "Place PKG files in this directory or its subfolders." > "$marker_path"
+    log "Initialized _PUT_YOUR_PKGS_HERE marker at $PKG_DIR/"
+    initialized_any="true"
+  fi
+  if [ "$initialized_any" != "true" ]; then
+    log "Great! Nothing to initialize!"
+  fi
+}
+
+create_path() {
+  target="$1"
+  label="$2"
+  root="$3"
+  if [ ! -d "$target" ]; then
+    mkdir -p "$target"
+    if [ -n "$label" ] && [ -n "$root" ]; then
+      log "Initialized ${label} directory at ${root}"
+    else
+      log "Initialized directory at $target"
     fi
-    (
-      sleep "$AUTO_GENERATE_JSON_PERIOD"
-      debounce_pid=""
-      generate
-    ) &
-    debounce_pid="$!"
-  }
+    initialized_any="true"
+  fi
+}
 
-  inotifywait -m -r -e create -e delete -e move -e close_write --format "%w%f|%e" "$PKG_DIR" | while IFS="|" read -r path events; do
-    case "$events" in
-      *MOVED_FROM*)
-        last_moved_from="$path"
-        ;;
-      *MOVED_TO*)
-        if [ -n "$last_moved_from" ]; then
-          log modified "Moved: $last_moved_from -> $path"
-          last_moved_from=""
-        else
-          log modified "Moved: $path"
-        fi
-        if move_only; then
-          schedule_generate
-        fi
-        ;;
-      *CREATE*|*DELETE*)
-        if echo "$events" | grep -q "DELETE"; then
-          log deleted "Change detected: $events $path"
-        else
-          log created "Change detected: $events $path"
-        fi
-        if move_only; then
-          schedule_generate
-        fi
-        ;;
-      *)
-        log modified "Change detected: $events $path"
-        if move_only; then
-          schedule_generate
-        fi
-        ;;
-    esac
-  done &
+hostport="${BASE_URL#*://}"
+hostport="${hostport%%/*}"
+host="${hostport%%:*}"
+port="${hostport##*:}"
+if [ "$host" = "$hostport" ]; then
+  port="80"
 fi
 
+clear_console
+BOX_KEY_WIDTH=$(printf "%s\n" \
+  "BASE_URL" \
+  "LOG_LEVEL" \
+  "PKG_WATCHER_ENABLED" \
+  "AUTO_INDEXER_ENABLED" \
+  "AUTO_RENAMER_ENABLED" \
+  "AUTO_RENAMER_MODE" \
+  "AUTO_RENAMER_TEMPLATE" \
+  "AUTO_RENAMER_EXCLUDED_DIRS" \
+  "AUTO_MOVER_ENABLED" \
+  "AUTO_MOVER_EXCLUDED_DIRS" \
+  | awk '{ if (length($0) > max) max = length($0) } END { print max + 2 }')
+BOX_CONTENT_WIDTH=$(build_content_lines_plain | awk '{ if (length($0) > max) max = length($0) } END { print max + 0 }')
+BOX_WIDTH=$((BOX_CONTENT_WIDTH + 6))
+box_border
+build_content_lines_colored | while IFS= read -r line; do
+  box_line "$line"
+done
+box_border
 
-log info "Starting NGINX..."
-exec nginx -g "daemon off;"
+log "Starting NGINX..."
+nginx
+log "NGINX is running on ${host}:${port}"
+log ""
+
+initialize_dir
+
+log ""
+if [ "$PKG_WATCHER_ENABLED" = "true" ]; then
+  exec python3 -u /scripts/watcher.py \
+    --base-url "$BASE_URL" \
+    --log-level "$LOG_LEVEL" \
+    --pkg-watcher-enabled "$PKG_WATCHER_ENABLED" \
+    --auto-indexer-enabled "$AUTO_INDEXER_ENABLED" \
+    --auto-renamer-enabled "$AUTO_RENAMER_ENABLED" \
+    --auto-mover-enabled "$AUTO_MOVER_ENABLED" \
+    --auto-renamer-mode "$AUTO_RENAMER_MODE" \
+    --auto-renamer-template "$AUTO_RENAMER_TEMPLATE" \
+    --auto-renamer-excluded-dirs "$AUTO_RENAMER_EXCLUDED_DIRS" \
+    --auto-mover-excluded-dirs "$AUTO_MOVER_EXCLUDED_DIRS"
+fi
+log "PKG watcher is disabled."
+exec tail -f /dev/null
