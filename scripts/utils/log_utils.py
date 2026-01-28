@@ -30,7 +30,11 @@ DEDUPE_WINDOW_SECONDS = 2.0
 _last_log_times = {}
 
 if not LOGGER.handlers:
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 
 
 def log(action, message, module=None):

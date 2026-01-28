@@ -42,7 +42,7 @@ MEDIA_DIR="$DATA_DIR/_media"
 CACHE_DIR="$DATA_DIR/_cache"
 
 log() {
-  printf "%s\n" "$*"
+  printf "%s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
 }
 
 clear_console(){
