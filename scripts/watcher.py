@@ -88,7 +88,6 @@ def watch(on_change):
             continue
         if "MOVED_TO" in events:
             if last_moved_from:
-                log("modified", f"Moved: {last_moved_from} -> {path}")
                 last_moved_from = ""
             on_change(schedule_index=True)
             continue

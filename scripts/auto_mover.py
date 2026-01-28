@@ -31,5 +31,6 @@ def run(pkgs):
             continue
         try:
             shutil.move(str(pkg), str(target_path))
+            log("modified", f"Auto moved: {pkg} -> {target_path}")
         except Exception as e:
             log("error", f"Error moving PKG to {target_path}: {e}")
