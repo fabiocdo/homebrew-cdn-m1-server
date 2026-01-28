@@ -5,17 +5,20 @@ LOGGER = logging.getLogger()
 COLORS = {
     "error": "\033[0;31m",
     "info": "\033[0;37m",
+    "debug": "\033[0;36m",
     "default": "\033[0m",
 }
 MODULE_COLORS = {
     "AUTO_INDEXER": "\033[0;32m",
     "AUTO_MOVER": "\033[0;33m",
     "AUTO_RENAMER": "\033[0;34m",
+    "WATCHER": "\033[0;36m",
 }
 LOG_LEVELS = {
     "created": logging.INFO,
     "modified": logging.INFO,
     "deleted": logging.INFO,
+    "debug": logging.INFO,
     "error": logging.ERROR,
     "info": logging.INFO,
 }
@@ -23,6 +26,7 @@ LOG_PREFIXES = {
     "created": "[+]",
     "modified": "[*]",
     "deleted": "[-]",
+    "debug": "[DEBUG]",
     "error": "[!]",
     "info": "[·]",
 }

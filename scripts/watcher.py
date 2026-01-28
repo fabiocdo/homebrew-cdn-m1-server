@@ -74,9 +74,10 @@ def watch(on_change):
         if not line:
             continue
         if "|" not in line:
-            log("info", line)
+            log("debug", f"Watcher output: {line}", module="WATCHER")
             continue
         path, events = line.split("|", 1)
+        log("debug", f"Captured events: {events} on {path}", module="WATCHER")
         if "DELETE" in events:
             log("deleted", f"Deleted: {path}")
             on_change(schedule_index=True)
