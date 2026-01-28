@@ -7,8 +7,8 @@ from utils.log_utils import log
 def run(pkgs):
     """Move PKGs into apptype folders when enabled."""
     excluded = set()
-    if settings.AUTO_PKG_MOVER_EXCLUDED_DIRS:
-        parts = [part.strip() for part in settings.AUTO_PKG_MOVER_EXCLUDED_DIRS.split(",")]
+    if settings.AUTO_MOVER_EXCLUDED_DIRS:
+        parts = [part.strip() for part in settings.AUTO_MOVER_EXCLUDED_DIRS.split(",")]
         excluded = {part for part in parts if part}
     for pkg, data in pkgs:
         apptype = data.get("apptype")

@@ -25,12 +25,14 @@ docker run -d \
   --name homebrew-store-cdn \
   -p 8080:80 \
   -e BASE_URL=http://127.0.0.1:8080 \
-  -e AUTO_GENERATE_JSON_PERIOD=2 \
-  -e AUTO_PKG_RENAMER_ENABLED=false \
-  -e AUTO_PKG_RENAMER_TEMPLATE="{title} [{titleid}][{apptype}]" \
-  -e AUTO_PKG_RENAMER_MODE=none \
-  -e AUTO_PKG_MOVER_ENABLED=true \
-  -e AUTO_PKG_MOVER_EXCLUDED_DIRS=app \
+  -e PKG_WATCHER_ENABLED=true \
+  -e AUTO_INDEXER_ENABLED=true \
+  -e AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=2 \
+  -e AUTO_RENAMER_ENABLED=false \
+  -e AUTO_RENAMER_TEMPLATE="{title} [{titleid}][{apptype}]" \
+  -e AUTO_RENAMER_MODE=none \
+  -e AUTO_MOVER_ENABLED=true \
+  -e AUTO_MOVER_EXCLUDED_DIRS=app \
   -v ./data:/data \
   -v ./nginx.conf:/etc/nginx/nginx.conf:ro \
   fabiocdo/homebrew-store-cdn:latest
@@ -49,12 +51,14 @@ services:
       - "8080:80"
     environment:
       - BASE_URL=http://127.0.0.1:8080
-      - AUTO_GENERATE_JSON_PERIOD=2
-      - AUTO_PKG_RENAMER_ENABLED=false
-      - AUTO_PKG_RENAMER_TEMPLATE={title} [{titleid}][{apptype}]
-      - AUTO_PKG_RENAMER_MODE=none
-      - AUTO_PKG_MOVER_ENABLED=true
-      - AUTO_PKG_MOVER_EXCLUDED_DIRS=app
+      - PKG_WATCHER_ENABLED=true
+      - AUTO_INDEXER_ENABLED=true
+      - AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=2
+      - AUTO_RENAMER_ENABLED=false
+      - AUTO_RENAMER_TEMPLATE={title} [{titleid}][{apptype}]
+      - AUTO_RENAMER_MODE=none
+      - AUTO_MOVER_ENABLED=true
+      - AUTO_MOVER_EXCLUDED_DIRS=app
     volumes:
       - ./data:/data
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
@@ -178,12 +182,21 @@ Fields:
 |-----------------------------|--------------------------------------------------------------------------------------------------------------------------|----------------------------------|
 | `BASE_URL`                  | Base URL written in `index.json`.                                                                                        | `http://127.0.0.1:8080`          |
 | `CDN_DATA_DIR`              | Host path mapped to `/data`.                                                                                             | `./data`                         |
-| `AUTO_GENERATE_JSON_PERIOD` | Delay (seconds) before regenerating `index.json` after changes.                                                          | `2`                              |
-| `AUTO_PKG_RENAMER_ENABLED`  | Enable PKG rename using `AUTO_PKG_RENAMER_TEMPLATE`.                                                                     | `false`                          |
-| `AUTO_PKG_RENAMER_TEMPLATE` | Template using `{title}`, `{titleid}`, `{region}`, `{apptype}`, `{version}`, `{category}`, `{content_id}`, `{app_type}`. | `{title} [{titleid}][{apptype}]` |
-| `AUTO_PKG_RENAMER_MODE`     | Title transform mode for `{title}`: `none`, `uppercase`, `lowercase`, `capitalize`.                                      | `none`                           |
-| `AUTO_PKG_MOVER_ENABLED`        | Enable auto-moving PKGs into `game/`, `dlc/`, `update/` folders.                                                    | `true`                           |
-| `AUTO_PKG_MOVER_EXCLUDED_DIRS`  | Comma-separated directory names to skip when auto-moving.                                                           | `app`                            |
+| `PKG_WATCHER_ENABLED` | Master switch for watcher-driven automations (rename, move, index).                                                   | `true`                           |
+| `AUTO_INDEXER_ENABLED`      | Enable auto-generated `index.json` and cache updates.                                                                    | `true`                           |
+| `AUTO_INDEXER_DEBOUNCE_TIME_SECONDS` | Delay (seconds) before regenerating `index.json` after changes.                                              | `2`                              |
+| `AUTO_RENAMER_ENABLED`      | Enable PKG rename using `AUTO_RENAMER_TEMPLATE`.                                                                         | `false`                          |
+| `AUTO_RENAMER_TEMPLATE`     | Template using `{title}`, `{titleid}`, `{region}`, `{apptype}`, `{version}`, `{category}`, `{content_id}`, `{app_type}`. | `{title} [{titleid}][{apptype}]` |
+| `AUTO_RENAMER_MODE`         | Title transform mode for `{title}`: `none`, `uppercase`, `lowercase`, `capitalize`.                                      | `none`                           |
+| `AUTO_MOVER_ENABLED`        | Enable auto-moving PKGs into `game/`, `dlc/`, `update/` folders.                                                         | `true`                           |
+| `AUTO_MOVER_EXCLUDED_DIRS`  | Comma-separated directory names to skip when auto-moving.                                                                | `app`                            |
+
+Dependencies and behavior:
+
+- `PKG_WATCHER_ENABLED=false` disables all automations (rename, move, index) and the watcher does not start.
+- `AUTO_INDEXER_DEBOUNCE_TIME_SECONDS` only applies when `AUTO_INDEXER_ENABLED=true` and the watcher is enabled.
+- `AUTO_RENAMER_TEMPLATE` and `AUTO_RENAMER_MODE` only apply when `AUTO_RENAMER_ENABLED=true` and the watcher is enabled.
+- `AUTO_MOVER_EXCLUDED_DIRS` only applies when `AUTO_MOVER_ENABLED=true` and the watcher is enabled.
 
 ## Volume config
 

@@ -24,23 +24,27 @@ CACHE_PATH = CACHE_DIR / "index-cache.json"
 
 # Runtime config (set by auto_indexer.py)
 BASE_URL = None
-AUTO_GENERATE_JSON_PERIOD = None
-AUTO_PKG_RENAMER_ENABLED = None
-AUTO_PKG_RENAMER_TEMPLATE = None
-AUTO_PKG_RENAMER_MODE = None
-AUTO_PKG_MOVER_ENABLED = None
-AUTO_PKG_MOVER_EXCLUDED_DIRS = None
+PKG_WATCHER_ENABLED = None
+AUTO_INDEXER_ENABLED = None
+AUTO_INDEXER_DEBOUNCE_TIME_SECONDS = None
+AUTO_RENAMER_ENABLED = None
+AUTO_RENAMER_TEMPLATE = None
+AUTO_RENAMER_MODE = None
+AUTO_MOVER_ENABLED = None
+AUTO_MOVER_EXCLUDED_DIRS = None
 
 # CLI Arguments
 CLI_ARGS = [
     ("--base-url", {"required": True}),
-    ("--auto-generate-json-period", {"required": True, "type": float}),
-    ("--auto-pkg-renamer-enabled", {"required": True}),
-    ("--auto-pkg-renamer-template", {"required": True}),
+    ("--pkg-watcher-enabled", {"required": True}),
+    ("--auto-indexer-enabled", {"required": True}),
+    ("--auto-indexer-debounce-time-seconds", {"required": True, "type": float}),
+    ("--auto-renamer-enabled", {"required": True}),
+    ("--auto-renamer-template", {"required": True}),
     (
-        "--auto-pkg-renamer-mode",
+        "--auto-renamer-mode",
         {"required": True, "choices": ["none", "uppercase", "lowercase", "capitalize"]},
     ),
-    ("--auto-pkg-mover-enabled", {"required": True}),
-    ("--auto-pkg-mover-excluded-dirs", {"required": True}),
+    ("--auto-mover-enabled", {"required": True}),
+    ("--auto-mover-excluded-dirs", {"required": True}),
 ]

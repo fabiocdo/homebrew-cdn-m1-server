@@ -13,11 +13,11 @@ def run(pkgs):
                 safe[key] = ""
             elif key == "title":
                 title_value = str(value)
-                if settings.AUTO_PKG_RENAMER_MODE == "uppercase":
+                if settings.AUTO_RENAMER_MODE == "uppercase":
                     title_value = title_value.upper()
-                elif settings.AUTO_PKG_RENAMER_MODE == "lowercase":
+                elif settings.AUTO_RENAMER_MODE == "lowercase":
                     title_value = title_value.lower()
-                elif settings.AUTO_PKG_RENAMER_MODE == "capitalize":
+                elif settings.AUTO_RENAMER_MODE == "capitalize":
                     title_value = " ".join(part.capitalize() for part in value.split())
                 title_value = re.sub(r"([A-Za-z])([0-9])", r"\1_\2", title_value)
                 value_str = title_value
@@ -38,7 +38,7 @@ def run(pkgs):
         if not titleid:
             return pkg_path
         new_name = format_pkg_name(
-            settings.AUTO_PKG_RENAMER_TEMPLATE,
+            settings.AUTO_RENAMER_TEMPLATE,
             {
                 "title": title,
                 "titleid": titleid,

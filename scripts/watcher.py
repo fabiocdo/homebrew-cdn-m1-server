@@ -4,14 +4,14 @@ import subprocess
 import threading
 
 import settings
-from auto_indexer import build_index
+from auto_indexer import run as run_indexer
 from auto_mover import run as run_mover
 from auto_renamer import run as run_renamer
 from utils.pkg_utils import scan_pkgs
 from utils.log_utils import log
 
 
-def parse_config():
+def parse_settings():
     """Parse CLI args into settings."""
     parser = argparse.ArgumentParser()
     for flag, opts in settings.CLI_ARGS:
@@ -24,15 +24,19 @@ def parse_config():
         return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
     settings.BASE_URL = args.base_url
-    settings.AUTO_GENERATE_JSON_PERIOD = args.auto_generate_json_period
-    settings.AUTO_PKG_RENAMER_ENABLED = parse_bool(args.auto_pkg_renamer_enabled)
-    settings.AUTO_PKG_RENAMER_TEMPLATE = args.auto_pkg_renamer_template
-    settings.AUTO_PKG_RENAMER_MODE = args.auto_pkg_renamer_mode
-    settings.AUTO_PKG_MOVER_ENABLED = parse_bool(args.auto_pkg_mover_enabled)
-    settings.AUTO_PKG_MOVER_EXCLUDED_DIRS = args.auto_pkg_mover_excluded_dirs
+    settings.PKG_WATCHER_ENABLED = parse_bool(args.pkg_watcher_enabled)
+    settings.AUTO_INDEXER_DEBOUNCE_TIME_SECONDS = (
+        args.auto_indexer_debounce_time_seconds
+    )
+    settings.AUTO_RENAMER_ENABLED = parse_bool(args.auto_renamer_enabled)
+    settings.AUTO_RENAMER_TEMPLATE = args.auto_renamer_template
+    settings.AUTO_RENAMER_MODE = args.auto_renamer_mode
+    settings.AUTO_MOVER_ENABLED = parse_bool(args.auto_mover_enabled)
+    settings.AUTO_MOVER_EXCLUDED_DIRS = args.auto_mover_excluded_dirs
+    settings.AUTO_INDEXER_ENABLED = parse_bool(args.auto_indexer_enabled)
 
 
-def watch_pkg_dir(auto_generate_json_period):
+def watch(on_change):
     """Watch pkg directory and trigger rename/move/index updates."""
     if shutil.which("inotifywait") is None:
         log("error", "inotifywait not found; skipping watcher.")
@@ -40,32 +44,8 @@ def watch_pkg_dir(auto_generate_json_period):
     if not settings.PKG_DIR.exists():
         return
 
+    log("info", f"Starting watcher on {settings.PKG_DIR}")
     last_moved_from = ""
-    debounce_timer = None
-
-    def schedule_generate(pkgs):
-        nonlocal debounce_timer
-        if debounce_timer and debounce_timer.is_alive():
-            debounce_timer.cancel()
-
-        def run():
-            nonlocal debounce_timer
-            debounce_timer = None
-            build_index(pkgs)
-
-        debounce_timer = threading.Timer(auto_generate_json_period, run)
-        debounce_timer.daemon = True
-        debounce_timer.start()
-
-    def handle_change():
-        pkgs = list(scan_pkgs())
-        if settings.AUTO_PKG_RENAMER_ENABLED:
-            run_renamer(pkgs)
-        if settings.AUTO_PKG_MOVER_ENABLED:
-            run_mover(pkgs)
-        if settings.AUTO_PKG_RENAMER_ENABLED or settings.AUTO_PKG_MOVER_ENABLED:
-            pkgs = list(scan_pkgs())
-        schedule_generate(pkgs)
 
     cmd = [
         "inotifywait",
@@ -110,33 +90,64 @@ def watch_pkg_dir(auto_generate_json_period):
                 last_moved_from = ""
             else:
                 log("modified", f"Moved: {path}")
-            handle_change()
+            on_change(schedule_index=True)
             continue
         if "CREATE" in events or "DELETE" in events:
             if "DELETE" in events:
                 log("deleted", f"Change detected: {events} {path}")
             else:
                 log("created", f"Change detected: {events} {path}")
-            handle_change()
+            on_change(schedule_index=True)
             continue
         log("modified", f"Change detected: {events} {path}")
-        handle_change()
+        on_change(schedule_index=True)
 
-def main():
+
+def start():
     """Entry point for the indexer watcher."""
-    parse_config()
-    pkgs = []
-    if settings.PKG_DIR.exists():
-        pkgs = list(scan_pkgs())
-    if settings.AUTO_PKG_RENAMER_ENABLED:
-        run_renamer(pkgs)
-    if settings.AUTO_PKG_MOVER_ENABLED:
-        run_mover(pkgs)
-    if settings.AUTO_PKG_RENAMER_ENABLED or settings.AUTO_PKG_MOVER_ENABLED:
-        pkgs = list(scan_pkgs())
-    build_index(pkgs)
-    watch_pkg_dir(settings.AUTO_GENERATE_JSON_PERIOD)
+    parse_settings()
+    if not settings.PKG_WATCHER_ENABLED:
+        log("info", "Automation watcher disabled.")
+        return
+    debounce_timer = None
+
+    def schedule_generate(pkgs):
+        nonlocal debounce_timer
+        if not settings.AUTO_INDEXER_ENABLED:
+            return
+        if debounce_timer and debounce_timer.is_alive():
+            debounce_timer.cancel()
+
+        def run():
+            nonlocal debounce_timer
+            debounce_timer = None
+            run_indexer(pkgs)
+
+        debounce_timer = threading.Timer(
+            settings.AUTO_INDEXER_DEBOUNCE_TIME_SECONDS,
+            run,
+        )
+        debounce_timer.daemon = True
+        debounce_timer.start()
+
+    def run_automations(schedule_index):
+        if not settings.PKG_WATCHER_ENABLED:
+            return
+        pkgs = list(scan_pkgs()) if settings.PKG_DIR.exists() else []
+        if settings.AUTO_RENAMER_ENABLED:
+            run_renamer(pkgs)
+        if settings.AUTO_MOVER_ENABLED:
+            run_mover(pkgs)
+        if settings.AUTO_RENAMER_ENABLED or settings.AUTO_MOVER_ENABLED:
+            pkgs = list(scan_pkgs()) if settings.PKG_DIR.exists() else []
+        if schedule_index:
+            schedule_generate(pkgs)
+        elif settings.AUTO_INDEXER_ENABLED:
+            run_indexer(pkgs)
+
+    run_automations(schedule_index=False)
+    watch(run_automations)
 
 
 if __name__ == "__main__":
-    main()
+    start()
