@@ -165,5 +165,21 @@ def scan_pkgs():
             result = extract_pkg_data(pkg, include_icon=False)
         except Exception as e:
             log("error", f"Failed to read PKG metadata: {pkg} ({e})")
+            try:
+                settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+                error_dir = settings.DATA_DIR / "_errors"
+                error_dir.mkdir(parents=True, exist_ok=True)
+                target = error_dir / pkg.name
+                counter = 1
+                while target.exists():
+                    if pkg.suffix:
+                        target = error_dir / f"{pkg.stem}_{counter}{pkg.suffix}"
+                    else:
+                        target = error_dir / f"{pkg.name}_{counter}"
+                    counter += 1
+                pkg.rename(target)
+                log("warn", f"Moved file with error to {error_dir}: {pkg}")
+            except Exception as move_error:
+                log("error", f"Failed to move errored PKG to _errors: {pkg} ({move_error})")
             continue
         yield pkg, result["data"]

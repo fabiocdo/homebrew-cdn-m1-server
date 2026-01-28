@@ -246,6 +246,37 @@ Dependencies and behavior:
 - When a rename or move conflict is detected, the PKG is moved to `/data/_errors`.
 - Files in `_errors/` are not indexed.
 - Resolve conflicts manually and move the file back into `pkg/`.
+- If `param.sfo` cannot be read, the PKG is moved to `/data/_errors`.
+
+## Flow diagram (ASCII)
+
+```
+fs events (CLOSE_WRITE / MOVED_TO / DELETE)
+                |
+                v
+           [watcher.py]
+                |
+                v
+         per-file pipeline
+                |
+                v
+         [auto_renamer.py]
+                |
+          (conflict?)----yes----> /data/_errors
+                |
+               no
+                v
+          [auto_mover.py]
+                |
+          (conflict?)----yes----> /data/_errors
+                |
+               no
+                v
+        [auto_indexer.py]
+                |
+                v
+           index.json
+```
 
 ## Volume config
 
