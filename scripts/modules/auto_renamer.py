@@ -51,7 +51,7 @@ def dry_run(pkgs):
 
     def planned_rename(pkg_path, title, titleid, apptype, region, version, category, content_id, app_type):
         if not titleid:
-            return pkg_path, None
+            return pkg_path, None, "missing_titleid"
         new_name = format_pkg_name(
             settings.AUTO_RENAMER_TEMPLATE,
             {
@@ -66,12 +66,13 @@ def dry_run(pkgs):
             },
         )
         if pkg_path.name == new_name:
-            return pkg_path, None
+            return pkg_path, None, "already_named"
         target_path = pkg_path.with_name(new_name)
-        return pkg_path, target_path
+        return pkg_path, target_path, "rename"
 
+    error_sources = set()
     for pkg, data in pkgs:
-        source_path, target_path = planned_rename(
+        source_path, target_path, status = planned_rename(
             pkg,
             data.get("title"),
             data.get("titleid"),
@@ -82,6 +83,10 @@ def dry_run(pkgs):
             data.get("content_id"),
             data.get("app_type"),
         )
+        if status == "missing_titleid":
+            error_sources.add(source_path)
+            blocked_sources.add(source_path)
+            continue
         if target_path is None:
             continue
         if is_excluded(source_path):
@@ -126,9 +131,10 @@ def dry_run(pkgs):
 
     return {
         "plan": plan,
-        "blocked_sources": [str(path) for path in (blocked_sources | excluded_sources)],
+        "blocked_sources": [str(path) for path in (blocked_sources | excluded_sources | error_sources)],
         "skipped_conflict": [str(path) for path in (blocked | conflicted)],
         "conflict_sources": [str(path) for path in conflict_sources],
+        "error_sources": [str(path) for path in error_sources],
         "skipped_excluded": len(excluded_sources),
     }
 
@@ -182,6 +188,16 @@ def apply(dry_result):
     for old_path, new_path in renamed:
         touched_paths.extend([str(old_path), str(new_path)])
     for source in dry_result.get("conflict_sources", []):
+        target = quarantine_path(source)
+        if target is not None:
+            quarantined.append(str(target))
+            touched_paths.extend([source, str(target)])
+            log(
+                "warn",
+                f"Moved file with error to {settings.DATA_DIR / '_errors'}",
+                module="AUTO_RENAMER",
+            )
+    for source in dry_result.get("error_sources", []):
         target = quarantine_path(source)
         if target is not None:
             quarantined.append(str(target))
