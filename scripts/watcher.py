@@ -141,9 +141,9 @@ def start():
         pkgs = list(scan_pkgs()) if settings.PKG_DIR.exists() else []
         if settings.AUTO_RENAMER_ENABLED:
             run_renamer(pkgs)
+            pkgs = list(scan_pkgs()) if settings.PKG_DIR.exists() else []
         if settings.AUTO_MOVER_ENABLED:
             run_mover(pkgs)
-        if settings.AUTO_RENAMER_ENABLED or settings.AUTO_MOVER_ENABLED:
             pkgs = list(scan_pkgs()) if settings.PKG_DIR.exists() else []
         if schedule_index:
             schedule_generate()
