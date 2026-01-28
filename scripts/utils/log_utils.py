@@ -24,6 +24,11 @@ LOG_SETTINGS = {
         "prefix": "",
     },
 }
+MODULE_COLORS = {
+    "AUTO_INDEXER": "\033[0;92m",
+    "AUTO_MOVER": "\033[0;93m",
+    "AUTO_RENAMER": "\033[0;94m",
+}
 def _resolve_log_level():
     env_level = os.getenv("LOG_LEVEL", "").strip().lower()
     mapping = {
@@ -52,6 +57,7 @@ def log(action, message, module=None):
     level = settings["level"]
     prefix = settings["prefix"]
     color = settings["color"]
-    module_tag = f"[{module}] " if module else ""
+    module_color = MODULE_COLORS.get(module, "")
+    module_tag = f"{module_color}[{module}]\033[0m " if module else ""
     sep = " " if prefix else ""
     LOGGER.log(level, f"{color}{prefix}{sep}{module_tag}{message}\033[0m")
