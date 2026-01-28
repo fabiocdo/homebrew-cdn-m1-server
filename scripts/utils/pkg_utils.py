@@ -6,20 +6,22 @@ from utils.log_utils import log
 from tools.pkgtool import run_pkgtool
 
 
+STAGE_LABELS = {
+    "init": "Initializing",
+    "pkg_listentries": "Reading PKG entries",
+    "param_sfo_not_found": "PARAM.SFO not found",
+    "pkg_extractentry": "Extracting PARAM.SFO",
+    "param_sfo_missing": "PARAM.SFO missing",
+    "sfo_listentries": "Reading PARAM.SFO",
+    "normalize": "Normalizing metadata",
+    "icon_extract": "Extracting icon",
+    "build_data": "Building metadata",
+}
+
+
 def extract_pkg_data(pkg_path, include_icon=False):
     """Extract and normalize PKG metadata, optionally including icon bytes."""
     stage = "init"
-    stage_labels = {
-        "init": "Initializing",
-        "pkg_listentries": "Reading PKG entries",
-        "param_sfo_not_found": "PARAM.SFO not found",
-        "pkg_extractentry": "Extracting PARAM.SFO",
-        "param_sfo_missing": "PARAM.SFO missing",
-        "sfo_listentries": "Reading PARAM.SFO",
-        "normalize": "Normalizing metadata",
-        "icon_extract": "Extracting icon",
-        "build_data": "Building metadata",
-    }
 
     def process_entries(entries_output):
         sfo_entry = None
@@ -184,7 +186,7 @@ def scan_pkgs():
         try:
             result = extract_pkg_data(pkg, include_icon=False)
         except Exception:
-            stage_label = stage_labels.get(stage, "Unknown stage")
+            stage_label = STAGE_LABELS.get(stage, "Unknown stage")
             log("error", f"Failed to read PKG metadata ({stage_label}): {pkg}")
             try:
                 settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
