@@ -26,7 +26,7 @@ LOG_PREFIXES = {
     "error": "[!]",
     "info": "[·]",
 }
-DEDUPE_WINDOW_SECONDS = 2.0
+DEDUPE_WINDOW_SECONDS = 5.0
 _last_log_times = {}
 
 if not LOGGER.handlers:
