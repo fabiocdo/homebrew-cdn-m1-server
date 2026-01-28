@@ -2,7 +2,6 @@ import pathlib
 import tempfile
 
 import settings
-from utils.log_utils import log
 from utils.pkgtool import run_pkgtool
 
 
@@ -113,13 +112,13 @@ def extract_pkg_data(pkg_path, include_icon=False):
         return None
 
     def build_data(info):
-        title = info.get("TITLE", pkg_path.stem)
-        titleid = info.get("TITLE_ID", pkg_path.stem)
-        version = info.get("VERSION", "1.00")
+        title = info.get("TITLE")
+        titleid = info.get("TITLE_ID")
+        version = info.get("VERSION")
         category = info.get("CATEGORY")
         content_id = info.get("CONTENT_ID")
         app_type = info.get("APP_TYPE")
-        apptype = info.get("APPTYPE", "app")
+        apptype = info.get("APPTYPE")
         region = info.get("REGION")
 
         return {
@@ -133,32 +132,27 @@ def extract_pkg_data(pkg_path, include_icon=False):
             "region": region,
         }
 
-    try:
-        with tempfile.TemporaryDirectory(prefix="pkg_extract_") as tmpdir:
-            tmp_root = pathlib.Path(tmpdir)
-            entries_output = run_pkgtool(["pkg_listentries", str(pkg_path)])
-            sfo_entry, icon_entry = process_entries(entries_output)
+    with tempfile.TemporaryDirectory(prefix="pkg_extract_") as tmpdir:
+        tmp_root = pathlib.Path(tmpdir)
+        entries_output = run_pkgtool(["pkg_listentries", str(pkg_path)])
+        sfo_entry, icon_entry = process_entries(entries_output)
 
-            if sfo_entry is None:
-                log("error", f"PARAM_SFO not found in {pkg_path}")
-                return {"data": {}, "icon_bytes": None}
+        if sfo_entry is None:
+            raise RuntimeError(f"PARAM_SFO not found in {pkg_path}")
 
-            sfo_path = tmp_root / "param.sfo"
-            run_pkgtool(["pkg_extractentry", str(pkg_path), str(sfo_entry), str(sfo_path)])
-            if not sfo_path.exists():
-                log("error", f"PARAM_SFO not found in {pkg_path}")
-                return {"data": {}, "icon_bytes": None}
+        sfo_path = tmp_root / "param.sfo"
+        run_pkgtool(["pkg_extractentry", str(pkg_path), str(sfo_entry), str(sfo_path)])
+        if not sfo_path.exists():
+            raise RuntimeError(f"PARAM_SFO not found in {pkg_path}")
 
-            info = process_info(sfo_path)
-            process_app_type(info)
-            process_apptype(info)
-            process_region(info)
-            icon_bytes = process_icon_bytes(icon_entry, tmp_root)
+        info = process_info(sfo_path)
+        process_app_type(info)
+        process_apptype(info)
+        process_region(info)
+        icon_bytes = process_icon_bytes(icon_entry, tmp_root)
 
-            data = build_data(info)
-            return {"data": data, "icon_bytes": icon_bytes}
-    except Exception:
-        return {"data": {}, "icon_bytes": None}
+        data = build_data(info)
+        return {"data": data, "icon_bytes": icon_bytes}
 
 
 def scan_pkgs():

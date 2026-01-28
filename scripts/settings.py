@@ -25,20 +25,22 @@ CACHE_PATH = CACHE_DIR / "index-cache.json"
 # Runtime config (set by auto_indexer.py)
 BASE_URL = None
 AUTO_GENERATE_JSON_PERIOD = None
-AUTO_RENAME_PKGS = None
-AUTO_RENAME_TEMPLATE = None
-AUTO_RENAME_TITLE_MODE = None
-AUTO_MOVE_PKG = None
+AUTO_PKG_RENAMER_ENABLED = None
+AUTO_PKG_RENAMER_TEMPLATE = None
+AUTO_PKG_RENAMER_MODE = None
+AUTO_PKG_MOVER_ENABLED = None
+AUTO_PKG_MOVER_EXCLUDED_DIRS = None
 
 # CLI Arguments
 CLI_ARGS = [
     ("--base-url", {"required": True}),
     ("--auto-generate-json-period", {"required": True, "type": float}),
-    ("--auto-rename-pkgs", {"required": True}),
-    ("--auto-rename-template", {"required": True}),
+    ("--auto-pkg-renamer-enabled", {"required": True}),
+    ("--auto-pkg-renamer-template", {"required": True}),
     (
-        "--auto-rename-title-mode",
+        "--auto-pkg-renamer-mode",
         {"required": True, "choices": ["none", "uppercase", "lowercase", "capitalize"]},
     ),
-    ("--auto-move-pkg", {"required": True}),
+    ("--auto-pkg-mover-enabled", {"required": True}),
+    ("--auto-pkg-mover-excluded-dirs", {"required": True}),
 ]

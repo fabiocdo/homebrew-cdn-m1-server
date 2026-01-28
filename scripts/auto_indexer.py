@@ -47,13 +47,11 @@ def build_index(pkgs):
 
         if cache_hit:
             data = cache_entry["data"]
-            icon_entry = cache_entry.get("icon_entry")
         else:
             cache_entry = {
                 "size": stat.st_size,
                 "mtime": stat.st_mtime,
                 "data": data,
-                "icon_entry": icon_entry,
             }
 
         title = data["title"]

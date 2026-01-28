@@ -26,10 +26,11 @@ docker run -d \
   -p 8080:80 \
   -e BASE_URL=http://127.0.0.1:8080 \
   -e AUTO_GENERATE_JSON_PERIOD=2 \
-  -e AUTO_RENAME_PKGS=false \
-  -e AUTO_RENAME_TEMPLATE="{title} [{titleid}][{apptype}]" \
-  -e AUTO_RENAME_TITLE_MODE=none \
-  -e AUTO_MOVE_PKG=true \
+  -e AUTO_PKG_RENAMER_ENABLED=false \
+  -e AUTO_PKG_RENAMER_TEMPLATE="{title} [{titleid}][{apptype}]" \
+  -e AUTO_PKG_RENAMER_MODE=none \
+  -e AUTO_PKG_MOVER_ENABLED=true \
+  -e AUTO_PKG_MOVER_EXCLUDED_DIRS=app \
   -v ./data:/data \
   -v ./nginx.conf:/etc/nginx/nginx.conf:ro \
   fabiocdo/homebrew-store-cdn:latest
@@ -49,10 +50,11 @@ services:
     environment:
       - BASE_URL=http://127.0.0.1:8080
       - AUTO_GENERATE_JSON_PERIOD=2
-      - AUTO_RENAME_PKGS=false
-      - AUTO_RENAME_TEMPLATE={title} [{titleid}][{apptype}]
-      - AUTO_RENAME_TITLE_MODE=none
-      - AUTO_MOVE_PKG=true
+      - AUTO_PKG_RENAMER_ENABLED=false
+      - AUTO_PKG_RENAMER_TEMPLATE={title} [{titleid}][{apptype}]
+      - AUTO_PKG_RENAMER_MODE=none
+      - AUTO_PKG_MOVER_ENABLED=true
+      - AUTO_PKG_MOVER_EXCLUDED_DIRS=app
     volumes:
       - ./data:/data
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
@@ -164,7 +166,7 @@ Example entry:
 
 Fields:
 
-- `id`, `name`, `version`: extracted from `param.sfo`, fallback to filename.
+- `id`, `name`, `version`: extracted from `param.sfo`.
 - `apptype`: derived from `CATEGORY` or forced to `app` for `pkg/app`.
 - `pkg`, `icon`: URLs built from `BASE_URL`.
 - `category`: optional, only when present.
@@ -177,10 +179,11 @@ Fields:
 | `BASE_URL`                  | Base URL written in `index.json`.                                                                                        | `http://127.0.0.1:8080`          |
 | `CDN_DATA_DIR`              | Host path mapped to `/data`.                                                                                             | `./data`                         |
 | `AUTO_GENERATE_JSON_PERIOD` | Delay (seconds) before regenerating `index.json` after changes.                                                          | `2`                              |
-| `AUTO_RENAME_PKGS`          | Enable PKG rename using `AUTO_RENAME_TEMPLATE`.                                                                          | `false`                          |
-| `AUTO_RENAME_TEMPLATE`      | Template using `{title}`, `{titleid}`, `{region}`, `{apptype}`, `{version}`, `{category}`, `{content_id}`, `{app_type}`. | `{title} [{titleid}][{apptype}]` |
-| `AUTO_RENAME_TITLE_MODE`    | Title transform mode for `{title}`: `none`, `uppercase`, `lowercase`, `capitalize`.                                      | `none`                           |
-| `AUTO_MOVE_PKG`             | Enable auto-moving PKGs into `game/`, `dlc/`, `update/` folders.                                                         | `true`                           |
+| `AUTO_PKG_RENAMER_ENABLED`  | Enable PKG rename using `AUTO_PKG_RENAMER_TEMPLATE`.                                                                     | `false`                          |
+| `AUTO_PKG_RENAMER_TEMPLATE` | Template using `{title}`, `{titleid}`, `{region}`, `{apptype}`, `{version}`, `{category}`, `{content_id}`, `{app_type}`. | `{title} [{titleid}][{apptype}]` |
+| `AUTO_PKG_RENAMER_MODE`     | Title transform mode for `{title}`: `none`, `uppercase`, `lowercase`, `capitalize`.                                      | `none`                           |
+| `AUTO_PKG_MOVER_ENABLED`        | Enable auto-moving PKGs into `game/`, `dlc/`, `update/` folders.                                                    | `true`                           |
+| `AUTO_PKG_MOVER_EXCLUDED_DIRS`  | Comma-separated directory names to skip when auto-moving.                                                           | `app`                            |
 
 ## Volume config
 
@@ -200,8 +203,7 @@ as shown in the quick start examples.
 
 ## Troubleshooting
 
-- If a PKG is encrypted, `pkgtool` may fail to read `param.sfo`.
-  In that case, the entry still appears in `index.json` using the filename.
+- If a PKG is encrypted, `pkgtool` may fail to read `param.sfo` and indexing will stop.
 - If icons are missing, ensure the PKG contains `ICON0_PNG` or `PIC0_PNG`.
 - If you see `Duplicate target exists, skipping`, the cycle will not regenerate `index.json` until the conflict is
   resolved.

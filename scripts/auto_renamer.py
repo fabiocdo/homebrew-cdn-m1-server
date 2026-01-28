@@ -4,90 +4,66 @@ import settings
 from utils.log_utils import log
 
 
-def sanitize_filename(value):
-    allowed = set("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 _-![]().'")
-    cleaned = []
-    for ch in value:
-        if ch.isalnum() or ch in allowed:
-            cleaned.append(ch)
-        else:
-            cleaned.append("_")
-    safe = "".join(cleaned)
-    safe = safe.replace("/", "_").replace("\\", "_").replace("-", "_").replace(":", "_").strip()
-    safe = "_".join(part for part in safe.split() if part)
-    while "__" in safe:
-        safe = safe.replace("__", "_")
-    return safe
-
-
-def format_title(value):
-    return " ".join(part.capitalize() for part in value.split())
-
-
-def render_rename(template, data):
-    safe = {}
-    for key, value in data.items():
-        if value is None:
-            safe[key] = ""
-        elif key == "title":
-            title_value = str(value)
-            if settings.AUTO_RENAME_TITLE_MODE == "uppercase":
-                title_value = title_value.upper()
-            elif settings.AUTO_RENAME_TITLE_MODE == "lowercase":
-                title_value = title_value.lower()
-            elif settings.AUTO_RENAME_TITLE_MODE == "capitalize":
-                title_value = format_title(title_value)
-            title_value = re.sub(r"([A-Za-z])([0-9])", r"\1_\2", title_value)
-            safe[key] = sanitize_filename(title_value)
-        else:
-            safe[key] = sanitize_filename(str(value))
-    try:
-        name = template.format_map(safe).strip()
-    except ValueError as exc:
-        log("error", f"Invalid AUTO_RENAME_TEMPLATE: {exc}. Using fallback.")
-        name = "{title} [{titleid}][{apptype}]".format_map(safe).strip()
-    if not name.lower().endswith(".pkg"):
-        name = f"{name}.pkg"
-    return name
-
-
-def maybe_rename_pkg(pkg_path, title, titleid, apptype, region, version, category, content_id, app_type):
-    if not settings.AUTO_RENAME_PKGS:
-        return pkg_path
-    if not titleid:
-        return pkg_path
-    new_name = render_rename(
-        settings.AUTO_RENAME_TEMPLATE,
-        {
-            "title": title,
-            "titleid": titleid,
-            "version": version or "1.00",
-            "category": category or "",
-            "content_id": content_id or "",
-            "app_type": app_type or "",
-            "apptype": apptype or "app",
-            "region": region or "UNK",
-        },
-    )
-    if pkg_path.name == new_name:
-        return pkg_path
-    target_path = pkg_path.with_name(new_name)
-    if target_path.exists():
-        return pkg_path
-    try:
-        pkg_path.rename(target_path)
-        log("modified", f"Renamed PKG to {target_path}")
-        return target_path
-    except Exception:
-        return pkg_path
-
-
 def run(pkgs):
-    """Rename PKGs based on SFO metadata when enabled."""
-    if not settings.AUTO_RENAME_PKGS:
-        return
+    """Rename PKGs based on SFO metadata."""
+    def format_pkg_name(template, data):
+        safe = {}
+        for key, value in data.items():
+            if value is None:
+                safe[key] = ""
+            elif key == "title":
+                title_value = str(value)
+                if settings.AUTO_PKG_RENAMER_MODE == "uppercase":
+                    title_value = title_value.upper()
+                elif settings.AUTO_PKG_RENAMER_MODE == "lowercase":
+                    title_value = title_value.lower()
+                elif settings.AUTO_PKG_RENAMER_MODE == "capitalize":
+                    title_value = " ".join(part.capitalize() for part in value.split())
+                title_value = re.sub(r"([A-Za-z])([0-9])", r"\1_\2", title_value)
+                value_str = title_value
+            else:
+                value_str = str(value)
+            value_str = re.sub(r"[\/\\:-]+", "_", value_str)
+            value_str = re.sub(r"[^A-Za-z0-9 _!\[\]\(\)\.']+", "_", value_str).strip()
+            value_str = "_".join(part for part in value_str.split() if part)
+            while "__" in value_str:
+                value_str = value_str.replace("__", "_")
+            safe[key] = value_str
+        name = template.format_map(safe).strip()
+        if not name.lower().endswith(".pkg"):
+            name = f"{name}.pkg"
+        return name
+
+    def rename_pkg(pkg_path, title, titleid, apptype, region, version, category, content_id, app_type):
+        if not titleid:
+            return pkg_path
+        new_name = format_pkg_name(
+            settings.AUTO_PKG_RENAMER_TEMPLATE,
+            {
+                "title": title,
+                "titleid": titleid,
+                "version": version,
+                "category": category,
+                "content_id": content_id,
+                "app_type": app_type,
+                "apptype": apptype,
+                "region": region,
+            },
+        )
+        if pkg_path.name == new_name:
+            return pkg_path
+        target_path = pkg_path.with_name(new_name)
+        if target_path.exists():
+            return pkg_path
+        try:
+            pkg_path.rename(target_path)
+            log("modified", f"Renamed PKG to {target_path}")
+            return target_path
+        except Exception:
+            return pkg_path
+
     for pkg, data in pkgs:
-        maybe_rename_pkg(
+        rename_pkg(
             pkg,
             data.get("title"),
             data.get("titleid"),

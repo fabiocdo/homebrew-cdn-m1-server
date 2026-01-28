@@ -7,10 +7,11 @@ export TERM
 # DEFAULT ENVIRONMENT VARIABLES
 DEFAULT_BASE_URL="http://127.0.0.1:8080"
 DEFAULT_AUTO_GENERATE_JSON_PERIOD=2
-DEFAULT_AUTO_RENAME_PKGS="false"
-DEFAULT_AUTO_RENAME_TEMPLATE="{title} [{titleid}][{apptype}]"
-DEFAULT_AUTO_RENAME_TITLE_MODE="none"
-DEFAULT_AUTO_MOVE_PKG="true"
+DEFAULT_AUTO_PKG_RENAMER_ENABLED="false"
+DEFAULT_AUTO_PKG_RENAMER_TEMPLATE="{title} [{titleid}][{apptype}]"
+DEFAULT_AUTO_PKG_RENAMER_MODE="none"
+DEFAULT_AUTO_PKG_MOVER_ENABLED="true"
+DEFAULT_AUTO_PKG_MOVER_EXCLUDED_DIRS="app"
 
 # ENVIRONMENT VARIABLES
 use_default_if_unset() {
@@ -24,10 +25,11 @@ use_default_if_unset() {
 
 use_default_if_unset BASE_URL "$DEFAULT_BASE_URL"
 use_default_if_unset AUTO_GENERATE_JSON_PERIOD "$DEFAULT_AUTO_GENERATE_JSON_PERIOD"
-use_default_if_unset AUTO_RENAME_PKGS "$DEFAULT_AUTO_RENAME_PKGS"
-use_default_if_unset AUTO_RENAME_TEMPLATE "$DEFAULT_AUTO_RENAME_TEMPLATE"
-use_default_if_unset AUTO_RENAME_TITLE_MODE "$DEFAULT_AUTO_RENAME_TITLE_MODE"
-use_default_if_unset AUTO_MOVE_PKG "$DEFAULT_AUTO_MOVE_PKG"
+use_default_if_unset AUTO_PKG_RENAMER_ENABLED "$DEFAULT_AUTO_PKG_RENAMER_ENABLED"
+use_default_if_unset AUTO_PKG_RENAMER_TEMPLATE "$DEFAULT_AUTO_PKG_RENAMER_TEMPLATE"
+use_default_if_unset AUTO_PKG_RENAMER_MODE "$DEFAULT_AUTO_PKG_RENAMER_MODE"
+use_default_if_unset AUTO_PKG_MOVER_ENABLED "$DEFAULT_AUTO_PKG_MOVER_ENABLED"
+use_default_if_unset AUTO_PKG_MOVER_EXCLUDED_DIRS "$DEFAULT_AUTO_PKG_MOVER_EXCLUDED_DIRS"
 
 # CDN PATHs
 DATA_DIR="/data"
@@ -111,10 +113,11 @@ log ""
 log "[·] Starting Auto Indexer with settings:"
 log_table "SERVER URL" "$(format_value BASE_URL "$BASE_URL")"
 log_table "AUTO_GENERATE_JSON_PERIOD" "$(format_value AUTO_GENERATE_JSON_PERIOD "$AUTO_GENERATE_JSON_PERIOD")"
-log_table "AUTO_RENAME_PKGS" "$(format_value AUTO_RENAME_PKGS "$AUTO_RENAME_PKGS")"
-log_table "AUTO_RENAME_TEMPLATE" "$(format_value AUTO_RENAME_TEMPLATE "$AUTO_RENAME_TEMPLATE")"
-log_table "AUTO_RENAME_TITLE_MODE" "$(format_value AUTO_RENAME_TITLE_MODE "$AUTO_RENAME_TITLE_MODE")"
-log_table "AUTO_MOVE_PKG" "$(format_value AUTO_MOVE_PKG "$AUTO_MOVE_PKG")"
+log_table "AUTO_PKG_RENAMER_ENABLED" "$(format_value AUTO_PKG_RENAMER_ENABLED "$AUTO_PKG_RENAMER_ENABLED")"
+log_table "AUTO_PKG_RENAMER_TEMPLATE" "$(format_value AUTO_PKG_RENAMER_TEMPLATE "$AUTO_PKG_RENAMER_TEMPLATE")"
+log_table "AUTO_PKG_RENAMER_MODE" "$(format_value AUTO_PKG_RENAMER_MODE "$AUTO_PKG_RENAMER_MODE")"
+log_table "AUTO_PKG_MOVER_ENABLED" "$(format_value AUTO_PKG_MOVER_ENABLED "$AUTO_PKG_MOVER_ENABLED")"
+log_table "AUTO_PKG_MOVER_EXCLUDED_DIRS" "$(format_value AUTO_PKG_MOVER_EXCLUDED_DIRS "$AUTO_PKG_MOVER_EXCLUDED_DIRS")"
 log ""
 
 initialize_dir
@@ -123,7 +126,8 @@ log ""
 exec python3 -u /scripts/watcher.py \
   --base-url "$BASE_URL" \
   --auto-generate-json-period "$AUTO_GENERATE_JSON_PERIOD" \
-  --auto-rename-pkgs "$AUTO_RENAME_PKGS" \
-  --auto-rename-template "$AUTO_RENAME_TEMPLATE" \
-  --auto-rename-title-mode "$AUTO_RENAME_TITLE_MODE" \
-  --auto-move-pkg "$AUTO_MOVE_PKG"
+  --auto-pkg-renamer-enabled "$AUTO_PKG_RENAMER_ENABLED" \
+  --auto-pkg-renamer-template "$AUTO_PKG_RENAMER_TEMPLATE" \
+  --auto-pkg-renamer-mode "$AUTO_PKG_RENAMER_MODE" \
+  --auto-pkg-mover-enabled "$AUTO_PKG_MOVER_ENABLED" \
+  --auto-pkg-mover-excluded-dirs "$AUTO_PKG_MOVER_EXCLUDED_DIRS"

@@ -25,10 +25,11 @@ def parse_config():
 
     settings.BASE_URL = args.base_url
     settings.AUTO_GENERATE_JSON_PERIOD = args.auto_generate_json_period
-    settings.AUTO_RENAME_PKGS = parse_bool(args.auto_rename_pkgs)
-    settings.AUTO_RENAME_TEMPLATE = args.auto_rename_template
-    settings.AUTO_RENAME_TITLE_MODE = args.auto_rename_title_mode
-    settings.AUTO_MOVE_PKG = parse_bool(args.auto_move_pkg)
+    settings.AUTO_PKG_RENAMER_ENABLED = parse_bool(args.auto_pkg_renamer_enabled)
+    settings.AUTO_PKG_RENAMER_TEMPLATE = args.auto_pkg_renamer_template
+    settings.AUTO_PKG_RENAMER_MODE = args.auto_pkg_renamer_mode
+    settings.AUTO_PKG_MOVER_ENABLED = parse_bool(args.auto_pkg_mover_enabled)
+    settings.AUTO_PKG_MOVER_EXCLUDED_DIRS = args.auto_pkg_mover_excluded_dirs
 
 
 def watch_pkg_dir(auto_generate_json_period):
@@ -58,11 +59,11 @@ def watch_pkg_dir(auto_generate_json_period):
 
     def handle_change():
         pkgs = list(scan_pkgs())
-        if settings.AUTO_RENAME_PKGS:
+        if settings.AUTO_PKG_RENAMER_ENABLED:
             run_renamer(pkgs)
-        if settings.AUTO_MOVE_PKG:
+        if settings.AUTO_PKG_MOVER_ENABLED:
             run_mover(pkgs)
-        if settings.AUTO_RENAME_PKGS or settings.AUTO_MOVE_PKG:
+        if settings.AUTO_PKG_RENAMER_ENABLED or settings.AUTO_PKG_MOVER_ENABLED:
             pkgs = list(scan_pkgs())
         schedule_generate(pkgs)
 
@@ -127,11 +128,11 @@ def main():
     pkgs = []
     if settings.PKG_DIR.exists():
         pkgs = list(scan_pkgs())
-    if settings.AUTO_RENAME_PKGS:
+    if settings.AUTO_PKG_RENAMER_ENABLED:
         run_renamer(pkgs)
-    if settings.AUTO_MOVE_PKG:
+    if settings.AUTO_PKG_MOVER_ENABLED:
         run_mover(pkgs)
-    if settings.AUTO_RENAME_PKGS or settings.AUTO_MOVE_PKG:
+    if settings.AUTO_PKG_RENAMER_ENABLED or settings.AUTO_PKG_MOVER_ENABLED:
         pkgs = list(scan_pkgs())
     build_index(pkgs)
     watch_pkg_dir(settings.AUTO_GENERATE_JSON_PERIOD)

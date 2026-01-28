@@ -10,9 +10,11 @@ services:
     environment:
       - BASE_URL=http://127.0.0.1:8080
       - AUTO_GENERATE_JSON_PERIOD=2
-      - AUTO_RENAME_PKGS=false
-      - AUTO_RENAME_TEMPLATE={title} [{titleid}][{apptype}]
-      - AUTO_RENAME_TITLE_MODE=none
+      - AUTO_PKG_RENAMER_ENABLED=false
+      - AUTO_PKG_RENAMER_TEMPLATE={title} [{titleid}][{apptype}]
+      - AUTO_PKG_RENAMER_MODE=none
+      - AUTO_PKG_MOVER_ENABLED=true
+      - AUTO_PKG_MOVER_EXCLUDED_DIRS=app
     volumes:
       - ./data:/data
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
