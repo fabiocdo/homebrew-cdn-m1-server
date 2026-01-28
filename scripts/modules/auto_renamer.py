@@ -146,7 +146,7 @@ def apply(dry_result):
         if not base.exists():
             return None
         settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
-        conflict_dir = settings.DATA_DIR / "_conflict"
+        conflict_dir = settings.DATA_DIR / "_errors"
         conflict_dir.mkdir(parents=True, exist_ok=True)
         suffix = "_conflict"
         if base.suffix:

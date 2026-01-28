@@ -20,9 +20,33 @@ def dry_run(pkgs, skip_paths=None):
 
     def is_excluded(path):
         return any(part in excluded for part in path.parts)
+
+    def conflict_dir():
+        settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        target = settings.DATA_DIR / "_errors"
+        target.mkdir(parents=True, exist_ok=True)
+        return target
+
+    def conflict_target_for(path):
+        base = Path(path)
+        target_dir = conflict_dir()
+        candidate = target_dir / base.name
+        counter = 1
+        while candidate.exists():
+            if base.suffix:
+                candidate = target_dir / f"{base.stem}_{counter}{base.suffix}"
+            else:
+                candidate = target_dir / f"{base.name}_{counter}"
+            counter += 1
+        return candidate
     for pkg, data in pkgs:
         if "_conflict" in pkg.stem:
-            log("debug", f"Skipping move; quarantined file: {pkg}", module="AUTO_MOVER")
+            target = conflict_target_for(pkg)
+            try:
+                shutil.move(str(pkg), str(target))
+                log("warn", "Moved conflict file to _errors directory", module="AUTO_MOVER")
+            except Exception:
+                pass
             continue
         apptype = data.get("apptype")
         if apptype not in settings.APPTYPE_PATHS:
