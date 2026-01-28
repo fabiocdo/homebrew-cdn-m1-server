@@ -22,7 +22,6 @@ def dry_run(pkgs, skip_paths=None):
     for pkg, data in pkgs:
         if str(pkg) in skip_set:
             skipped_combined.append(str(pkg))
-            log("debug", f"Skipping move; blocked by combined dry-run: {pkg}", module="AUTO_MOVER")
             continue
         apptype = data.get("apptype")
         if apptype not in settings.APPTYPE_PATHS:
@@ -71,16 +70,13 @@ def apply(dry_result):
             "Moved: " + "; ".join(f"{src} -> {dest}" for src, dest in moved),
             module="AUTO_MOVER",
         )
-    if dry_result.get("skipped_existing"):
+    skipped_existing = dry_result.get("skipped_existing", [])
+    skipped_combined = dry_result.get("skipped_combined", [])
+    skipped_existing_total = len(skipped_existing) + len(skipped_combined)
+    if skipped_existing_total:
         log(
             "warn",
-            f"Skipped {len(dry_result['skipped_existing'])} move(s); target already exists",
-            module="AUTO_MOVER",
-        )
-    if dry_result.get("skipped_combined"):
-        log(
-            "debug",
-            f"Skipped {len(dry_result['skipped_combined'])} move(s); blocked by combined dry-run",
+            f"Skipped {skipped_existing_total} move(s); target already exists",
             module="AUTO_MOVER",
         )
     if dry_result.get("skipped_excluded"):
