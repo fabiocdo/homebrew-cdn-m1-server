@@ -10,6 +10,10 @@ def run(pkgs):
     planned = {}
     blocked = set()
     conflicted = set()
+    excluded_apptypes = set()
+    if settings.AUTO_MOVER_EXCLUDED_DIRS:
+        parts = [part.strip() for part in settings.AUTO_MOVER_EXCLUDED_DIRS.split(",")]
+        excluded_apptypes = {part for part in parts if part}
 
     def format_pkg_name(template, data):
         safe = {}
@@ -74,6 +78,12 @@ def run(pkgs):
         )
         if target_path is None:
             continue
+        apptype_dir = settings.APPTYPE_PATHS.get(apptype) if apptype else None
+        if apptype_dir and apptype not in excluded_apptypes:
+            apptype_target = apptype_dir / target_path.name
+            if apptype_target.exists():
+                blocked.add(apptype_target)
+                continue
         if target_path.exists():
             blocked.add(target_path)
             continue
