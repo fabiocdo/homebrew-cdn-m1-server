@@ -112,29 +112,8 @@ def start():
             run_indexer(pkgs)
 
 
-        created = set()
-        moved = set()
-        deleted = set()
-        for path, event_str in manual_events:
-            events = {item.strip() for item in event_str.split(",") if item.strip()}
-            if "MOVED_FROM" in events or "MOVED_TO" in events:
-                moved.add(path)
-                continue
-            if "DELETE" in events:
-                deleted.add(path)
-                continue
-            if "CREATE" in events or "CLOSE_WRITE" in events:
-                created.add(path)
-
-        if not initial_run and (created or moved or deleted):
-            parts = []
-            if created:
-                parts.append(f"created {len(created)}")
-            if moved:
-                parts.append(f"moved {len(moved)}")
-            if deleted:
-                parts.append(f"deleted {len(deleted)}")
-            log("debug", f"Manual changes detected: {', '.join(parts)}")
+        if not initial_run:
+            return
 
     run_automations()
     watch(run_automations)

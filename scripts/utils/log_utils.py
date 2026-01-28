@@ -5,7 +5,7 @@ LOGGER = logging.getLogger()
 LOG_SETTINGS = {
     "debug": {
         "level": logging.DEBUG,
-        "color": "\033[0;90m",
+        "color": "\033[0;37m",
         "prefix": "",
     },
     "info": {
