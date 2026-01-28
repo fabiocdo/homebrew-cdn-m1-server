@@ -59,7 +59,7 @@ def run(pkgs):
             pkg_path.rename(target_path)
             log(
                 "modified",
-                f"Auto renamed: {pkg_path} -> {target_path}",
+                f"Renamed: {pkg_path} -> {target_path}",
                 module="AUTO_RENAMER",
             )
             return target_path

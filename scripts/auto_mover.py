@@ -37,7 +37,7 @@ def run(pkgs):
             shutil.move(str(pkg), str(target_path))
             log(
                 "modified",
-                f"Auto moved: {pkg} -> {target_path}",
+                f"Moved: {pkg} -> {target_path}",
                 module="AUTO_MOVER",
             )
         except Exception as e:
