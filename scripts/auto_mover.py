@@ -38,7 +38,7 @@ def dry_run(pkgs, skip_paths=None):
             skipped_excluded.append(str(pkg))
             continue
         if str(pkg) in skip_set:
-            skipped_combined.append(str(target_path))
+            skipped_combined.append(str(pkg))
             continue
         if target_path.exists():
             skipped_existing.append(str(target_path))
@@ -76,10 +76,10 @@ def apply(dry_result):
             f"Skipped move. {target} target already exists",
             module="AUTO_MOVER",
         )
-    for target in dry_result.get("skipped_combined", []):
+    for source in dry_result.get("skipped_combined", []):
         log(
             "warn",
-            f"Skipped move. {target} target already exists",
+            f"Skipped move. {source} target already exists",
             module="AUTO_MOVER",
         )
     if errors:
