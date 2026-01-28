@@ -20,7 +20,15 @@ def run(pkgs):
 
     def save_cache(cache):
         settings.CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        settings.CACHE_PATH.write_text(json.dumps(cache, indent=2))
+        new_content = json.dumps(cache, indent=2)
+        if settings.CACHE_PATH.exists():
+            try:
+                if settings.CACHE_PATH.read_text() == new_content:
+                    return False
+            except Exception:
+                pass
+        settings.CACHE_PATH.write_text(new_content)
+        return True
 
     cache = load_cache()
     apps = []
@@ -91,13 +99,24 @@ def run(pkgs):
         apps.append(app)
 
     cache["pkgs"] = new_cache_pkgs
-    save_cache(cache)
+    cache_written = save_cache(cache)
 
-    with open(settings.INDEX_PATH, "w") as f:
-        json.dump({"apps": apps}, f, indent=2)
+    index_payload = {"apps": apps}
+    index_written = True
+    if settings.INDEX_PATH.exists():
+        try:
+            if json.loads(settings.INDEX_PATH.read_text()) == index_payload:
+                index_written = False
+            else:
+                settings.INDEX_PATH.write_text(json.dumps(index_payload, indent=2))
+        except Exception:
+            settings.INDEX_PATH.write_text(json.dumps(index_payload, indent=2))
+    else:
+        settings.INDEX_PATH.write_text(json.dumps(index_payload, indent=2))
 
-    message = "Generated index.json and index-cache.json"
-    if icon_extracted:
-        message = f"{message}; extracted {icon_extracted} icon(s)"
-    log("info", message, module="AUTO_INDEXER")
+    if cache_written or index_written or icon_extracted:
+        message = "Generated index.json and index-cache.json"
+        if icon_extracted:
+            message = f"{message}; extracted {icon_extracted} icon(s)"
+        log("info", message, module="AUTO_INDEXER")
     return 0
