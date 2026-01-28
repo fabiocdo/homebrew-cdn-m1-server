@@ -7,22 +7,22 @@ LOG_SETTINGS = {
     "debug": {
         "level": logging.DEBUG,
         "color": "\033[0;90m",
-        "prefix": "[DEBUG]",
+        "prefix": "",
     },
     "info": {
         "level": logging.INFO,
         "color": "\033[0m",
-        "prefix": "[INFO]",
+        "prefix": "",
     },
     "warn": {
         "level": logging.WARNING,
         "color": "\033[0;33m",
-        "prefix": "[WARN]",
+        "prefix": "",
     },
     "error": {
         "level": logging.ERROR,
         "color": "\033[0;31m",
-        "prefix": "[ERROR]",
+        "prefix": "",
     },
 }
 DEDUPE_WINDOW_SECONDS = 2.0
@@ -63,4 +63,5 @@ def log(action, message, module=None):
     if last is not None and (now - last) < DEDUPE_WINDOW_SECONDS:
         return
     _last_log_times[key] = now
-    LOGGER.log(level, f"{color}{prefix} {module_tag}{message}\033[0m")
+    sep = " " if prefix else ""
+    LOGGER.log(level, f"{color}{prefix}{sep}{module_tag}{message}\033[0m")
