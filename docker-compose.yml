@@ -11,7 +11,7 @@ services:
       - BASE_URL=http://192.168.15.69:8080
       - PKG_WATCHER_ENABLED=true
       - AUTO_INDEXER_ENABLED=true
-      - LOG_LEVEL=info
+      - LOG_LEVEL=debug
       - AUTO_RENAMER_ENABLED=true
       - AUTO_RENAMER_TEMPLATE={title}_[{titleid}]_[{region}]_[{apptype}]_[{version}]
       - AUTO_RENAMER_MODE=uppercase
