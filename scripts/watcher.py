@@ -2,6 +2,7 @@ import argparse
 import shutil
 import subprocess
 import threading
+import time
 
 import settings
 from auto_indexer import run as run_indexer
@@ -111,17 +112,27 @@ def start():
         log("info", "Automation watcher disabled.")
         return
     debounce_timer = None
+    last_event_at = None
 
-    def schedule_generate(pkgs):
-        nonlocal debounce_timer
+    def schedule_generate():
+        nonlocal debounce_timer, last_event_at
         if not settings.AUTO_INDEXER_ENABLED:
             return
+        last_event_at = time.monotonic()
         if debounce_timer and debounce_timer.is_alive():
-            debounce_timer.cancel()
+            return
 
         def run():
             nonlocal debounce_timer
+            now = time.monotonic()
+            remaining = settings.AUTO_INDEXER_DEBOUNCE_TIME_SECONDS - (now - last_event_at)
+            if remaining > 0:
+                debounce_timer = threading.Timer(remaining, run)
+                debounce_timer.daemon = True
+                debounce_timer.start()
+                return
             debounce_timer = None
+            pkgs = list(scan_pkgs()) if settings.PKG_DIR.exists() else []
             run_indexer(pkgs)
 
         debounce_timer = threading.Timer(
@@ -142,7 +153,7 @@ def start():
         if settings.AUTO_RENAMER_ENABLED or settings.AUTO_MOVER_ENABLED:
             pkgs = list(scan_pkgs()) if settings.PKG_DIR.exists() else []
         if schedule_index:
-            schedule_generate(pkgs)
+            schedule_generate()
         elif settings.AUTO_INDEXER_ENABLED:
             run_indexer(pkgs)
 
