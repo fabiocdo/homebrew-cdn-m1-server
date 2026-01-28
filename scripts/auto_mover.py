@@ -27,10 +27,22 @@ def run(pkgs):
         if pkg.resolve() == target_path.resolve():
             continue
         if target_path.exists():
-            log("error", f"Target already exists, skipping move: {target_path}")
+            log(
+                "error",
+                f"Target already exists, skipping move: {target_path}",
+                module="AUTO_MOVER",
+            )
             continue
         try:
             shutil.move(str(pkg), str(target_path))
-            log("modified", f"[AUTO-MOVER] Moved: {pkg} -> {target_path}")
+            log(
+                "modified",
+                f"Auto moved: {pkg} -> {target_path}",
+                module="AUTO_MOVER",
+            )
         except Exception as e:
-            log("error", f"Error moving PKG to {target_path}: {e}")
+            log(
+                "error",
+                f"Error moving PKG to {target_path}: {e}",
+                module="AUTO_MOVER",
+            )

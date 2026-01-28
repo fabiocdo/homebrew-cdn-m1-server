@@ -2,12 +2,14 @@ import logging
 
 LOGGER = logging.getLogger()
 COLORS = {
-    "created": "\033[0;32m",
-    "modified": "\033[0;33m",
-    "deleted": "\033[0;91m",
-    "error": "\033[1;35m",
-    "info": "\033[0m",
+    "error": "\033[0;31m",
+    "info": "\033[0;37m",
     "default": "\033[0m",
+}
+MODULE_COLORS = {
+    "AUTO_INDEXER": "\033[0;32m",
+    "AUTO_MOVER": "\033[0;33m",
+    "AUTO_RENAMER": "\033[0;34m",
 }
 LOG_LEVELS = {
     "created": logging.INFO,
@@ -28,8 +30,12 @@ if not LOGGER.handlers:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 
-def log(action, message):
+def log(action, message, module=None):
     level = LOG_LEVELS.get(action, logging.INFO)
     prefix = LOG_PREFIXES.get(action, "[*]")
-    color = COLORS.get(action, COLORS["default"])
-    LOGGER.log(level, f"{color}{prefix} {message}\033[0m")
+    if module:
+        color = MODULE_COLORS[module]
+    else:
+        color = COLORS.get(action, COLORS["default"])
+    module_tag = f"[{module}] " if module else ""
+    LOGGER.log(level, f"{color}{prefix} {module_tag}{message}\033[0m")

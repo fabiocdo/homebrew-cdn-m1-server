@@ -57,7 +57,11 @@ def run(pkgs):
             return pkg_path
         try:
             pkg_path.rename(target_path)
-            log("modified", f"[AUTO-RENAMER] Renamed: {pkg_path} -> {target_path}")
+            log(
+                "modified",
+                f"Auto renamed: {pkg_path} -> {target_path}",
+                module="AUTO_RENAMER",
+            )
             return target_path
         except Exception:
             return pkg_path

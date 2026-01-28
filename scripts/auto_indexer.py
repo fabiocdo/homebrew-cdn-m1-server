@@ -19,7 +19,7 @@ def run(pkgs):
     def save_cache(cache):
         settings.CACHE_DIR.mkdir(parents=True, exist_ok=True)
         settings.CACHE_PATH.write_text(json.dumps(cache, indent=2))
-        log("created", "[AUTO-INDEXER] Generated: index-cache.json")
+        log("created", "Auto generated: index-cache.json", module="AUTO_INDEXER")
 
     cache = load_cache()
     apps = []
@@ -95,5 +95,5 @@ def run(pkgs):
     with open(settings.INDEX_PATH, "w") as f:
         json.dump({"apps": apps}, f, indent=2)
 
-    log("created", "[AUTO-INDEXER] Generated: index.json")
+    log("created", "Auto generated: index.json", module="AUTO_INDEXER")
     return 0
