@@ -50,9 +50,9 @@ def watch_pkg_dir(auto_generate_json_period):
         debounce_timer.start()
 
     def handle_change():
-        if AUTO_RENAME_PKGS:
+        if settings.AUTO_RENAME_PKGS:
             run_renamer()
-        if AUTO_MOVE_PKG:
+        if settings.AUTO_MOVE_PKG:
             run_mover()
         schedule_generate()
 
