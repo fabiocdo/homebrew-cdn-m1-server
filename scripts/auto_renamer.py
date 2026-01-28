@@ -7,6 +7,9 @@ from utils.log_utils import log
 def run(pkgs):
     """Rename PKGs based on SFO metadata."""
     renamed = []
+    planned = {}
+    blocked = set()
+    conflicted = set()
 
     def format_pkg_name(template, data):
         safe = {}
@@ -36,9 +39,9 @@ def run(pkgs):
             name = f"{name}.pkg"
         return name
 
-    def rename_pkg(pkg_path, title, titleid, apptype, region, version, category, content_id, app_type):
+    def planned_rename(pkg_path, title, titleid, apptype, region, version, category, content_id, app_type):
         if not titleid:
-            return pkg_path, False
+            return pkg_path, None
         new_name = format_pkg_name(
             settings.AUTO_RENAMER_TEMPLATE,
             {
@@ -53,18 +56,12 @@ def run(pkgs):
             },
         )
         if pkg_path.name == new_name:
-            return pkg_path, False
+            return pkg_path, None
         target_path = pkg_path.with_name(new_name)
-        if target_path.exists():
-            return pkg_path, False
-        try:
-            pkg_path.rename(target_path)
-            return target_path, True
-        except Exception:
-            return pkg_path, False
+        return pkg_path, target_path
 
     for pkg, data in pkgs:
-        new_path, changed = rename_pkg(
+        source_path, target_path = planned_rename(
             pkg,
             data.get("title"),
             data.get("titleid"),
@@ -75,13 +72,42 @@ def run(pkgs):
             data.get("content_id"),
             data.get("app_type"),
         )
-        if changed:
-            renamed.append((pkg, new_path))
+        if target_path is None:
+            continue
+        if target_path.exists():
+            blocked.add(target_path)
+            continue
+        planned.setdefault(target_path, []).append(source_path)
+
+    for target_path, sources in planned.items():
+        if target_path in blocked:
+            continue
+        if len(sources) > 1:
+            conflicted.add(target_path)
+            continue
+        source_path = sources[0]
+        try:
+            source_path.rename(target_path)
+            renamed.append((source_path, target_path))
+        except Exception:
+            continue
 
     if renamed:
         log(
             "info",
             "Renamed: " + "; ".join(f"{src} -> {dest}" for src, dest in renamed),
+            module="AUTO_RENAMER",
+        )
+    if blocked:
+        log(
+            "warn",
+            f"Skipped {len(blocked)} rename(s); target already exists",
+            module="AUTO_RENAMER",
+        )
+    if conflicted:
+        log(
+            "warn",
+            f"Skipped {len(conflicted)} rename(s); conflicting targets",
             module="AUTO_RENAMER",
         )
 
