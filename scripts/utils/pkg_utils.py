@@ -8,6 +8,18 @@ from tools.pkgtool import run_pkgtool
 
 def extract_pkg_data(pkg_path, include_icon=False):
     """Extract and normalize PKG metadata, optionally including icon bytes."""
+    stage = "init"
+    stage_labels = {
+        "init": "Initializing",
+        "pkg_listentries": "Reading PKG entries",
+        "param_sfo_not_found": "PARAM.SFO not found",
+        "pkg_extractentry": "Extracting PARAM.SFO",
+        "param_sfo_missing": "PARAM.SFO missing",
+        "sfo_listentries": "Reading PARAM.SFO",
+        "normalize": "Normalizing metadata",
+        "icon_extract": "Extracting icon",
+        "build_data": "Building metadata",
+    }
 
     def process_entries(entries_output):
         sfo_entry = None
@@ -135,23 +147,31 @@ def extract_pkg_data(pkg_path, include_icon=False):
 
     with tempfile.TemporaryDirectory(prefix="pkg_extract_") as tmpdir:
         tmp_root = pathlib.Path(tmpdir)
+        stage = "pkg_listentries"
         entries_output = run_pkgtool(["pkg_listentries", str(pkg_path)])
         sfo_entry, icon_entry = process_entries(entries_output)
 
         if sfo_entry is None:
-            raise RuntimeError(f"PARAM_SFO not found in {pkg_path}")
+            stage = "param_sfo_not_found"
+            raise RuntimeError("PARAM_SFO not found")
 
         sfo_path = tmp_root / "param.sfo"
+        stage = "pkg_extractentry"
         run_pkgtool(["pkg_extractentry", str(pkg_path), str(sfo_entry), str(sfo_path)])
         if not sfo_path.exists():
-            raise RuntimeError(f"PARAM_SFO not found in {pkg_path}")
+            stage = "param_sfo_missing"
+            raise RuntimeError("PARAM_SFO not found")
 
+        stage = "sfo_listentries"
         info = process_info(sfo_path)
+        stage = "normalize"
         process_app_type(info)
         process_apptype(info)
         process_region(info)
+        stage = "icon_extract"
         icon_bytes = process_icon_bytes(icon_entry, tmp_root)
 
+        stage = "build_data"
         data = build_data(info)
         return {"data": data, "icon_bytes": icon_bytes}
 
@@ -163,8 +183,9 @@ def scan_pkgs():
             continue
         try:
             result = extract_pkg_data(pkg, include_icon=False)
-        except Exception as e:
-            log("error", f"Failed to read PKG metadata: {pkg} ({e})")
+        except Exception:
+            stage_label = stage_labels.get(stage, "Unknown stage")
+            log("error", f"Failed to read PKG metadata ({stage_label}): {pkg}")
             try:
                 settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
                 error_dir = settings.DATA_DIR / "_errors"
