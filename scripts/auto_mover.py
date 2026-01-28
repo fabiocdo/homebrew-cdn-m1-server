@@ -1,4 +1,5 @@
 import shutil
+import time
 
 import settings
 from utils.log_utils import log
@@ -59,6 +60,7 @@ def apply(dry_result):
     """Execute moves from a dry-run plan."""
     moved = []
     errors = []
+    conflict_log_times = {}
     for pkg, target_path in dry_result.get("plan", []):
         try:
             shutil.move(str(pkg), str(target_path))
@@ -73,6 +75,11 @@ def apply(dry_result):
             module="AUTO_MOVER",
         )
     for target in dry_result.get("skipped_conflict", []):
+        now = time.monotonic()
+        last = conflict_log_times.get(target)
+        if last is not None and (now - last) < 3.0:
+            continue
+        conflict_log_times[target] = now
         log(
             "warn",
             "Skipped move. A file with the same name already exists in the target directory",
