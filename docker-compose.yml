@@ -11,8 +11,6 @@ services:
       - BASE_URL=http://192.168.15.69:8080
       - PKG_WATCHER_ENABLED=true
       - AUTO_INDEXER_ENABLED=true
-      - AUTO_INDEXER_DEBOUNCE_TIME_SECONDS=3
-      - WATCHER_EVENT_DEBOUNCE_SECONDS=5
       - LOG_LEVEL=info
       - AUTO_RENAMER_ENABLED=true
       - AUTO_RENAMER_TEMPLATE={title}_[{titleid}]_[{region}]_[{apptype}]_[{version}]

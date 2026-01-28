@@ -1,8 +1,6 @@
 import argparse
 import shutil
 import subprocess
-import threading
-import time
 
 import settings
 from auto_indexer import run as run_indexer
@@ -26,10 +24,6 @@ def parse_settings():
 
     settings.BASE_URL = args.base_url
     settings.PKG_WATCHER_ENABLED = parse_bool(args.pkg_watcher_enabled)
-    settings.AUTO_INDEXER_DEBOUNCE_TIME_SECONDS = (
-        args.auto_indexer_debounce_time_seconds
-    )
-    settings.WATCHER_EVENT_DEBOUNCE_SECONDS = args.watcher_event_debounce_seconds
     settings.AUTO_RENAMER_ENABLED = parse_bool(args.auto_renamer_enabled)
     settings.AUTO_RENAMER_TEMPLATE = args.auto_renamer_template
     settings.AUTO_RENAMER_MODE = args.auto_renamer_mode.lower()
@@ -76,30 +70,6 @@ def watch(on_change):
     if process.stdout is None:
         return
 
-    pending_events = []
-    debounce_timer = None
-
-    def flush_events():
-        nonlocal pending_events, debounce_timer
-        if not pending_events:
-            debounce_timer = None
-            return
-        batch = pending_events
-        pending_events = []
-        debounce_timer = None
-        on_change(batch)
-
-    def schedule_flush():
-        nonlocal debounce_timer
-        if debounce_timer and debounce_timer.is_alive():
-            debounce_timer.cancel()
-        debounce_timer = threading.Timer(
-            settings.WATCHER_EVENT_DEBOUNCE_SECONDS,
-            flush_events,
-        )
-        debounce_timer.daemon = True
-        debounce_timer.start()
-
     for line in process.stdout:
         line = line.strip()
         if not line:
@@ -109,56 +79,18 @@ def watch(on_change):
             continue
         path, events = line.split("|", 1)
         log("debug", f"Captured events: {events} on {path}", module="WATCHER")
-        pending_events.append((path, events))
-        schedule_flush()
+        on_change([(path, events)])
 
 
 def start():
     """Entry point for the indexer watcher."""
     parse_settings()
-    debounce_timer = None
-    last_event_at = None
-    module_touched_until = {}
-
-    def schedule_generate():
-        nonlocal debounce_timer, last_event_at
-        if not settings.AUTO_INDEXER_ENABLED:
-            return
-        last_event_at = time.monotonic()
-        if debounce_timer and debounce_timer.is_alive():
-            return
-
-        def run():
-            nonlocal debounce_timer
-            now = time.monotonic()
-            remaining = settings.AUTO_INDEXER_DEBOUNCE_TIME_SECONDS - (now - last_event_at)
-            if remaining > 0:
-                debounce_timer = threading.Timer(remaining, run)
-                debounce_timer.daemon = True
-                debounce_timer.start()
-                return
-            debounce_timer = None
-            pkgs = list(scan_pkgs()) if settings.PKG_DIR.exists() else []
-            run_indexer(pkgs)
-
-        debounce_timer = threading.Timer(
-            settings.AUTO_INDEXER_DEBOUNCE_TIME_SECONDS,
-            run,
-        )
-        debounce_timer.daemon = True
-        debounce_timer.start()
 
     def run_automations(events=None):
         initial_run = events is None
         manual_events = []
         if not initial_run:
-            now = time.monotonic()
             for path, event_str in events:
-                expires_at = module_touched_until.get(path)
-                if expires_at is not None and expires_at >= now:
-                    continue
-                if expires_at is not None and expires_at < now:
-                    module_touched_until.pop(path, None)
                 manual_events.append((path, event_str))
 
             if not manual_events:
@@ -177,15 +109,8 @@ def start():
             touched_paths.extend(result.get("touched_paths", []))
             pkgs = list(scan_pkgs()) if settings.PKG_DIR.exists() else []
         if settings.AUTO_INDEXER_ENABLED:
-            if initial_run:
-                run_indexer(pkgs)
-            else:
-                schedule_generate()
+            run_indexer(pkgs)
 
-        if touched_paths:
-            expires_at = time.monotonic() + settings.WATCHER_EVENT_DEBOUNCE_SECONDS
-            for path in touched_paths:
-                module_touched_until[path] = expires_at
 
         created = set()
         moved = set()
