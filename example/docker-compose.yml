@@ -5,6 +5,7 @@ services:
     build: .
     image: fabiocdo/homebrew-store-cdn:latest
     container_name: homebrew-store-cdn
+    tty: true
     ports:
       - "8080:80"
     environment:
