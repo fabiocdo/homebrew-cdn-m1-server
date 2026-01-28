@@ -71,9 +71,6 @@ def dry_run(pkgs):
         return pkg_path, target_path
 
     for pkg, data in pkgs:
-        if "_conflict" in pkg.stem:
-            log("debug", f"Skipping rename; quarantined file: {pkg}", module="AUTO_RENAMER")
-            continue
         source_path, target_path = planned_rename(
             pkg,
             data.get("title"),
