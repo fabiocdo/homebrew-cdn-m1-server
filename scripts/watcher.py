@@ -52,8 +52,6 @@ def watch(on_change):
         "-m",
         "-r",
         "-e",
-        "create",
-        "-e",
         "delete",
         "-e",
         "close_write",
@@ -121,6 +119,8 @@ def start():
                 if touched_at is not None and (now - touched_at) < module_suppression_seconds:
                     continue
                 events = {item.strip() for item in event_str.split(",") if item.strip()}
+                if "CREATE" in events:
+                    continue
                 if "MOVED_FROM" in events:
                     last_moved_from[path] = time.monotonic()
                 if "MOVED_TO" in events:
