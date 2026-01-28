@@ -194,7 +194,7 @@ def apply(dry_result):
             touched_paths.extend([source, str(target)])
             log(
                 "warn",
-                f"Moved file with error to {settings.DATA_DIR / '_errors'}",
+                f"Moved file with error to {settings.DATA_DIR / '_errors'}: {source}",
                 module="AUTO_RENAMER",
             )
     for source in dry_result.get("error_sources", []):
@@ -204,7 +204,7 @@ def apply(dry_result):
             touched_paths.extend([source, str(target)])
             log(
                 "warn",
-                f"Moved file with error to {settings.DATA_DIR / '_errors'}",
+                f"Moved file with error to {settings.DATA_DIR / '_errors'}: {source}",
                 module="AUTO_RENAMER",
             )
     return {"renamed": renamed, "touched_paths": touched_paths, "quarantined_paths": quarantined}

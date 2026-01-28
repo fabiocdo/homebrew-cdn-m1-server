@@ -122,7 +122,7 @@ def apply(dry_result):
             touched_paths.extend([source, str(target)])
             log(
                 "warn",
-                f"Moved file with error to {settings.DATA_DIR / '_errors'}",
+                f"Moved file with error to {settings.DATA_DIR / '_errors'}: {source}",
                 module="AUTO_MOVER",
             )
     return {"moved": moved, "errors": errors, "touched_paths": touched_paths, "quarantined_paths": quarantined}
