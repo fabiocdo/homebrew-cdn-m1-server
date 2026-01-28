@@ -1,4 +1,5 @@
 import shutil
+from pathlib import Path
 
 import settings
 from utils.log_utils import log
@@ -9,6 +10,7 @@ def dry_run(pkgs, skip_paths=None):
     plan = []
     skipped_conflict = []
     skipped_excluded = []
+    conflict_sources = []
     skip_set = {str(path) for path in (skip_paths or [])}
 
     excluded = set()
@@ -19,6 +21,9 @@ def dry_run(pkgs, skip_paths=None):
     def is_excluded(path):
         return any(part in excluded for part in path.parts)
     for pkg, data in pkgs:
+        if "_conflict" in pkg.stem:
+            log("debug", f"Skipping move; quarantined file: {pkg}", module="AUTO_MOVER")
+            continue
         apptype = data.get("apptype")
         if apptype not in settings.APPTYPE_PATHS:
             continue
@@ -45,6 +50,7 @@ def dry_run(pkgs, skip_paths=None):
             continue
         if target_path.exists():
             skipped_conflict.append(str(target_path))
+            conflict_sources.append(str(pkg))
             continue
         plan.append((pkg, target_path))
 
@@ -52,6 +58,7 @@ def dry_run(pkgs, skip_paths=None):
         "plan": plan,
         "skipped_conflict": skipped_conflict,
         "skipped_excluded": skipped_excluded,
+        "conflict_sources": conflict_sources,
     }
 
 
@@ -59,6 +66,33 @@ def apply(dry_result):
     """Execute moves from a dry-run plan."""
     moved = []
     errors = []
+    quarantined = []
+
+    def quarantine_path(path):
+        base = Path(path)
+        if not base.exists():
+            return None
+        settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        conflict_dir = settings.DATA_DIR / "_conflict"
+        conflict_dir.mkdir(parents=True, exist_ok=True)
+        suffix = "_conflict"
+        if base.suffix:
+            stem = base.stem + suffix
+            candidate = conflict_dir / f"{stem}{base.suffix}"
+        else:
+            candidate = conflict_dir / f"{base.name}{suffix}"
+        counter = 1
+        while candidate.exists():
+            if base.suffix:
+                candidate = conflict_dir / f"{base.stem}{suffix}_{counter}{base.suffix}"
+            else:
+                candidate = conflict_dir / f"{base.name}{suffix}_{counter}"
+            counter += 1
+        try:
+            base.rename(candidate)
+            return candidate
+        except Exception:
+            return None
     for pkg, target_path in dry_result.get("plan", []):
         try:
             shutil.move(str(pkg), str(target_path))
@@ -88,7 +122,17 @@ def apply(dry_result):
     touched_paths = []
     for src, dest in moved:
         touched_paths.extend([str(src), str(dest)])
-    return {"moved": moved, "errors": errors, "touched_paths": touched_paths}
+    for source in dry_result.get("conflict_sources", []):
+        target = quarantine_path(source)
+        if target is not None:
+            quarantined.append(str(target))
+            touched_paths.extend([source, str(target)])
+            log(
+                "warn",
+                "Quarantined file due to name conflict",
+                module="AUTO_MOVER",
+            )
+    return {"moved": moved, "errors": errors, "touched_paths": touched_paths, "quarantined_paths": quarantined}
 
 
 def run(pkgs, skip_paths=None):

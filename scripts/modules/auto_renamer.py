@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 import settings
 from utils.log_utils import log
@@ -9,6 +10,7 @@ def dry_run(pkgs):
     planned = {}
     blocked = set()
     blocked_sources = set()
+    conflict_sources = set()
     conflicted = set()
     excluded_dirs = set()
     excluded_sources = set()
@@ -69,6 +71,9 @@ def dry_run(pkgs):
         return pkg_path, target_path
 
     for pkg, data in pkgs:
+        if "_conflict" in pkg.stem:
+            log("debug", f"Skipping rename; quarantined file: {pkg}", module="AUTO_RENAMER")
+            continue
         source_path, target_path = planned_rename(
             pkg,
             data.get("title"),
@@ -97,6 +102,7 @@ def dry_run(pkgs):
             if apptype_target.exists():
                 blocked.add(apptype_target)
                 blocked_sources.add(source_path)
+                conflict_sources.add(source_path)
                 continue
         if apptype_dir and is_excluded(apptype_dir):
             log("debug", f"Skipping rename; apptype dir excluded: {apptype_dir}", module="AUTO_RENAMER")
@@ -104,6 +110,7 @@ def dry_run(pkgs):
         if target_path.exists():
             blocked.add(target_path)
             blocked_sources.add(source_path)
+            conflict_sources.add(source_path)
             continue
         planned.setdefault(target_path, []).append(source_path)
 
@@ -111,10 +118,12 @@ def dry_run(pkgs):
     for target_path, sources in planned.items():
         if target_path in blocked:
             blocked_sources.update(sources)
+            conflict_sources.update(sources)
             continue
         if len(sources) > 1:
             conflicted.add(target_path)
             blocked_sources.update(sources)
+            conflict_sources.update(sources)
             continue
         plan.append((sources[0], target_path))
 
@@ -122,6 +131,7 @@ def dry_run(pkgs):
         "plan": plan,
         "blocked_sources": [str(path) for path in (blocked_sources | excluded_sources)],
         "skipped_conflict": [str(path) for path in (blocked | conflicted)],
+        "conflict_sources": [str(path) for path in conflict_sources],
         "skipped_excluded": len(excluded_sources),
     }
 
@@ -129,6 +139,33 @@ def dry_run(pkgs):
 def apply(dry_result):
     """Execute renames from a dry-run plan."""
     renamed = []
+    quarantined = []
+
+    def quarantine_path(path):
+        base = Path(path)
+        if not base.exists():
+            return None
+        settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        conflict_dir = settings.DATA_DIR / "_conflict"
+        conflict_dir.mkdir(parents=True, exist_ok=True)
+        suffix = "_conflict"
+        if base.suffix:
+            stem = base.stem + suffix
+            candidate = conflict_dir / f"{stem}{base.suffix}"
+        else:
+            candidate = conflict_dir / f"{base.name}{suffix}"
+        counter = 1
+        while candidate.exists():
+            if base.suffix:
+                candidate = conflict_dir / f"{base.stem}{suffix}_{counter}{base.suffix}"
+            else:
+                candidate = conflict_dir / f"{base.name}{suffix}_{counter}"
+            counter += 1
+        try:
+            base.rename(candidate)
+            return candidate
+        except Exception:
+            return None
     for source_path, target_path in dry_result.get("plan", []):
         try:
             source_path.rename(target_path)
@@ -152,7 +189,17 @@ def apply(dry_result):
     touched_paths = []
     for old_path, new_path in renamed:
         touched_paths.extend([str(old_path), str(new_path)])
-    return {"renamed": renamed, "touched_paths": touched_paths}
+    for source in dry_result.get("conflict_sources", []):
+        target = quarantine_path(source)
+        if target is not None:
+            quarantined.append(str(target))
+            touched_paths.extend([source, str(target)])
+            log(
+                "warn",
+                "Quarantined file due to name conflict",
+                module="AUTO_RENAMER",
+            )
+    return {"renamed": renamed, "touched_paths": touched_paths, "quarantined_paths": quarantined}
 
 
 def run(pkgs):

@@ -76,6 +76,7 @@ initialize_dir(){
   create_path "$PKG_DIR/app" "app/" "$PKG_DIR/"
   create_path "$MEDIA_DIR" "_media/" "$DATA_DIR/"
   create_path "$CACHE_DIR" "_cache/" "$DATA_DIR/"
+  create_path "$DATA_DIR/_conflict" "_conflict/" "$DATA_DIR/"
   marker_path="$PKG_DIR/_PUT_YOUR_PKGS_HERE"
   if [ ! -f "$marker_path" ]; then
     printf "%s\n" "Place PKG files in this directory or its subfolders." > "$marker_path"

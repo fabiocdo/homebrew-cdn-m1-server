@@ -4,11 +4,11 @@ import subprocess
 import time
 
 import settings
-from auto_indexer import run as run_indexer
-from auto_mover import apply as apply_mover
-from auto_mover import dry_run as mover_dry_run
-from auto_renamer import apply as apply_renamer
-from auto_renamer import dry_run as renamer_dry_run
+from modules.auto_indexer import run as run_indexer
+from modules.auto_mover import apply as apply_mover
+from modules.auto_mover import dry_run as mover_dry_run
+from modules.auto_renamer import apply as apply_renamer
+from modules.auto_renamer import dry_run as renamer_dry_run
 from utils.pkg_utils import scan_pkgs
 from utils.log_utils import log
 
@@ -164,6 +164,7 @@ def start():
             blocked_sources.update(dry_result.get("blocked_sources", []))
             result = apply_renamer(dry_result)
             touched_paths.extend(result.get("touched_paths", []))
+            blocked_sources.update(result.get("quarantined_paths", []))
             pkgs = list(scan_pkgs()) if settings.PKG_DIR.exists() else []
         if settings.AUTO_MOVER_ENABLED:
             dry_result = mover_dry_run(pkgs, skip_paths=blocked_sources)

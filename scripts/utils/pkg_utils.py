@@ -3,7 +3,7 @@ import tempfile
 
 import settings
 from utils.log_utils import log
-from utils.pkgtool import run_pkgtool
+from tools.pkgtool import run_pkgtool
 
 
 def extract_pkg_data(pkg_path, include_icon=False):
