@@ -50,7 +50,7 @@ clear_console(){
 }
 
 log_table() {
-  printf "    %-38s %s\n" "$1" "$2"
+  printf "%s     %-38s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$1" "$2"
 }
 
 format_value() {
