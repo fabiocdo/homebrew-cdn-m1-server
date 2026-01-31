@@ -28,10 +28,10 @@ COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy app files
 COPY entrypoint.sh /entrypoint.sh
-COPY watcher.py settings.py /app/
-COPY modules/ /app/modules/
-COPY utils/ /app/utils/
-COPY tools/ /app/tools/
+COPY src/__main__.py settings.py /app/
+COPY src/modules/ /app/modules/
+COPY src/utils/ /app/utils/
+COPY src/tools/ /app/tools/
 COPY lib/ /app/lib/
 RUN chmod +x /entrypoint.sh
 
