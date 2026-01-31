@@ -1,4 +1,3 @@
-from src.tools.pkg_tool import run_pkgtool
 
 def extract_sfo_data(pkg_path):
     output = tool_extract_sfo_data(pkg_path)
