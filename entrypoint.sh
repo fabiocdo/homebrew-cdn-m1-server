@@ -179,7 +179,7 @@ build_content_lines_colored() {
   printf "\n"
 }
 
-initialize_dir(){
+initialize_data_dir(){
   log "Initializing directories and files..."
   initialized_any="false"
   create_path "$PKG_DIR/game" "game/" "$PKG_DIR/"
@@ -232,6 +232,27 @@ CREATE TABLE IF NOT EXISTS homebrews (
 SQL
 }
 
+compile_binaries() {
+  tool_source="/scripts/tools/lib/sfotool.c"
+  tool_binary="/scripts/tools/bin/sfotool"
+  if [ ! -f "$tool_source" ]; then
+    return
+  fi
+  if [ -f "$tool_binary" ]; then
+    return
+  fi
+  if command -v cc >/dev/null 2>&1; then
+    mkdir -p "/scripts/tools/bin"
+    if cc "$tool_source" -o "$tool_binary" >/dev/null 2>&1; then
+      log "Compiled sfotool to $tool_binary"
+    else
+      log "Failed to compile sfotool"
+    fi
+  else
+    log "cc not found; skipping sfotool compilation."
+  fi
+}
+
 create_path() {
   target="$1"
   label="$2"
@@ -282,8 +303,9 @@ nginx
 log "NGINX is running on ${host}:${port}"
 log ""
 
-initialize_dir
+initialize_data_dir
 initialize_store_db
+compile_binaries
 
 log ""
 if [ "$PKG_WATCHER_ENABLED" = "true" ]; then
