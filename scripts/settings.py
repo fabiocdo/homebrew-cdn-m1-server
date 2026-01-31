@@ -6,6 +6,7 @@ DATA_DIR = pathlib.Path("/data")
 PKG_DIR = DATA_DIR / "pkg"
 MEDIA_DIR = DATA_DIR / "_media"
 CACHE_DIR = DATA_DIR / "_cache"
+STORE_DB_PATH = DATA_DIR / "store.db"
 
 GAME_DIR = PKG_DIR / "game"
 DLC_DIR = PKG_DIR / "dlc"

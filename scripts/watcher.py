@@ -209,8 +209,7 @@ def start():
                 if moved:
                     current_pkg = moved[0][1]
 
-            if settings.AUTO_INDEXER_ENABLED:
-                ensure_icon(current_pkg, data)
+            ensure_icon(current_pkg, data)
             return touched
 
         touched_paths = []
@@ -252,9 +251,9 @@ def start():
 
         for path in touched_paths:
             module_touched_at[path] = now
-        if settings.AUTO_INDEXER_ENABLED and settings.INDEX_JSON_ENABLED and should_reindex:
+        if settings.AUTO_INDEXER_ENABLED and should_reindex:
             pkgs = list(scan_pkgs(use_cache=True)) if settings.PKG_DIR.exists() else []
-            run_indexer(pkgs, extract_icons=False)
+            run_indexer(pkgs)
 
 
         if not initial_run:

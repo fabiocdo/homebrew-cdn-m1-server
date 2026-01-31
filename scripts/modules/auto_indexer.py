@@ -1,4 +1,5 @@
 import json
+import sqlite3
 from urllib.parse import quote
 
 import settings
@@ -22,11 +23,11 @@ def ensure_icon(pkg, data):
     return False
 
 
-def run(pkgs, extract_icons=True):
-    """Build index.json and index-cache.json from scanned PKGs."""
+def update_index_json(pkgs):
+    """Update index.json and index-cache.json from scanned PKGs."""
     if settings.INDEX_JSON_ENABLED is False:
         log("info", "INDEX_JSON_ENABLED is false; skipping index generation", module="AUTO_INDEXER")
-        return 0
+        return 0, 0
     icon_extracted = 0
 
     def load_cache():
@@ -54,8 +55,6 @@ def run(pkgs, extract_icons=True):
     new_cache_pkgs = {}
 
     for pkg, data in pkgs:
-        if pkg.parent == settings.PKG_DIR:
-            continue
         try:
             stat = pkg.stat()
         except Exception:
@@ -94,7 +93,7 @@ def run(pkgs, extract_icons=True):
         else:
             category = base_category
 
-        if extract_icons and ensure_icon(pkg, data):
+        if ensure_icon(pkg, data):
             icon_extracted += 1
 
         pkg_url = f"{settings.BASE_URL}/pkg/{quote(rel, safe='/')}"
@@ -137,4 +136,95 @@ def run(pkgs, extract_icons=True):
         log("info", message, module="AUTO_INDEXER")
     else:
         log("info", "No indexable changes detected", module="AUTO_INDEXER")
+    return cache_written, index_written
+
+
+def update_store_db(pkgs):
+    """Update store.db entries from scanned PKGs."""
+    try:
+        settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(settings.STORE_DB_PATH) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS homebrews (
+                  pid INTEGER,
+                  id TEXT,
+                  name TEXT,
+                  "desc" TEXT,
+                  image TEXT,
+                  package TEXT,
+                  version TEXT,
+                  picpath TEXT,
+                  desc_1 TEXT,
+                  desc_2 TEXT,
+                  ReviewStars REAL,
+                  Size INTEGER,
+                  Author TEXT,
+                  apptype TEXT,
+                  pv TEXT,
+                  main_icon_path TEXT,
+                  main_menu_pic TEXT,
+                  releaseddate TEXT
+                );
+                """
+            )
+            updated = 0
+            for pkg, data in pkgs:
+                try:
+                    stat = pkg.stat()
+                except Exception:
+                    continue
+
+                title = data.get("title")
+                titleid = data.get("titleid")
+                version = data.get("version")
+                apptype = data.get("apptype")
+                if not titleid:
+                    continue
+
+                rel = pkg.relative_to(settings.PKG_DIR).as_posix()
+                pkg_url = f"{settings.BASE_URL}/pkg/{quote(rel, safe='/')}"
+                icon_url = f"{settings.BASE_URL}/_media/{quote(f'{titleid}.png')}"
+
+                conn.execute("DELETE FROM homebrews WHERE id = ?", (titleid,))
+                conn.execute(
+                    """
+                    INSERT INTO homebrews
+                    (pid,id,name,"desc",image,package,version,picpath,desc_1,desc_2,ReviewStars,Size,Author,apptype,pv,main_icon_path,main_menu_pic,releaseddate)
+                    VALUES
+                    (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        None,
+                        titleid,
+                        title,
+                        None,
+                        icon_url,
+                        pkg_url,
+                        version,
+                        icon_url,
+                        None,
+                        None,
+                        None,
+                        stat.st_size,
+                        None,
+                        apptype,
+                        None,
+                        icon_url,
+                        None,
+                        None,
+                    ),
+                )
+                updated += 1
+            if updated:
+                log("info", f"Updated store.db entries: {updated}", module="AUTO_INDEXER")
+    except Exception as exc:
+        log("error", f"Failed to update store.db: {exc}", module="AUTO_INDEXER")
+    return 0
+
+
+def run(pkgs):
+    """Update store.db and optionally index.json/index-cache.json."""
+    update_store_db(pkgs)
+    update_index_json(pkgs)
     return 0
