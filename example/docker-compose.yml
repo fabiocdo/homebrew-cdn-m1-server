@@ -16,7 +16,7 @@ services:
       - AUTO_FORMATTER_ENABLED=true
       - AUTO_FORMATTER_MODE=none
       - AUTO_FORMATTER_TEMPLATE={title} [{titleid}][{apptype}]
-      - AUTO_MOVER_ENABLED=true
+      - AUTO_SORTER_ENABLED=true
       - PERIODIC_SCAN_SECONDS=30
     volumes:
       - ./data:/data

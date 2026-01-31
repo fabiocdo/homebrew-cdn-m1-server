@@ -7,8 +7,8 @@ from pathlib import Path
 
 import settings
 from modules.auto_indexer import ensure_icon, run as run_indexer
-from modules.auto_mover import apply as apply_mover
-from modules.auto_mover import dry_run as mover_dry_run
+from modules.auto_sorter import dry_run as sorter_dry_run
+from modules.auto_sorter import run as sorter_run
 from modules.auto_formatter import dry_run as formatter_dry_run
 from modules.auto_formatter import run as formatter_run
 from utils.pkg_utils import scan_pkgs
@@ -33,7 +33,7 @@ def parse_settings():
     settings.AUTO_FORMATTER_ENABLED = parse_bool(args.auto_formatter_enabled)
     settings.AUTO_FORMATTER_TEMPLATE = args.auto_formatter_template
     settings.AUTO_FORMATTER_MODE = args.auto_formatter_mode.lower()
-    settings.AUTO_MOVER_ENABLED = parse_bool(args.auto_mover_enabled)
+    settings.AUTO_SORTER_ENABLED = parse_bool(args.auto_sorter_enabled)
     settings.AUTO_INDEXER_ENABLED = parse_bool(args.auto_indexer_enabled)
     settings.INDEX_JSON_ENABLED = parse_bool(args.index_json_enabled)
     settings.PROCESS_WORKERS = args.process_workers
@@ -164,13 +164,9 @@ def start():
                 if pkg.name in blocked_sources:
                     return touched
 
-            if settings.AUTO_MOVER_ENABLED:
-                mover_dry = mover_dry_run([(current_pkg, data)], skip_paths=blocked_sources)
-                mover_result = apply_mover(mover_dry)
-                touched.extend(mover_result.get("touched_paths", []))
-                moved = mover_result.get("moved", [])
-                if moved:
-                    current_pkg = moved[0][1]
+            if settings.AUTO_SORTER_ENABLED:
+                sorter_dry_run(current_pkg, data)
+                sorter_run(current_pkg, data)
 
             ensure_icon(current_pkg, data)
             return touched

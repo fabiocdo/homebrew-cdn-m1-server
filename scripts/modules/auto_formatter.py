@@ -1,7 +1,4 @@
-
-
 from utils.log_utils import log
-
 
 def dry_run(sfo_data, template, mode):
     """Plan renames and report which entries can be renamed."""
@@ -30,7 +27,6 @@ def dry_run(sfo_data, template, mode):
     if planned_name and not planned_name.lower().endswith(".pkg"):
         planned_name = f"{planned_name}.pkg"
     return planned_name
-
 
 def run(pkg, sfo_data, template, mode):
     """Rename PKGs based on SFO metadata."""

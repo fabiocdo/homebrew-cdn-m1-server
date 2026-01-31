@@ -32,7 +32,7 @@ INDEX_JSON_ENABLED = None
 AUTO_FORMATTER_ENABLED = None
 AUTO_FORMATTER_TEMPLATE = None
 AUTO_FORMATTER_MODE = None
-AUTO_MOVER_ENABLED = None
+AUTO_SORTER_ENABLED = None
 PROCESS_WORKERS = None
 PERIODIC_SCAN_SECONDS = None
 
@@ -44,7 +44,7 @@ CLI_ARGS = [
     ("--auto-indexer-enabled", {"required": True}),
     ("--index-json-enabled", {"required": True}),
     ("--auto-formatter-enabled", {"required": True}),
-    ("--auto-mover-enabled", {"required": True}),
+    ("--auto-sorter-enabled", {"required": True}),
     ("--auto-formatter-template", {"required": True}),
     (
         "--auto-formatter-mode",

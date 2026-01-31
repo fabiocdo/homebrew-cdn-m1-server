@@ -34,7 +34,7 @@ docker run -d \
   -e AUTO_FORMATTER_ENABLED=true \
   -e AUTO_FORMATTER_MODE=none \
   -e AUTO_FORMATTER_TEMPLATE="{title} [{titleid}][{apptype}]" \
-  -e AUTO_MOVER_ENABLED=true \
+  -e AUTO_SORTER_ENABLED=true \
   -e PERIODIC_SCAN_SECONDS=30 \
   -v ./data:/data \
   -v ./nginx.conf:/etc/nginx/nginx.conf:ro \
@@ -62,7 +62,7 @@ services:
       - AUTO_FORMATTER_ENABLED=true
       - AUTO_FORMATTER_MODE=none
       - AUTO_FORMATTER_TEMPLATE={title} [{titleid}][{apptype}]
-      - AUTO_MOVER_ENABLED=true
+      - AUTO_SORTER_ENABLED=true
       - PERIODIC_SCAN_SECONDS=30
     volumes:
       - ./data:/data
@@ -135,7 +135,7 @@ Notes:
 
 - `index.json` and `_media/*.png` are generated automatically.
 - PKGs are processed even if they are inside folders that start with `_`.
-- PKGs placed directly in `pkg/` are processed by formatter/mover but are not indexed.
+- PKGs placed directly in `pkg/` are processed by formatter/sorter but are not indexed.
 - The `_PUT_YOUR_PKGS_HERE` file is a marker created on container startup.
 - Auto-created folders and the marker are only created during container startup.
 - `_cache/index-cache.json` stores metadata to speed up subsequent runs.
@@ -196,7 +196,7 @@ Fields:
 | `AUTO_FORMATTER_ENABLED`      | Enable PKG formatting using `AUTO_FORMATTER_TEMPLATE`.                                                                     | `true`                           |
 | `AUTO_FORMATTER_MODE`         | Title transform mode for `{title}`: `none`, `uppercase`, `lowercase`, `capitalize`.                                      | `none`                           |
 | `AUTO_FORMATTER_TEMPLATE`     | Template using `{title}`, `{titleid}`, `{region}`, `{apptype}`, `{version}`, `{category}`, `{content_id}`, `{app_type}`. | `{title} [{titleid}][{apptype}]` |
-| `AUTO_MOVER_ENABLED`        | Enable auto-moving PKGs into `game/`, `dlc/`, `update/` folders.                                                         | `true`                           |
+| `AUTO_SORTER_ENABLED`        | Enable auto-sorting PKGs into `game/`, `dlc/`, `update/` folders.                                                        | `true`                           |
 | `PERIODIC_SCAN_SECONDS`     | Interval in seconds for periodic PKG scans (no inotify watcher).                                                        | `30`                             |
 | `CDN_DATA_DIR`              | Host path mapped to `/data`.                                                                                             | `./data`                         |
 
@@ -213,7 +213,7 @@ Dependencies and behavior:
 
 - Location: `scripts/watcher.py`
 - Runs periodic scans under `pkg/`.
-- Runs a per-file pipeline (formatter → mover → indexer), sharded across `PROCESS_WORKERS`.
+- Runs a per-file pipeline (formatter → sorter → indexer), sharded across `PROCESS_WORKERS`.
 
 ### Auto Formatter
 
@@ -221,10 +221,10 @@ Dependencies and behavior:
 - Renames PKGs based on `AUTO_FORMATTER_TEMPLATE` and `AUTO_FORMATTER_MODE`.
 - Moves conflicts to `_errors/`.
 
-### Auto Mover
+### Auto Sorter
 
-- Location: `scripts/modules/auto_mover.py`
-- Moves PKGs into `game/`, `dlc/`, `update/` based on SFO metadata.
+- Location: `scripts/modules/auto_sorter.py`
+- Sorts PKGs into `game/`, `dlc/`, `update/` based on SFO metadata.
 - Moves conflicts to `_errors/`.
 
 ### Auto Indexer
@@ -233,7 +233,7 @@ Dependencies and behavior:
 - Builds `index.json` and `_cache/index-cache.json` from scanned PKGs.
 - Only logs when content changes (or icons are extracted).
 - Uses `_cache/index-cache.json` to skip reprocessing unchanged PKGs.
-- Icon extraction runs per-file in the same pipeline as formatter/mover.
+- Icon extraction runs per-file in the same pipeline as formatter/sorter.
 
 ### PKG Utilities
 
@@ -263,7 +263,7 @@ periodic scan
                 |
                no
                 v
-          [auto_mover.py]
+          [auto_sorter.py]
                 |
           (conflict?)----yes----> /data/_errors
                 |

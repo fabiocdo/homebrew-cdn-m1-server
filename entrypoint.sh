@@ -14,7 +14,7 @@ DEFAULT_INDEX_JSON_ENABLED="false"
 DEFAULT_AUTO_FORMATTER_ENABLED="true"
 DEFAULT_AUTO_FORMATTER_TEMPLATE="{title} [{titleid}][{apptype}]"
 DEFAULT_AUTO_FORMATTER_MODE="none"
-DEFAULT_AUTO_MOVER_ENABLED="true"
+DEFAULT_AUTO_SORTER_ENABLED="true"
 DEFAULT_PERIODIC_SCAN_SECONDS="30"
 
 # ENVIRONMENT VARIABLES
@@ -34,7 +34,7 @@ use_default_if_unset PKG_WATCHER_ENABLED "$DEFAULT_PKG_WATCHER_ENABLED"
 use_default_if_unset AUTO_INDEXER_ENABLED "$DEFAULT_AUTO_INDEXER_ENABLED"
 use_default_if_unset INDEX_JSON_ENABLED "$DEFAULT_INDEX_JSON_ENABLED"
 use_default_if_unset AUTO_FORMATTER_ENABLED "$DEFAULT_AUTO_FORMATTER_ENABLED"
-use_default_if_unset AUTO_MOVER_ENABLED "$DEFAULT_AUTO_MOVER_ENABLED"
+use_default_if_unset AUTO_SORTER_ENABLED "$DEFAULT_AUTO_SORTER_ENABLED"
 use_default_if_unset PERIODIC_SCAN_SECONDS "$DEFAULT_PERIODIC_SCAN_SECONDS"
 use_default_if_unset AUTO_FORMATTER_MODE "$DEFAULT_AUTO_FORMATTER_MODE"
 use_default_if_unset AUTO_FORMATTER_TEMPLATE "$DEFAULT_AUTO_FORMATTER_TEMPLATE"
@@ -132,7 +132,7 @@ build_content_lines_plain() {
   format_kv_plain "AUTO_FORMATTER_MODE" "$(format_value AUTO_FORMATTER_MODE "$AUTO_FORMATTER_MODE")"
   format_kv_plain "AUTO_FORMATTER_TEMPLATE" "$(format_value AUTO_FORMATTER_TEMPLATE "$AUTO_FORMATTER_TEMPLATE")"
   printf "\n"
-  format_kv_plain "AUTO_MOVER_ENABLED" "$(format_value AUTO_MOVER_ENABLED "$AUTO_MOVER_ENABLED")"
+  format_kv_plain "AUTO_SORTER_ENABLED" "$(format_value AUTO_SORTER_ENABLED "$AUTO_SORTER_ENABLED")"
   format_kv_plain "PERIODIC_SCAN_SECONDS" "$(format_value PERIODIC_SCAN_SECONDS "$PERIODIC_SCAN_SECONDS")"
   printf "\n"
 }
@@ -169,9 +169,9 @@ build_content_lines_colored() {
     "$(color_value "$(format_value AUTO_FORMATTER_TEMPLATE "$AUTO_FORMATTER_TEMPLATE")" "$COLOR_BLUE")"
   printf "\n"
   format_kv_colored \
-    "AUTO_MOVER_ENABLED" \
-    "$(color_value "AUTO_MOVER_ENABLED" "$COLOR_YELLOW")" \
-    "$(color_value "$(format_value AUTO_MOVER_ENABLED "$AUTO_MOVER_ENABLED")" "$COLOR_YELLOW")"
+    "AUTO_SORTER_ENABLED" \
+    "$(color_value "AUTO_SORTER_ENABLED" "$COLOR_YELLOW")" \
+    "$(color_value "$(format_value AUTO_SORTER_ENABLED "$AUTO_SORTER_ENABLED")" "$COLOR_YELLOW")"
   format_kv_colored \
     "PERIODIC_SCAN_SECONDS" \
     "$(color_value "PERIODIC_SCAN_SECONDS" "$COLOR_YELLOW")" \
@@ -266,7 +266,7 @@ BOX_KEY_WIDTH=$(printf "%s\n" \
   "AUTO_FORMATTER_ENABLED" \
   "AUTO_FORMATTER_MODE" \
   "AUTO_FORMATTER_TEMPLATE" \
-  "AUTO_MOVER_ENABLED" \
+  "AUTO_SORTER_ENABLED" \
   "PERIODIC_SCAN_SECONDS" \
   | awk '{ if (length($0) > max) max = length($0) } END { print max + 2 }')
 BOX_CONTENT_WIDTH=$(build_content_lines_plain | awk '{ if (length($0) > max) max = length($0) } END { print max + 0 }')
@@ -295,7 +295,7 @@ if [ "$PKG_WATCHER_ENABLED" = "true" ]; then
     --auto-indexer-enabled "$AUTO_INDEXER_ENABLED" \
     --index-json-enabled "$INDEX_JSON_ENABLED" \
     --auto-formatter-enabled "$AUTO_FORMATTER_ENABLED" \
-    --auto-mover-enabled "$AUTO_MOVER_ENABLED" \
+    --auto-sorter-enabled "$AUTO_SORTER_ENABLED" \
     --periodic-scan-seconds "$PERIODIC_SCAN_SECONDS" \
     --auto-formatter-mode "$AUTO_FORMATTER_MODE" \
     --auto-formatter-template "$AUTO_FORMATTER_TEMPLATE"
