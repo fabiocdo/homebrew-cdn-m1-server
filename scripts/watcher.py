@@ -152,9 +152,9 @@ def start():
             touched = []
 
             if settings.AUTO_FORMATTER_ENABLED:
-                formatter_dry = formatter_dry_run([(current_pkg, data)])
+                formatter_dry = formatter_dry_run(current_pkg, data)
                 blocked_sources.update(formatter_dry.get("blocked_sources", []))
-                formatter_result = formatter_run([(current_pkg, data)])
+                formatter_result = formatter_run(current_pkg, data)
                 touched.extend(formatter_result.get("touched_paths", []))
 
                 renamed = formatter_result.get("renamed", [])
