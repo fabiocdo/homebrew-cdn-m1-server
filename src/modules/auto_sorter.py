@@ -1,7 +1,7 @@
+import os
 from pathlib import Path
 from enum import Enum
 from src.utils import log
-from src import settings
 
 
 class AutoSorter:
@@ -44,7 +44,8 @@ class AutoSorter:
             return self.PlanResult.NOT_FOUND, None
 
         target_folder = self.CATEGORY_MAP.get(category, "_unknown")
-        target_dir = settings.PKG_DIR / target_folder
+        pkg_dir = Path(os.environ["PKG_DIR"])
+        target_dir = pkg_dir / target_folder
         target_path = target_dir / pkg.name
 
         if pkg.parent == target_dir:
@@ -70,16 +71,17 @@ class AutoSorter:
             return None
 
         if plan_result == self.PlanResult.SKIP:
-            log("info", "Skipping sort. PKG is already in the folder", message=f"{target_dir}", module="AUTO_SORTER")
+            log("debug", "Skipping sort. PKG is already in the folder", message=f"{target_dir}", module="AUTO_SORTER")
             return None
 
         if plan_result == self.PlanResult.CONFLICT:
             log("error", "Failed to move PKG. Target already exists", message=f"{pkg.name}", module="AUTO_SORTER")
-            settings.ERROR_DIR.mkdir(parents=True, exist_ok=True)
-            conflict_path = settings.ERROR_DIR / pkg.name
+            error_dir = Path(os.environ["ERROR_DIR"])
+            error_dir.mkdir(parents=True, exist_ok=True)
+            conflict_path = error_dir / pkg.name
             counter = 1
             while conflict_path.exists():
-                conflict_path = settings.ERROR_DIR / f"{pkg.stem}_{counter}{pkg.suffix}"
+                conflict_path = error_dir / f"{pkg.stem}_{counter}{pkg.suffix}"
                 counter += 1
             pkg.rename(conflict_path)
             log("warn", "PKG moved to errors folder", message=f"{pkg.name} -> {conflict_path.name}", module="AUTO_SORTER")

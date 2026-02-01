@@ -28,7 +28,7 @@ COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy app files
 COPY entrypoint.sh /entrypoint.sh
-COPY src/__main__.py settings.py /app/
+COPY src/__main__.py settings.env /app/
 COPY src/modules/ /app/modules/
 COPY src/utils/ /app/utils/
 COPY src/tools/ /app/tools/

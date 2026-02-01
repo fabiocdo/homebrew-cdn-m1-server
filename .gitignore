@@ -1,6 +1,9 @@
 .idea
+__.pycache__
+*.env
+*.yml
+*.conf
+
+!example/**
 data/
 bin/
-docker-compose.yml
-nginx.conf
-__pycache__

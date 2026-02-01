@@ -1,7 +1,7 @@
+import os
 from pathlib import Path
 from enum import Enum
 from src.utils import log
-from src import settings
 
 
 class AutoFormatter:
@@ -46,11 +46,12 @@ class AutoFormatter:
         value = str(value)
 
         if key.lower() == "title":
-            if settings.AUTO_FORMATTER_MODE == "uppercase":
+            mode = os.getenv("AUTO_FORMATTER_MODE", "none")
+            if mode == "uppercase":
                 return value.upper()
-            if settings.AUTO_FORMATTER_MODE == "lowercase":
+            if mode == "lowercase":
                 return value.lower()
-            if settings.AUTO_FORMATTER_MODE == "capitalize":
+            if mode == "capitalize":
                 import re
                 roman_numerals = r"^(?=[MDCLXVI])M*(C[MD]|D?C{0,3})(X[CL]|L?X{0,3})(I[XV]|V?I{0,3})$"
                 parts = []
@@ -79,9 +80,8 @@ class AutoFormatter:
             for key, value in (sfo_data or {}).items()
         }
 
-        planned_name = (
-            settings.AUTO_FORMATTER_TEMPLATE.format_map(self._SafeDict(safe_data)).strip()
-        )
+        template = os.environ["AUTO_FORMATTER_TEMPLATE"]
+        planned_name = template.format_map(self._SafeDict(safe_data)).strip()
 
         if not planned_name:
             return self.PlanResult.INVALID, pkg.name
@@ -117,16 +117,19 @@ class AutoFormatter:
             return None
 
         if plan_result == self.PlanResult.SKIP:
-            log("info", "Skipping rename. PKG is already renamed", message=f"{planned_name}", module="AUTO_FORMATTER")
+            log("debug", "Skipping rename. PKG is already renamed", message=f"{planned_name}", module="AUTO_FORMATTER")
             return None
 
         if plan_result == self.PlanResult.CONFLICT:
             log("error", "Failed to rename PKG. Target name already exists", message=f"{pkg.name} -> {planned_name}", module="AUTO_FORMATTER")
-            settings.ERROR_DIR.mkdir(parents=True, exist_ok=True)
-            conflict_path = settings.ERROR_DIR / pkg.name
+            error_dir = Path(
+                os.getenv("ERROR_DIR", str(Path(os.getenv("DATA_DIR", "data")) / "_error"))
+            )
+            error_dir.mkdir(parents=True, exist_ok=True)
+            conflict_path = error_dir / pkg.name
             counter = 1
             while conflict_path.exists():
-                conflict_path = settings.ERROR_DIR / f"{pkg.stem}_{counter}{pkg.suffix}"
+                conflict_path = error_dir / f"{pkg.stem}_{counter}{pkg.suffix}"
                 counter += 1
             pkg.rename(conflict_path)
             log("warn", "PKG moved to errors folder", message=f"{pkg.name} -> {conflict_path.name}", module="AUTO_FORMATTER")

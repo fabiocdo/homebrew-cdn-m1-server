@@ -1,9 +1,8 @@
-import os
 import subprocess
 import tempfile
 import struct
 from pathlib import Path
-from src import settings
+import os
 
 
 class PkgUtils:

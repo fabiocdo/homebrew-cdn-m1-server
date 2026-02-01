@@ -8,8 +8,8 @@ index generation and icon extraction.
 - Serves `.pkg` files over HTTP.
 - Generates `index.json` for Homebrew Store clients.
 - Extracts `icon0.png` from each PKG and serves it from `_media`.
-- Organizes PKGs into `game/`, `update/`, `dlc/`, and `app/` folders.
-- Moves files with rename/move conflicts into `_errors/`.
+- Organizes PKGs into `game/`, `update/`, `dlc/`, `save/`, and `_unknown/` folders.
+- Moves files with rename/move conflicts into `_error/`.
 - Watches the `pkg/` tree and refreshes `index.json` after file changes.
 
 ## Requirements
@@ -118,14 +118,15 @@ The host directory mapped to `/data` must follow this layout:
 |   |-- game/              # Auto-created
 |   |-- update/            # Auto-created
 |   |-- dlc/               # Auto-created
-|   |-- app/               # Auto-created (no auto-move)
+|   |-- save/              # Auto-created
+|   |-- _unknown/          # Auto-created
 |   |-- _PUT_YOUR_PKGS_HERE
 |   |-- Game Name [CUSA12345].pkg
 |-- _media/                # Auto-generated icons
 |   |-- CUSA12345.png
 |-- _cache/                # Auto-generated cache
 |   |-- index-cache.json
-|-- _errors/               # Files moved when rename/move conflicts occur
+|-- _error/               # Files moved when rename/move conflicts occur
 |-- index.json             # Auto-generated index
 ```
 
@@ -138,7 +139,7 @@ Notes:
 - Auto-created folders and the marker are only created during container startup.
 - `_cache/index-cache.json` stores metadata to speed up subsequent runs.
 - The cache is updated only when `index.json` is generated.
-- If a duplicate target name is detected, the file is moved to `_errors/`.
+- If a duplicate target name is detected, the file is moved to `_error/`.
 
 ## Package organization
 
@@ -147,14 +148,8 @@ During indexing, packages are classified by their `CATEGORY` from `param.sfo`:
 - `gd` -> `game`
 - `gp` -> `update`
 - `ac` -> `dlc`
-- `ap`, `ad`, `al`, `bd` -> `app`
-
-Packages placed under `pkg/app` are always indexed as:
-
-- `apptype: "app"`
-- `category: "ap"`
-
-The container never auto-moves files inside `pkg/app`.
+- `sd` -> `save`
+- (anything else) -> `_unknown`
 
 ## index.json format
 
@@ -193,39 +188,39 @@ Fields:
 | `AUTO_FORMATTER_ENABLED`      | Enable PKG formatting using `AUTO_FORMATTER_TEMPLATE`.                                                                     | `true`                           |
 | `AUTO_FORMATTER_MODE`         | Title transform mode for `{title}`: `none`, `uppercase`, `lowercase`, `capitalize`.                                      | `none`                           |
 | `AUTO_FORMATTER_TEMPLATE`     | Template using `{title}`, `{title_id}`, `{region}`, `{app_type}`, `{version}`, `{category}`, `{content_id}`. | `{title} {title_id} {app_type}` |
-| `AUTO_SORTER_ENABLED`        | Enable auto-sorting PKGs into `game/`, `dlc/`, `update/` folders.                                                        | `true`                           |
+| `AUTO_SORTER_ENABLED`        | Enable auto-sorting PKGs into `game/`, `dlc/`, `update/`, `save/`, `_unknown/` folders.                                  | `true`                           |
 | `PERIODIC_SCAN_SECONDS`     | Interval in seconds for periodic PKG scans (no inotify watcher).                                                        | `30`                             |
-| `CDN_DATA_DIR`              | Host path mapped to `/data`.                                                                                             | `./data`                         |
+| `DATA_DIR`                  | Host path mapped to `/data`.                                                                                             | `/data`                          |
 
 Dependencies and behavior:
 
 - `PKG_WATCHER_ENABLED=false` disables all automations (format, move, index) and the watcher does not start.
 - `AUTO_FORMATTER_TEMPLATE` and `AUTO_FORMATTER_MODE` only apply when `AUTO_FORMATTER_ENABLED=true` and the watcher is enabled.
-- Conflicting files are moved to `_errors/`.
+- Conflicting files are moved to `_error/`.
 
 ## Modules
 
 ### Watcher
 
-- Location: `src/modules/watcher/watcher.py`
+- Location: `src/modules/watcher.py`
 - Runs periodic scans under `pkg/`.
 - Runs a per-file pipeline (formatter → sorter → indexer).
 
 ### Auto Formatter
 
-- Location: `src/modules/auto_formatter/auto_formatter.py`
+- Location: `src/modules/auto_formatter.py`
 - Renames PKGs based on `AUTO_FORMATTER_TEMPLATE` and `AUTO_FORMATTER_MODE`.
-- Moves conflicts to `_errors/`.
+- Moves conflicts to `_error/`.
 
 ### Auto Sorter
 
-- Location: `src/modules/auto_sorter/auto_sorter.py`
+- Location: `src/modules/auto_sorter.py`
 - Sorts PKGs into `game/`, `dlc/`, `update/` based on SFO metadata.
-- Moves conflicts to `_errors/`.
+- Moves conflicts to `_error/`.
 
 ### Auto Indexer
 
-- Location: `src/modules/auto_indexer/auto_indexer.py`
+- Location: `src/modules/auto_indexer.py`
 - Builds `index.json` and `_cache/index-cache.json` from scanned PKGs.
 - Only logs when content changes (or icons are extracted).
 - Uses `_cache/index-cache.json` to skip reprocessing unchanged PKGs.
@@ -292,13 +287,13 @@ periodic scan
                 v
         [src/modules/auto_formatter/auto_formatter.py]
                 |
-          (conflict?)----yes----> /data/_errors
+          (conflict?)----yes----> /data/_error
                 |
                no
                 v
           [src/modules/auto_sorter/auto_sorter.py]
                 |
-          (conflict?)----yes----> /data/_errors
+          (conflict?)----yes----> /data/_error
                 |
                no
                 v
@@ -330,10 +325,10 @@ as shown in the quick start examples.
 ## Troubleshooting
 
 - If the index is not updating, remove `/data/_cache/index-cache.json` to force a rebuild.
-- If a PKG is encrypted, `pkgtool` may fail to read `param.sfo` and the PKG is moved to `_errors/`.
+- If a PKG is encrypted, `pkgtool` may fail to read `param.sfo` and the PKG is moved to `_error/`.
 - If icons are missing, ensure the PKG contains `ICON0_PNG` or `PIC0_PNG`.
-- If a format or move conflict is detected, the PKG is moved to `/data/_errors`.
-- Files in `_errors/` are not indexed.
+- If a format or move conflict is detected, the PKG is moved to `/data/_error`.
+- Files in `_error/` are not indexed.
 - Resolve conflicts manually and move the file back into `pkg/`.
 - PKG metadata errors are logged with a human-friendly stage (e.g. `Reading PKG entries`, `PARAM.SFO not found`).
-- Each error move appends the full console-formatted line to `/data/_errors/error_log.txt`.
+- Each error move appends the full console-formatted line to `/data/_error/error_log.txt`.

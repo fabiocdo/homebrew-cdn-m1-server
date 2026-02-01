@@ -4,7 +4,6 @@ from pathlib import Path
 
 from src.modules import AutoFormatter
 from src.modules.auto_sorter import AutoSorter
-from src import settings
 
 
 def start():
@@ -23,7 +22,7 @@ def start():
     # print(sorter.dry_run(pkg_path, "ac"))
     # sorter.run(pkg_path, "ac")
     print(formatter.dry_run(pkg_path, SFO_DLC))
-    formatter.run(pkg_path, SFO_DLC)
+    # formatter.run(pkg_path, SFO_DLC)
 
 if __name__ == "__main__":
     start()
