@@ -238,9 +238,45 @@ Dependencies and behavior:
 
 ### Log Utilities
 
-- Location: `utils/log_utils.py`
-- Modular tagging and color support.
-- Handles formatted and colored logging.
+- Location: `src/utils/log_utils.py`
+- Modular tagging and log level filtering.
+- Provides a centralized `log` function.
+
+**Logging Examples:**
+
+```python
+from src.utils import log
+
+# Watcher
+log("info", "Starting periodic scan", module="WATCHER")
+
+# Auto Formatter
+log("info", "Renaming file", message="old.pkg -> NEW.pkg", module="AUTO_FORMATTER")
+log("error", "Failed to rename", message="Permission denied", module="AUTO_FORMATTER")
+
+# Auto Sorter
+log("info", "Moving PKG to category folder", message="game/my_game.pkg", module="AUTO_SORTER")
+log("warn", "Category mapping missing", module="AUTO_SORTER")
+
+# Auto Indexer
+log("info", "Indexing started", module="AUTO_INDEXER")
+```
+
+Output format: `<timestamp UTC> | [MODULE] Action: Message` (with module-specific colors).
+
+**Colors:**
+- `AUTO_INDEXER`: Green
+- `AUTO_SORTER`: Yellow
+- `AUTO_FORMATTER`: Blue
+- `WATCHER`: White
+
+**Level Colors:**
+- `DEBUG`: Gray
+- `INFO`: White
+- `WARN`: Orange
+- `ERROR`: Red
+
+Example: `2024-05-20 14:30:05 UTC | [WATCHER] Starting periodic scan` (where `[WATCHER]` is white and the message is white).
 
 ### PKG Tool Wrapper
 
