@@ -3,9 +3,18 @@ import datetime
 class Logger:
     """
     Logger class with modular tagging and color support.
+
+    Provides a centralized logging mechanism that supports different severity levels
+    and modular tags with colorized output for better readability in the terminal.
     """
 
     def __init__(self, name=None, log_level="info"):
+        """
+        Initialize the Logger with a name and a minimum log level.
+
+        :param name: Optional name for the logger (currently unused)
+        :param log_level: Minimum severity level to log ("debug", "info", "warn", "error")
+        """
         self.levels = {
             "debug": 0,
             "info": 1,
@@ -31,6 +40,16 @@ class Logger:
         }
 
     def log(self, level, action, message=None, module=None):
+        """
+        Emit a log message if its level is greater than or equal to the configured log level.
+
+        The output format is: <timestamp UTC> | [module] action: message
+
+        :param level: Severity level ("debug", "info", "warn", "error")
+        :param action: The main action or event being logged
+        :param message: Optional detailed message or context
+        :param module: Optional module tag (e.g., "WATCHER", "AUTO_FORMATTER")
+        """
         level_val = self.levels.get(level.lower(), 1)
         if level_val >= self.log_level:
             timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
