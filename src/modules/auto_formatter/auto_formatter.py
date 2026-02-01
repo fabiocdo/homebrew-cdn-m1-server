@@ -1,5 +1,6 @@
 from pathlib import Path
 from src.utils import log
+from src import settings
 
 
 class AutoFormatter:
@@ -10,7 +11,7 @@ class AutoFormatter:
     template and formatting mode.
     """
 
-    def __init__(self, template: str | None = None, mode: str | None = None, error_path: str | None = "/data/_errors"):
+    def __init__(self, template: str | None = None, mode: str | None = None, error_path: str | Path | None = None):
         """
         Initialize the formatter.
 
@@ -21,7 +22,7 @@ class AutoFormatter:
         """
         self.template = template or "{title} {title_id} {app_type}"
         self.mode = mode
-        self.error_path = Path(error_path) if error_path else None
+        self.error_path = Path(error_path) if error_path else settings.ERROR_DIR
 
     class _SafeDict(dict):
         """Dictionary that returns empty string for missing keys."""

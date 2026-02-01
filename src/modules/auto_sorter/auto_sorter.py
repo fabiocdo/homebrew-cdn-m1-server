@@ -1,5 +1,6 @@
 from pathlib import Path
 from src.utils import log
+from src import settings
 
 
 class AutoSorter:
@@ -9,7 +10,7 @@ class AutoSorter:
     It supports dry-run planning and real moving based on PKG category.
     """
 
-    def __init__(self, category_map: dict | None = None, error_path: str | None = "/data/_errors"):
+    def __init__(self, category_map: dict | None = None, error_path: str | Path | None = None):
         """
         Initialize the sorter.
 
@@ -23,7 +24,7 @@ class AutoSorter:
             "gp": "update",
             "sd": "save",
         }
-        self.error_path = Path(error_path) if error_path else None
+        self.error_path = Path(error_path) if error_path else settings.ERROR_DIR
 
     def dry_run(self, pkg_path: Path, category: str) -> Path | None:
         """

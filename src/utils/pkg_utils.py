@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 import struct
 from pathlib import Path
+from src import settings
 
 
 class PkgUtils:
@@ -12,13 +13,13 @@ class PkgUtils:
     It handles entry listing, SFO metadata extraction and icon extraction.
     """
 
-    def __init__(self, pkgtool_path: str = "./src/utils/bin/pkgtool"):
+    def __init__(self, pkgtool_path: str | None = None):
         """
         Initialize PkgUtils.
 
         :param pkgtool_path: Path to the pkgtool executable
         """
-        self.pkgtool_path = pkgtool_path
+        self.pkgtool_path = pkgtool_path or os.getenv("CDN_PKGTOOL_PATH", "./src/utils/bin/pkgtool")
         self.env = {
             "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1",
         }

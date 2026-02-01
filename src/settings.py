@@ -1,53 +1,12 @@
+import os
 import pathlib
 
-# Constants
-DATA_DIR = pathlib.Path("/data")
+# Paths - prioritizing environment variables
+DATA_DIR = pathlib.Path(os.getenv("CDN_DATA_DIR", "/home/fabio/dev/homebrew-store-cdn/data"))
 
-PKG_DIR = DATA_DIR / "pkg"
-MEDIA_DIR = DATA_DIR / "_media"
-CACHE_DIR = DATA_DIR / "_cache"
-STORE_DB_PATH = DATA_DIR / "store.db"
+PKG_DIR = pathlib.Path(os.getenv("CDN_PKG_DIR", str(DATA_DIR / "pkg")))
+ERROR_DIR = pathlib.Path(os.getenv("CDN_ERROR_DIR", str(DATA_DIR / "_errors")))
 
-GAME_DIR = PKG_DIR / "game"
-DLC_DIR = PKG_DIR / "dlc"
-UPDATE_DIR = PKG_DIR / "update"
-APP_DIR = PKG_DIR / "app"
-
-APPTYPE_PATHS = {
-    "game": GAME_DIR,
-    "dlc": DLC_DIR,
-    "update": UPDATE_DIR,
-    "app": APP_DIR,
-}
-
-INDEX_PATH = DATA_DIR / "index.json"
-CACHE_PATH = CACHE_DIR / "index-cache.json"
-
-# Runtime config (set by auto_indexer.py)
-BASE_URL = None
-LOG_LEVEL = None
-PKG_WATCHER_ENABLED = None
-AUTO_INDEXER_ENABLED = None
-INDEX_JSON_ENABLED = None
-AUTO_FORMATTER_ENABLED = None
-AUTO_FORMATTER_TEMPLATE = None
-AUTO_FORMATTER_MODE = None
-AUTO_SORTER_ENABLED = None
-PERIODIC_SCAN_SECONDS = None
-
-# CLI Arguments
-CLI_ARGS = [
-    ("--base-url", {"required": True}),
-    ("--log-level", {"required": True}),
-    ("--pkg-watcher-enabled", {"required": True}),
-    ("--auto-indexer-enabled", {"required": True}),
-    ("--index-json-enabled", {"required": True}),
-    ("--auto-formatter-enabled", {"required": True}),
-    ("--auto-sorter-enabled", {"required": True}),
-    ("--auto-formatter-template", {"required": True}),
-    (
-        "--auto-formatter-mode",
-        {"required": True, "choices": ["none", "uppercase", "lowercase", "capitalize"]},
-    ),
-    ("--periodic-scan-seconds", {"required": True}),
-]
+# Runtime config (set by environment variables)
+AUTO_FORMATTER_TEMPLATE = os.getenv("AUTO_FORMATTER_TEMPLATE", "{title} {title_id} {app_type}")
+AUTO_FORMATTER_MODE = os.getenv("AUTO_FORMATTER_MODE", "none")

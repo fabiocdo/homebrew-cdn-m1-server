@@ -1,5 +1,6 @@
 import time
 from src.utils import log
+from src import settings
 from src.modules.auto_formatter.auto_formatter import AutoFormatter
 from src.modules.auto_sorter.auto_sorter import AutoSorter
 from src.modules.auto_indexer.auto_indexer import AutoIndexer
@@ -36,7 +37,10 @@ class Watcher:
         self.periodic_scan_seconds = periodic_scan_seconds
 
         # Initialize orchestrated modules
-        self.formatter = AutoFormatter()
+        self.formatter = AutoFormatter(
+            template=settings.AUTO_FORMATTER_TEMPLATE,
+            mode=settings.AUTO_FORMATTER_MODE
+        )
         self.sorter = AutoSorter()
         self.indexer = AutoIndexer()
 

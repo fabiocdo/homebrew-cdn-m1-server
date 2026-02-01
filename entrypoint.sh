@@ -38,11 +38,12 @@ use_default_if_unset AUTO_FORMATTER_MODE "$DEFAULT_AUTO_FORMATTER_MODE"
 use_default_if_unset AUTO_FORMATTER_TEMPLATE "$DEFAULT_AUTO_FORMATTER_TEMPLATE"
 
 # CDN PATHs
-DATA_DIR="/data"
-PKG_DIR="$DATA_DIR/pkg"
-MEDIA_DIR="$DATA_DIR/_media"
-CACHE_DIR="$DATA_DIR/_cache"
-STORE_DB_PATH="$DATA_DIR/store.db"
+DATA_DIR="${CDN_DATA_DIR:-/data}"
+PKG_DIR="${CDN_PKG_DIR:-$DATA_DIR/pkg}"
+MEDIA_DIR="${CDN_MEDIA_DIR:-$DATA_DIR/_media}"
+CACHE_DIR="${CDN_CACHE_DIR:-$DATA_DIR/_cache}"
+ERROR_DIR="${CDN_ERROR_DIR:-$DATA_DIR/_errors}"
+STORE_DB_PATH="${CDN_STORE_DB_PATH:-$DATA_DIR/store.db}"
 
 log() {
   printf "%s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -184,7 +185,7 @@ initialize_data_dir(){
   create_path "$PKG_DIR/app" "app/" "$PKG_DIR/"
   create_path "$MEDIA_DIR" "_media/" "$DATA_DIR/"
   create_path "$CACHE_DIR" "_cache/" "$DATA_DIR/"
-  create_path "$DATA_DIR/_errors" "_errors/" "$DATA_DIR/"
+  create_path "$ERROR_DIR" "_errors/" "$DATA_DIR/"
   marker_path="$PKG_DIR/_PUT_YOUR_PKGS_HERE"
   if [ ! -f "$marker_path" ]; then
     printf "%s\n" "Place PKG files in this directory or its subfolders." > "$marker_path"
