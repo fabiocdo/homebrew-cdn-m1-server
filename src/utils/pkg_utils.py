@@ -166,12 +166,18 @@ class PkgUtils:
 
         return self.ExtractResult.OK, {key.lower(): value for key, value in selected.items()}
 
-    def extract_pkg_icon(self, pkg: Path, content_id: str) -> tuple[ExtractResult, str]:
+    def extract_pkg_icon(
+        self,
+        pkg: Path,
+        content_id: str,
+        dry_run: bool = False,
+    ) -> tuple[ExtractResult, str]:
         """
         Extract ICON0.PNG from a PKG.
 
         :param pkg: Path to the PKG file
         :param content_id: Content ID used as icon filename (without extension)
+        :param dry_run: When True, do not extract; only return the expected output path
         :return: Tuple of (ExtractResult, path string)
         """
         output_dir = os.environ["MEDIA_DIR"]
@@ -206,19 +212,20 @@ class PkgUtils:
         if icon_index is None:
             return self.ExtractResult.NOT_FOUND, str(pkg)
 
-        subprocess.run(
-            [
-                self.pkgtool_path,
-                "pkg_extractentry",
-                str(pkg),
-                str(icon_index),
-                final_path,
-            ],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            env=self.env,
-        )
+        if not dry_run:
+            subprocess.run(
+                [
+                    self.pkgtool_path,
+                    "pkg_extractentry",
+                    str(pkg),
+                    str(icon_index),
+                    final_path,
+                ],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                env=self.env,
+            )
 
         return self.ExtractResult.OK, final_path

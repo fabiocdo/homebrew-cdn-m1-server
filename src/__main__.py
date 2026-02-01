@@ -23,10 +23,10 @@ def start():
     pkg_path = Path("/home/fabio/dev/homebrew-store-cdn/data/pkg/1.pkg")
     # print(sorter.dry_run(pkg_path, "ac"))
     # sorter.run(pkg_path, "ac")
-    # print(formatter.dry_run(pkg_path, SFO_DLC))
+    print(formatter.dry_run(pkg_path, SFO_DLC))
     # formatter.run(pkg_path, SFO_DLC)
-    print(pkgutil.extract_pkg_data(pkg_path))
-    # print(pkgutil.extract_pkg_icon(pkg_path, SFO_DLC["content_id"]))
+    # print(pkgutil.extract_pkg_data(pkg_path))
+    print(pkgutil.extract_pkg_icon(pkg_path, SFO_DLC["content_id"], True))
 
 if __name__ == "__main__":
     start()
