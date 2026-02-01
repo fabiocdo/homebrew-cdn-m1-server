@@ -61,11 +61,11 @@ class AutoFormatter:
 
         return value
 
-    def dry_run(self, pkg_path: Path, sfo_data: dict) -> str | None:
+    def dry_run(self, pkg: Path, sfo_data: dict) -> str | None:
         """
         Plan the final PKG filename and check for conflicts.
 
-        :param pkg_path: Path-like object representing the source PKG file
+        :param pkg: Path-like object representing the source PKG file
         :param sfo_data: Parsed PARAM.SFO data
         :return: Planned filename or None if conflict or not resolvable
         """
@@ -84,11 +84,10 @@ class AutoFormatter:
         if not planned_name.lower().endswith(".pkg"):
             planned_name = f"{planned_name}.pkg"
 
-        # Check for conflicts
-        if pkg_path.name != planned_name:
-            target_path = pkg_path.with_name(planned_name)
+        if pkg.name != planned_name:
+            target_path = pkg.with_name(planned_name)
             if target_path.exists():
-                log("error", "Failed to rename PKG", message=f"{pkg_path.name} -> {planned_name} (Target already exists)", module="AUTO_FORMATTER")
+                log("error", "Failed to rename PKG", message=f"{pkg.name} -> {planned_name} (Target already exists)", module="AUTO_FORMATTER")
                 return None
 
         return planned_name
