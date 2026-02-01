@@ -82,5 +82,5 @@ class AutoSorter:
         target_dir.mkdir(parents=True, exist_ok=True)
         target_path = target_dir / pkg.name
         pkg.rename(target_path)
-        log("info", "PKG sorted successfully", message=f"{pkg.name} -> {target_dir.name}/{pkg.name}", module="AUTO_SORTER")
+        log("info", "PKG sorted successfully", message=f"{pkg.name} -> {target_path}", module="AUTO_SORTER")
         return str(target_path)

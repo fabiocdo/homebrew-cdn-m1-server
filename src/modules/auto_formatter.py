@@ -50,6 +50,7 @@ class AutoFormatter:
 
         template = os.environ["AUTO_FORMATTER_TEMPLATE"]
         planned_name = template.format_map(self._SafeDict(safe_data)).strip()
+        planned_name = self._sanitize_filename(planned_name)
 
         if not planned_name:
             return self.PlanResult.INVALID, pkg.name
@@ -138,5 +139,24 @@ class AutoFormatter:
                     else:
                         parts.append(part.capitalize())
                 return " ".join(parts)
+            if mode == "snake_case":
+                return "_".join(value.split())
+            if mode == "snake_uppercase":
+                return "_".join(value.split()).upper()
+            if mode == "snake_lowercase":
+                return "_".join(value.split()).lower()
 
         return value
+
+    @staticmethod
+    def _sanitize_filename(name: str) -> str:
+        """
+        Sanitize a filename by removing path separators and invalid characters.
+        """
+        invalid = '<>:"/\\|?*'
+        table = str.maketrans({ch: "_" for ch in invalid})
+        name = name.translate(table)
+        name = name.replace("_ ", "_").replace(" _", "_")
+        while "__" in name:
+            name = name.replace("__", "_")
+        return name.strip()
