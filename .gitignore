@@ -3,3 +3,4 @@ data/
 bin/
 docker-compose.yml
 nginx.conf
+*.pkg
