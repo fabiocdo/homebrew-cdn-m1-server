@@ -8,27 +8,29 @@ USER root
 
 # Install system dependencies
 RUN apt update && apt install -y --no-install-recommends \
+    ca-certificates \
     nginx \
-    inotify-tools \
+    optipng \
     python3 \
-    python3-pip \
+    sqlite3 \
  && rm -rf /var/lib/apt/lists/*
 
 # Use the PkgTool bundled in the official OpenOrbis image
-RUN if command -v PkgTool.Core >/dev/null 2>&1; then ln -s "$(command -v PkgTool.Core)" /usr/local/bin/pkgtool; fi
-
-# Install pip globally
-RUN python3 -m pip install --upgrade pip setuptools wheel --no-cache-dir \
- && python3 -m pip cache purge
+RUN mkdir -p /app/bin \
+ && if command -v PkgTool.Core >/dev/null 2>&1; then ln -s "$(command -v PkgTool.Core)" /app/bin/pkgtool; fi
 
 # NGINX configuration
 RUN rm /etc/nginx/sites-enabled/default
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Copy scripts
+# Copy app files
 COPY entrypoint.sh /entrypoint.sh
-COPY scripts/ /scripts/
+COPY settings.env pyproject.toml /app/
+COPY src/ /app/src/
 RUN chmod +x /entrypoint.sh
+
+# Default workdir
+WORKDIR /app
 
 # Data volume
 VOLUME ["/data"]

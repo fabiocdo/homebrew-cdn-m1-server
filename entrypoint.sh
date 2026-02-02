@@ -4,18 +4,22 @@ set -e
 TERM="${TERM:-xterm}"
 export TERM
 
+if [ -f /app/settings.env ]; then
+  set -a
+  . /app/settings.env
+  set +a
+fi
+
 # DEFAULT ENVIRONMENT VARIABLES
 DEFAULT_BASE_URL="http://127.0.0.1:8080"
 DEFAULT_LOG_LEVEL="info"
-DEFAULT_PROCESS_WORKERS="$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)"
-DEFAULT_PKG_WATCHER_ENABLED="true"
-DEFAULT_AUTO_INDEXER_ENABLED="true"
-DEFAULT_AUTO_RENAMER_ENABLED="true"
-DEFAULT_AUTO_RENAMER_TEMPLATE="{title} [{titleid}][{apptype}]"
-DEFAULT_AUTO_RENAMER_MODE="none"
-DEFAULT_AUTO_RENAMER_EXCLUDED_DIRS="app"
-DEFAULT_AUTO_MOVER_ENABLED="true"
-DEFAULT_AUTO_MOVER_EXCLUDED_DIRS="app"
+DEFAULT_WATCHER_ENABLED="true"
+DEFAULT_WATCHER_PERIODIC_SCAN_SECONDS="30"
+DEFAULT_WATCHER_ACCESS_LOG_TAIL="true"
+DEFAULT_WATCHER_ACCESS_LOG_INTERVAL="5"
+DEFAULT_AUTO_INDEXER_OUTPUT_FORMAT="db,json"
+DEFAULT_AUTO_FORMATTER_TEMPLATE="{title}_[{region}]_[{app_type}]_[{version}]"
+DEFAULT_AUTO_FORMATTER_MODE="snake_uppercase"
 
 # ENVIRONMENT VARIABLES
 use_default_if_unset() {
@@ -23,180 +27,41 @@ use_default_if_unset() {
   eval "isset=\${$var+x}"
   if [ -z "$isset" ]; then
     eval "$var=\$2"
-    eval "${var}_IS_DEFAULT=true"
   fi
 }
 
 use_default_if_unset BASE_URL "$DEFAULT_BASE_URL"
 use_default_if_unset LOG_LEVEL "$DEFAULT_LOG_LEVEL"
-use_default_if_unset PROCESS_WORKERS "$DEFAULT_PROCESS_WORKERS"
-use_default_if_unset PKG_WATCHER_ENABLED "$DEFAULT_PKG_WATCHER_ENABLED"
-use_default_if_unset AUTO_INDEXER_ENABLED "$DEFAULT_AUTO_INDEXER_ENABLED"
-use_default_if_unset AUTO_RENAMER_ENABLED "$DEFAULT_AUTO_RENAMER_ENABLED"
-use_default_if_unset AUTO_MOVER_ENABLED "$DEFAULT_AUTO_MOVER_ENABLED"
-use_default_if_unset AUTO_RENAMER_MODE "$DEFAULT_AUTO_RENAMER_MODE"
-use_default_if_unset AUTO_RENAMER_TEMPLATE "$DEFAULT_AUTO_RENAMER_TEMPLATE"
-use_default_if_unset AUTO_RENAMER_EXCLUDED_DIRS "$DEFAULT_AUTO_RENAMER_EXCLUDED_DIRS"
-use_default_if_unset AUTO_MOVER_EXCLUDED_DIRS "$DEFAULT_AUTO_MOVER_EXCLUDED_DIRS"
+use_default_if_unset WATCHER_ENABLED "$DEFAULT_WATCHER_ENABLED"
+use_default_if_unset AUTO_INDEXER_OUTPUT_FORMAT "$DEFAULT_AUTO_INDEXER_OUTPUT_FORMAT"
+use_default_if_unset WATCHER_PERIODIC_SCAN_SECONDS "$DEFAULT_WATCHER_PERIODIC_SCAN_SECONDS"
+use_default_if_unset WATCHER_ACCESS_LOG_TAIL "$DEFAULT_WATCHER_ACCESS_LOG_TAIL"
+use_default_if_unset WATCHER_ACCESS_LOG_INTERVAL "$DEFAULT_WATCHER_ACCESS_LOG_INTERVAL"
+use_default_if_unset AUTO_FORMATTER_MODE "$DEFAULT_AUTO_FORMATTER_MODE"
+use_default_if_unset AUTO_FORMATTER_TEMPLATE "$DEFAULT_AUTO_FORMATTER_TEMPLATE"
 
-# CDN PATHs
+# Normalize boolean-like values
+WATCHER_ENABLED=$(printf "%s" "$WATCHER_ENABLED" | tr '[:upper:]' '[:lower:]')
+WATCHER_ACCESS_LOG_TAIL=$(printf "%s" "$WATCHER_ACCESS_LOG_TAIL" | tr '[:upper:]' '[:lower:]')
+
+# PATHs
 DATA_DIR="/data"
-PKG_DIR="$DATA_DIR/pkg"
-MEDIA_DIR="$DATA_DIR/_media"
-CACHE_DIR="$DATA_DIR/_cache"
+PKG_DIR="${DATA_DIR}/pkg"
+GAME_DIR="${PKG_DIR}/game"
+DLC_DIR="${PKG_DIR}/dlc"
+UPDATE_DIR="${PKG_DIR}/update"
+SAVE_DIR="${PKG_DIR}/save"
+UNKNOWN_DIR="${PKG_DIR}/_unknown"
+MEDIA_DIR="${PKG_DIR}/_media"
+CACHE_DIR="${DATA_DIR}/_cache"
+ERROR_DIR="${DATA_DIR}/_error"
+LOG_DIR="${DATA_DIR}/_logs"
+STORE_DIR="${DATA_DIR}"
+INDEX_DIR="${DATA_DIR}"
+STORE_DB_PATH="${DATA_DIR}/store.db"
 
 log() {
   printf "%s %s\n" "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
-}
-
-COLOR_GREEN="\033[0;92m"
-COLOR_BLUE="\033[1;94m"
-COLOR_YELLOW="\033[1;93m"
-
-clear_console(){
-  printf "\033c\n"
-}
-
-format_value() {
-  var="$1"
-  value="$2"
-  is_default=""
-  eval "is_default=\${${var}_IS_DEFAULT-}"
-  value="$(printf "%s" "$value" | tr '[:lower:]' '[:upper:]')"
-  if [ "$is_default" = "true" ]; then
-    printf "%s %b(DEFAULT)%b" "$value" "\033[0;90m" "\033[0m"
-  else
-    printf "%s" "$value"
-  fi
-}
-
-color_value() {
-  value="$1"
-  color="$2"
-  printf "%b%s%b" "$color" "$value" "\033[0m"
-}
-
-strip_ansi() {
-  printf "%s" "$1" | sed 's/\x1B\[[0-9;]*m//g'
-}
-
-format_kv_plain() {
-  key="$1"
-  value="$2"
-  key_pad=$((BOX_KEY_WIDTH - ${#key}))
-  if [ "$key_pad" -lt 1 ]; then
-    key_pad=1
-  fi
-  printf "%s%*s%s\n" "$key" "$key_pad" "" "$value"
-}
-
-format_kv_colored() {
-  key_plain="$1"
-  key_display="$2"
-  value_display="$3"
-  key_pad=$((BOX_KEY_WIDTH - ${#key_plain}))
-  if [ "$key_pad" -lt 1 ]; then
-    key_pad=1
-  fi
-  printf "%s%*s%s\n" "$key_display" "$key_pad" "" "$value_display"
-}
-
-box_border() {
-  printf "%s\n" "$(printf "%*s" "$BOX_WIDTH" "" | tr ' ' '=')"
-}
-
-box_line() {
-  content="$1"
-  plain="$(strip_ansi "$content")"
-  pad=$((BOX_WIDTH - 6 - ${#plain}))
-  if [ "$pad" -lt 0 ]; then
-    pad=0
-  fi
-  printf "|| %s%*s ||\n" "$content" "$pad" ""
-}
-
-build_content_lines_plain() {
-  printf "%s\n" "HOMEBREW-STORE-CDN"
-  printf "\n"
-  format_kv_plain "BASE_URL" "$(format_value BASE_URL "$BASE_URL")"
-  format_kv_plain "LOG_LEVEL" "$(format_value LOG_LEVEL "$LOG_LEVEL")"
-  format_kv_plain "PROCESS_WORKERS" "$(format_value PROCESS_WORKERS "$PROCESS_WORKERS")"
-  printf "\n"
-  format_kv_plain "PKG_WATCHER_ENABLED" "$(format_value PKG_WATCHER_ENABLED "$PKG_WATCHER_ENABLED")"
-  printf "\n"
-  format_kv_plain "AUTO_INDEXER_ENABLED" "$(format_value AUTO_INDEXER_ENABLED "$AUTO_INDEXER_ENABLED")"
-  printf "\n"
-  format_kv_plain "AUTO_RENAMER_ENABLED" "$(format_value AUTO_RENAMER_ENABLED "$AUTO_RENAMER_ENABLED")"
-  format_kv_plain "AUTO_RENAMER_MODE" "$(format_value AUTO_RENAMER_MODE "$AUTO_RENAMER_MODE")"
-  format_kv_plain "AUTO_RENAMER_TEMPLATE" "$(format_value AUTO_RENAMER_TEMPLATE "$AUTO_RENAMER_TEMPLATE")"
-  format_kv_plain "AUTO_RENAMER_EXCLUDED_DIRS" "$(format_value AUTO_RENAMER_EXCLUDED_DIRS "$AUTO_RENAMER_EXCLUDED_DIRS")"
-  printf "\n"
-  format_kv_plain "AUTO_MOVER_ENABLED" "$(format_value AUTO_MOVER_ENABLED "$AUTO_MOVER_ENABLED")"
-  format_kv_plain "AUTO_MOVER_EXCLUDED_DIRS" "$(format_value AUTO_MOVER_EXCLUDED_DIRS "$AUTO_MOVER_EXCLUDED_DIRS")"
-  printf "\n"
-}
-
-build_content_lines_colored() {
-  printf "%s\n" "HOMEBREW-STORE-CDN"
-  printf "\n"
-  format_kv_plain "BASE_URL" "$(format_value BASE_URL "$BASE_URL")"
-  format_kv_plain "LOG_LEVEL" "$(format_value LOG_LEVEL "$LOG_LEVEL")"
-  format_kv_plain "PROCESS_WORKERS" "$(format_value PROCESS_WORKERS "$PROCESS_WORKERS")"
-  printf "\n"
-  format_kv_plain "PKG_WATCHER_ENABLED" "$(format_value PKG_WATCHER_ENABLED "$PKG_WATCHER_ENABLED")"
-  printf "\n"
-  format_kv_colored \
-    "AUTO_INDEXER_ENABLED" \
-    "$(color_value "AUTO_INDEXER_ENABLED" "$COLOR_GREEN")" \
-    "$(color_value "$(format_value AUTO_INDEXER_ENABLED "$AUTO_INDEXER_ENABLED")" "$COLOR_GREEN")"
-  printf "\n"
-  format_kv_colored \
-    "AUTO_RENAMER_ENABLED" \
-    "$(color_value "AUTO_RENAMER_ENABLED" "$COLOR_BLUE")" \
-    "$(color_value "$(format_value AUTO_RENAMER_ENABLED "$AUTO_RENAMER_ENABLED")" "$COLOR_BLUE")"
-  format_kv_colored \
-    "AUTO_RENAMER_MODE" \
-    "$(color_value "AUTO_RENAMER_MODE" "$COLOR_BLUE")" \
-    "$(color_value "$(format_value AUTO_RENAMER_MODE "$AUTO_RENAMER_MODE")" "$COLOR_BLUE")"
-  format_kv_colored \
-    "AUTO_RENAMER_TEMPLATE" \
-    "$(color_value "AUTO_RENAMER_TEMPLATE" "$COLOR_BLUE")" \
-    "$(color_value "$(format_value AUTO_RENAMER_TEMPLATE "$AUTO_RENAMER_TEMPLATE")" "$COLOR_BLUE")"
-  format_kv_colored \
-    "AUTO_RENAMER_EXCLUDED_DIRS" \
-    "$(color_value "AUTO_RENAMER_EXCLUDED_DIRS" "$COLOR_BLUE")" \
-    "$(color_value "$(format_value AUTO_RENAMER_EXCLUDED_DIRS "$AUTO_RENAMER_EXCLUDED_DIRS")" "$COLOR_BLUE")"
-  printf "\n"
-  format_kv_colored \
-    "AUTO_MOVER_ENABLED" \
-    "$(color_value "AUTO_MOVER_ENABLED" "$COLOR_YELLOW")" \
-    "$(color_value "$(format_value AUTO_MOVER_ENABLED "$AUTO_MOVER_ENABLED")" "$COLOR_YELLOW")"
-  format_kv_colored \
-    "AUTO_MOVER_EXCLUDED_DIRS" \
-    "$(color_value "AUTO_MOVER_EXCLUDED_DIRS" "$COLOR_YELLOW")" \
-    "$(color_value "$(format_value AUTO_MOVER_EXCLUDED_DIRS "$AUTO_MOVER_EXCLUDED_DIRS")" "$COLOR_YELLOW")"
-  printf "\n"
-}
-
-initialize_dir(){
-  log "Initializing directories and files..."
-  initialized_any="false"
-  create_path "$PKG_DIR/game" "game/" "$PKG_DIR/"
-  create_path "$PKG_DIR/dlc" "dlc/" "$PKG_DIR/"
-  create_path "$PKG_DIR/update" "update/" "$PKG_DIR/"
-  create_path "$PKG_DIR/app" "app/" "$PKG_DIR/"
-  create_path "$MEDIA_DIR" "_media/" "$DATA_DIR/"
-  create_path "$CACHE_DIR" "_cache/" "$DATA_DIR/"
-  create_path "$DATA_DIR/_errors" "_errors/" "$DATA_DIR/"
-  marker_path="$PKG_DIR/_PUT_YOUR_PKGS_HERE"
-  if [ ! -f "$marker_path" ]; then
-    printf "%s\n" "Place PKG files in this directory or its subfolders." > "$marker_path"
-    log "Initialized _PUT_YOUR_PKGS_HERE marker at $PKG_DIR/"
-    initialized_any="true"
-  fi
-  if [ "$initialized_any" != "true" ]; then
-    log "Great! Nothing to initialize!"
-  fi
 }
 
 create_path() {
@@ -214,6 +79,66 @@ create_path() {
   fi
 }
 
+initialize_data_dir(){
+  log "Initializing directories and files..."
+  initialized_any="false"
+  create_path "$GAME_DIR" "game/" "$PKG_DIR/"
+  create_path "$DLC_DIR" "dlc/" "$PKG_DIR/"
+  create_path "$UPDATE_DIR" "update/" "$PKG_DIR/"
+  create_path "$SAVE_DIR" "save/" "$PKG_DIR/"
+  create_path "$UNKNOWN_DIR" "_unknown/" "$PKG_DIR/"
+  create_path "$MEDIA_DIR" "_media/" "$PKG_DIR/"
+  create_path "$CACHE_DIR" "_cache/" "$DATA_DIR/"
+  create_path "$ERROR_DIR" "_error/" "$DATA_DIR/"
+  create_path "$LOG_DIR" "_logs/" "$DATA_DIR/"
+  marker_path="$PKG_DIR/_PUT_YOUR_PKGS_HERE"
+  if [ ! -f "$marker_path" ]; then
+    printf "%s\n" "Place PKG files in this directory or its subfolders." > "$marker_path"
+    log "Initialized _PUT_YOUR_PKGS_HERE marker at $PKG_DIR/"
+    initialized_any="true"
+  fi
+  if [ "$initialized_any" != "true" ]; then
+    log "Great! Nothing to initialize!"
+  fi
+}
+
+initialize_store_db() {
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    log "sqlite3 not found; skipping store.db initialization."
+    return
+  fi
+  if [ ! -f "$STORE_DB_PATH" ]; then
+    log "Initializing store.db at $STORE_DB_PATH"
+  fi
+  sqlite3 "$STORE_DB_PATH" <<'SQL'
+CREATE TABLE IF NOT EXISTS homebrews (
+  "pid" INTEGER,
+  "id" TEXT,
+  "name" TEXT,
+  "desc" TEXT,
+  "image" TEXT,
+  "package" TEXT,
+  "version" TEXT,
+  "picpath" TEXT,
+  "desc_1" TEXT,
+  "desc_2" TEXT,
+  "ReviewStars" REAL,
+  "Size" INTEGER,
+  "Author" TEXT,
+  "apptype" TEXT,
+  "pv" TEXT,
+  "main_icon_path" TEXT,
+  "main_menu_pic" TEXT,
+  "releaseddate" TEXT,
+  "number_of_downloads" TEXT,
+  "github" TEXT,
+  "video" TEXT,
+  "twitter" TEXT,
+  "md5" TEXT
+);
+SQL
+}
+
 hostport="${BASE_URL#*://}"
 hostport="${hostport%%/*}"
 host="${hostport%%:*}"
@@ -222,49 +147,17 @@ if [ "$host" = "$hostport" ]; then
   port="80"
 fi
 
-clear_console
-BOX_KEY_WIDTH=$(printf "%s\n" \
-  "BASE_URL" \
-  "LOG_LEVEL" \
-  "PROCESS_WORKERS" \
-  "PKG_WATCHER_ENABLED" \
-  "AUTO_INDEXER_ENABLED" \
-  "AUTO_RENAMER_ENABLED" \
-  "AUTO_RENAMER_MODE" \
-  "AUTO_RENAMER_TEMPLATE" \
-  "AUTO_RENAMER_EXCLUDED_DIRS" \
-  "AUTO_MOVER_ENABLED" \
-  "AUTO_MOVER_EXCLUDED_DIRS" \
-  | awk '{ if (length($0) > max) max = length($0) } END { print max + 2 }')
-BOX_CONTENT_WIDTH=$(build_content_lines_plain | awk '{ if (length($0) > max) max = length($0) } END { print max + 0 }')
-BOX_WIDTH=$((BOX_CONTENT_WIDTH + 6))
-box_border
-build_content_lines_colored | while IFS= read -r line; do
-  box_line "$line"
-done
-box_border
+initialize_data_dir
 
 log "Starting NGINX..."
 nginx
 log "NGINX is running on ${host}:${port}"
 log ""
 
-initialize_dir
+initialize_store_db
 
-log ""
-if [ "$PKG_WATCHER_ENABLED" = "true" ]; then
-  exec python3 -u /scripts/watcher.py \
-    --base-url "$BASE_URL" \
-    --log-level "$LOG_LEVEL" \
-    --process-workers "$PROCESS_WORKERS" \
-    --pkg-watcher-enabled "$PKG_WATCHER_ENABLED" \
-    --auto-indexer-enabled "$AUTO_INDEXER_ENABLED" \
-    --auto-renamer-enabled "$AUTO_RENAMER_ENABLED" \
-    --auto-mover-enabled "$AUTO_MOVER_ENABLED" \
-    --auto-renamer-mode "$AUTO_RENAMER_MODE" \
-    --auto-renamer-template "$AUTO_RENAMER_TEMPLATE" \
-    --auto-renamer-excluded-dirs "$AUTO_RENAMER_EXCLUDED_DIRS" \
-    --auto-mover-excluded-dirs "$AUTO_MOVER_EXCLUDED_DIRS"
+if [ "$WATCHER_ENABLED" = "true" ]; then
+  exec python3 -u -m src
 fi
-log "PKG watcher is disabled."
+log "Watcher is disabled."
 exec tail -f /dev/null
