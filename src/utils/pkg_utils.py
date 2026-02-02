@@ -2,8 +2,8 @@ import subprocess
 import tempfile
 import struct
 from pathlib import Path
-from enum import Enum
 import os
+from src.utils.models.pkg_models import ExtractResult, REGION_MAP, APP_TYPE_MAP, SELECTED_FIELDS
 
 
 class PkgUtils:
@@ -13,12 +13,7 @@ class PkgUtils:
     It handles entry listing, SFO metadata extraction and icon extraction.
     """
 
-    class ExtractResult(Enum):
-        OK = "ok"
-        SKIP = "skip"
-        NOT_FOUND = "not_found"
-        INVALID = "invalid"
-        ERROR = "error"
+    ExtractResult = ExtractResult
 
     def __init__(self):
         """
@@ -138,29 +133,14 @@ class PkgUtils:
                         break
 
         content_id = result.get("CONTENT_ID", "")
-        region_map = {
-            "UP": "USA",
-            "EP": "EUR",
-            "JP": "JAP",
-            "HP": "ASIA",
-            "AP": "ASIA",
-            "KP": "ASIA",
-        }
         prefix = content_id[:2].upper() if content_id else ""
-        result["REGION"] = region_map.get(prefix, "UNK")
+        result["REGION"] = REGION_MAP.get(prefix, "UNK")
 
         category = str(result.get("CATEGORY", "")).lower()
-        app_type_map = {
-            "ac": "dlc",
-            "gc": "game",
-            "gd": "game",
-            "gp": "update",
-            "sd": "save",
-        }
-        result["APP_TYPE"] = app_type_map.get(category, "_unknown")
+        result["APP_TYPE"] = APP_TYPE_MAP.get(category, "_unknown")
 
         selected = {}
-        for field in ("TITLE", "TITLE_ID", "CONTENT_ID", "CATEGORY", "VERSION", "RELEASE_DATE", "REGION", "APP_TYPE"):
+        for field in SELECTED_FIELDS:
             if field in result and result[field] is not None:
                 selected[field] = result[field]
 
@@ -171,26 +151,30 @@ class PkgUtils:
         pkg: Path,
         content_id: str,
         dry_run: bool = False,
-    ) -> tuple[ExtractResult, str]:
+    ) -> Path | None:
         """
         Extract ICON0.PNG from a PKG.
 
         :param pkg: Path to the PKG file
         :param content_id: Content ID used as icon filename (without extension)
         :param dry_run: When True, do not extract; only return the expected output path
-        :return: Tuple of (ExtractResult, path string)
+        :return: Path to the icon or None if not found
         """
-        output_dir = os.environ["MEDIA_DIR"]
-        os.makedirs(output_dir, exist_ok=True)
+        output_dir = Path(os.environ["MEDIA_DIR"])
+        output_dir.mkdir(parents=True, exist_ok=True)
+        final_path = output_dir / f"{content_id}.png"
 
-        result = subprocess.run(
-            [self.pkgtool_path, "pkg_listentries", str(pkg)],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            env=self.env,
-        )
+        try:
+            result = subprocess.run(
+                [self.pkgtool_path, "pkg_listentries", str(pkg)],
+                check=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                env=self.env,
+            )
+        except subprocess.CalledProcessError:
+            return None
 
         icon_index = None
         lines = result.stdout.strip().splitlines()
@@ -204,28 +188,29 @@ class PkgUtils:
                 icon_index = index
                 break
 
-        final_name = f"{content_id}.png"
-        final_path = os.path.join(output_dir, final_name)
-        if os.path.exists(final_path):
-            return self.ExtractResult.SKIP, final_path
-
         if icon_index is None:
-            return self.ExtractResult.NOT_FOUND, str(pkg)
+            return None
+
+        if final_path.exists():
+            return final_path
 
         if not dry_run:
-            subprocess.run(
-                [
-                    self.pkgtool_path,
-                    "pkg_extractentry",
-                    str(pkg),
-                    str(icon_index),
-                    final_path,
-                ],
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                env=self.env,
-            )
+            try:
+                subprocess.run(
+                    [
+                        self.pkgtool_path,
+                        "pkg_extractentry",
+                        str(pkg),
+                        str(icon_index),
+                        str(final_path),
+                    ],
+                    check=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    env=self.env,
+                )
+            except subprocess.CalledProcessError:
+                return None
 
-        return self.ExtractResult.OK, final_path
+        return final_path

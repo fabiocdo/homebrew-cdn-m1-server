@@ -1,5 +1,6 @@
 import datetime
 import os
+from src.utils.models.log_models import LOG_LEVELS, MODULE_COLORS, LEVEL_COLORS
 
 class Logger:
     """
@@ -15,29 +16,11 @@ class Logger:
 
         :param log_level: Minimum severity level to log ("debug", "info", "warn", "error")
         """
-        self.levels = {
-            "debug": 0,
-            "info": 1,
-            "warn": 2,
-            "error": 3
-        }
+        self.levels = LOG_LEVELS
         self.log_level = self.levels.get(log_level.lower(), 1)
         
-        # ANSI Color Codes
-        self.colors = {
-            "AUTO_INDEXER": "\033[1;92m",   # Green
-            "AUTO_SORTER": "\033[1;93m",    # Yellow
-            "AUTO_FORMATTER": "\033[1;94m", # Blue
-            "WATCHER": "\033[1;95m",        # Purple
-            "RESET": "\033[0m"
-        }
-
-        self.level_colors = {
-            "debug": "\033[0;90m",  # Gray
-            "info": "\033[0;97m",   # White
-            "warn": "\033[0;33m",   # Orange/Yellow
-            "error": "\033[0;31m"   # Red
-        }
+        self.colors = MODULE_COLORS
+        self.level_colors = LEVEL_COLORS
 
     def log(self, level, action, message=None, module=None):
         """

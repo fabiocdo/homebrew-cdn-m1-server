@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
-from enum import Enum
 from src.utils import log
+from src.modules.models.sorter_models import SorterPlanResult
 
 
 class AutoSorter:
@@ -11,12 +11,7 @@ class AutoSorter:
     It supports dry-run planning and real moving based on PKG category.
     """
 
-    class PlanResult(Enum):
-        """Enumeration of dry-run planning results."""
-        OK = "ok"
-        SKIP = "skip"
-        CONFLICT = "conflict"
-        NOT_FOUND = "not_found"
+    PlanResult = SorterPlanResult
 
     def __init__(self):
         """

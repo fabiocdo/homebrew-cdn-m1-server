@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
-from enum import Enum
 from src.utils import log
+from src.modules.models.formatter_models import FormatterPlanResult
 
 
 class AutoFormatter:
@@ -12,13 +12,7 @@ class AutoFormatter:
     template and formatting mode.
     """
 
-    class PlanResult(Enum):
-        """Enumeration of dry-run planning results."""
-        OK = "ok"
-        SKIP = "skip"
-        CONFLICT = "conflict"
-        NOT_FOUND = "not_found"
-        INVALID = "invalid"
+    PlanResult = FormatterPlanResult
 
     def __init__(self):
         """
