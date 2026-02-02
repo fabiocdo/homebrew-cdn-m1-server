@@ -67,6 +67,8 @@ def _print_startup_info() -> None:
         ("WATCHER_ENABLED", os.environ.get("WATCHER_ENABLED", ""), "WATCHER"),
         ("WATCHER_PERIODIC_SCAN_SECONDS", os.environ.get("WATCHER_PERIODIC_SCAN_SECONDS", ""), "WATCHER"),
         ("WATCHER_SCAN_BATCH_SIZE", os.environ.get("WATCHER_SCAN_BATCH_SIZE", ""), "WATCHER"),
+        ("WATCHER_EXECUTOR_WORKERS", os.environ.get("WATCHER_EXECUTOR_WORKERS", ""), "WATCHER"),
+        ("WATCHER_SCAN_WORKERS", os.environ.get("WATCHER_SCAN_WORKERS", ""), "WATCHER"),
         ("WATCHER_ACCESS_LOG_TAIL", os.environ.get("WATCHER_ACCESS_LOG_TAIL", ""), "WATCHER"),
         ("WATCHER_ACCESS_LOG_INTERVAL", os.environ.get("WATCHER_ACCESS_LOG_INTERVAL", ""), "WATCHER"),
         ("", "", None),

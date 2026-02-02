@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import os
+import concurrent.futures
 from pathlib import Path
 from src.utils.pkg_utils import PkgUtils
 from src.utils.log_utils import log
-from src.utils.index_cache import load_cache, save_cache, hash_file, DB_SCHEMA_VERSION
+from src.utils.index_cache import load_cache, save_cache, DB_SCHEMA_VERSION
 
 
 def scan_pkgs(
@@ -12,6 +13,7 @@ def scan_pkgs(
     pkg_utils: PkgUtils,
     pkgs: list[Path] | None = None,
     batch_size: int | None = None,
+    workers: int | None = None,
     log_module: str | None = None,
 ) -> tuple[list[tuple[Path, dict | None]], bool]:
     """
@@ -21,6 +23,7 @@ def scan_pkgs(
     :param pkg_utils: PkgUtils instance
     :param pkgs: Optional list of PKG paths to scan
     :param batch_size: Optional batch size for scanning
+    :param workers: Optional number of parallel workers
     :param log_module: Optional module tag for progress logs
     :return: (list of (pkg path, sfo data or None), has_changes flag)
     """
@@ -44,6 +47,35 @@ def scan_pkgs(
         batches = [pkg_list]
 
     total_batches = max(1, len(batches))
+
+    def _scan_one(pkg: Path) -> tuple[Path, dict | None, dict | None, bool]:
+        try:
+            stat = pkg.stat()
+        except FileNotFoundError:
+            return pkg, None, None, True
+        key = str(pkg)
+        entry = files_cache.get(key)
+
+        sfo_data = None
+        file_hash = None
+        changed = not entry or entry.get("size") != stat.st_size or entry.get("mtime") != stat.st_mtime
+        if not changed:
+            sfo_data = entry.get("sfo")
+            file_hash = entry.get("hash")
+        else:
+            file_hash = entry.get("hash") if entry else None
+            sfo_result, sfo_payload = pkg_utils.extract_pkg_data(pkg)
+            if sfo_result == PkgUtils.ExtractResult.OK:
+                sfo_data = sfo_payload
+
+        cache_entry = {
+            "size": stat.st_size,
+            "mtime": stat.st_mtime,
+            "hash": file_hash,
+            "sfo": sfo_data,
+        }
+        return pkg, sfo_data, cache_entry, changed
+
     for batch_index, batch in enumerate(batches, start=1):
         if log_module and batch:
             log(
@@ -51,37 +83,47 @@ def scan_pkgs(
                 f"Scanning batch {batch_index}/{total_batches} ({len(batch)} PKG(s))...",
                 module=log_module,
             )
-        for pkg in batch:
-            stat = pkg.stat()
-            key = str(pkg)
-            entry = files_cache.get(key)
-
-            sfo_data = None
-            file_hash = None
-            changed = not entry or entry.get("size") != stat.st_size or entry.get("mtime") != stat.st_mtime
-            if changed:
-                any_changes = True
-
-            if not changed:
-                sfo_data = entry.get("sfo")
-                file_hash = entry.get("hash")
-            else:
-                file_hash = hash_file(pkg)
-                cached_hash = entry.get("hash") if entry else None
-                if cached_hash and file_hash == cached_hash:
-                    sfo_data = entry.get("sfo")
-                else:
-                    sfo_result, sfo_payload = pkg_utils.extract_pkg_data(pkg)
-                    if sfo_result == PkgUtils.ExtractResult.OK:
-                        sfo_data = sfo_payload
-
-            new_cache[key] = {
-                "size": stat.st_size,
-                "mtime": stat.st_mtime,
-                "hash": file_hash,
-                "sfo": sfo_data,
-            }
-            results.append((pkg, sfo_data))
+        progress_every = max(1, len(batch) // 5) if batch else 1
+        processed = 0
+        batch_workers = workers or 1
+        if batch_workers < 1:
+            batch_workers = 1
+        if batch_workers > 1 and len(batch) > 1:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=batch_workers) as pool:
+                futures = [pool.submit(_scan_one, pkg) for pkg in batch]
+                for future in concurrent.futures.as_completed(futures):
+                    pkg, sfo_data, cache_entry, changed = future.result()
+                    processed += 1
+                    if log_module and (processed % progress_every == 0 or processed == len(batch)):
+                        log(
+                            "debug",
+                            f"Batch {batch_index}/{total_batches} progress: {processed}/{len(batch)}",
+                            module=log_module,
+                        )
+                    if cache_entry is None:
+                        any_changes = True
+                        continue
+                    if changed:
+                        any_changes = True
+                    new_cache[str(pkg)] = cache_entry
+                    results.append((pkg, sfo_data))
+        else:
+            for pkg in batch:
+                pkg, sfo_data, cache_entry, changed = _scan_one(pkg)
+                processed += 1
+                if log_module and (processed % progress_every == 0 or processed == len(batch)):
+                    log(
+                        "debug",
+                        f"Batch {batch_index}/{total_batches} progress: {processed}/{len(batch)}",
+                        module=log_module,
+                    )
+                if cache_entry is None:
+                    any_changes = True
+                    continue
+                if changed:
+                    any_changes = True
+                new_cache[str(pkg)] = cache_entry
+                results.append((pkg, sfo_data))
 
     removed = set(files_cache.keys()) - set(new_cache.keys())
     if removed:

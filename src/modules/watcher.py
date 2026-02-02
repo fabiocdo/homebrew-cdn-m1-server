@@ -4,6 +4,7 @@ import os
 import re
 import time
 import threading
+import concurrent.futures
 from datetime import datetime, timezone
 from pathlib import Path
 from src.utils import PkgUtils, log
@@ -35,6 +36,7 @@ class Watcher:
         """
         self.watcher_enabled = os.environ["WATCHER_ENABLED"].lower() == "true"
         self.periodic_scan_seconds = int(os.environ["WATCHER_PERIODIC_SCAN_SECONDS"])
+        self.executor_workers = int(os.environ.get("WATCHER_EXECUTOR_WORKERS", "4"))
         self.access_log_enabled = os.environ.get("WATCHER_ACCESS_LOG_TAIL").lower() == "true"
         self.access_log_path = "/data/_logs/access.log"
         self.access_log_interval = int(os.environ.get("WATCHER_ACCESS_LOG_INTERVAL"))
@@ -216,7 +218,62 @@ class Watcher:
                 if not results:
                     next_run = start + interval
                     continue
-                sfo_cache, _stats = self.executor.run(results, sfo_cache)
+                log("info", "Executing planned changes...", module="WATCHER_EXECUTOR")
+                batch_size = int(os.environ.get("WATCHER_SCAN_BATCH_SIZE", "50"))
+                if batch_size < 1:
+                    batch_size = len(results) if results else 1
+                batches = [
+                    results[i : i + batch_size]
+                    for i in range(0, len(results), batch_size)
+                ]
+                workers = max(1, self.executor_workers)
+                workers = min(workers, len(batches))
+                stats = {"moves": 0, "renames": 0, "extractions": 0, "errors": 0, "skipped": 0}
+                if workers <= 1:
+                    _sfo_cache, batch_stats = self.executor.run(
+                        results,
+                        sfo_cache,
+                        log_start=False,
+                        log_summary=False,
+                        module_name="WATCHER-EXECUTOR-1",
+                    )
+                    for key in stats:
+                        stats[key] += batch_stats.get(key, 0)
+                else:
+                    worker_batches: list[list[list[dict]]] = [[] for _ in range(workers)]
+                    for idx, batch in enumerate(batches):
+                        worker_batches[idx % workers].append(batch)
+
+                    def _run_worker(worker_id: int, batch_groups: list[list[dict]]) -> dict:
+                        worker_stats = {"moves": 0, "renames": 0, "extractions": 0, "errors": 0, "skipped": 0}
+                        module_name = f"WATCHER-EXECUTOR-{worker_id}"
+                        for batch in batch_groups:
+                            _sfo_cache, batch_stats = self.executor.run(
+                                batch,
+                                sfo_cache,
+                                log_start=False,
+                                log_summary=False,
+                                module_name=module_name,
+                            )
+                            for key in worker_stats:
+                                worker_stats[key] += batch_stats.get(key, 0)
+                        return worker_stats
+
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+                        futures = [
+                            pool.submit(_run_worker, worker_id + 1, worker_batches[worker_id])
+                            for worker_id in range(workers)
+                        ]
+                        for future in concurrent.futures.as_completed(futures):
+                            worker_stats = future.result()
+                            for key in stats:
+                                stats[key] += worker_stats.get(key, 0)
+                log(
+                    "info",
+                    f"Planned changes executed: Moves: {stats['moves']}, Renames: {stats['renames']}, "
+                    f"Extractions: {stats['extractions']}, Errors: {stats['errors']}, Skipped: {stats['skipped']}",
+                    module="WATCHER_EXECUTOR",
+                )
                 self.indexer.run(results, sfo_cache)
             except Exception as exc:
                 log("error", "Watcher cycle failed", message=str(exc), module="WATCHER")

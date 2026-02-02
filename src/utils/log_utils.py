@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime
 import os
+import re
 from src.utils.models.log_models import LOG_LEVELS, MODULE_COLORS, LEVEL_COLORS
 
 class Logger:
@@ -44,7 +45,15 @@ class Logger:
         if level_val >= self.log_level:
             timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
             
-            module_color = self.colors.get(module, "") if module else ""
+            module_color = ""
+            if module:
+                module_key = module
+                if module_key not in self.colors:
+                    normalized = module.replace("-", "_")
+                    module_key = normalized
+                    if module_key not in self.colors:
+                        module_key = re.sub(r"_\d+$", "", normalized)
+                module_color = self.colors.get(module_key, "")
             level_color = self.level_colors.get(level.lower(), "")
             reset = self.colors["RESET"]
             

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from pathlib import Path
 import datetime
 from src.utils import PkgUtils, log
@@ -31,16 +32,27 @@ class WatcherExecutor:
         self.pkg_utils = pkg_utils
         self.formatter = formatter
         self.sorter = sorter
+        self._error_log_lock = threading.Lock()
 
-    def run(self, results: list[dict], sfo_cache: dict[str, dict]) -> tuple[dict, dict]:
+    def run(
+        self,
+        results: list[dict],
+        sfo_cache: dict[str, dict],
+        log_start: bool = True,
+        log_summary: bool = True,
+        module_name: str = "WATCHER_EXECUTOR",
+    ) -> tuple[dict, dict]:
         """
         Execute a planned set of PKG operations and return updated cache and stats.
 
         :param results: Planned items from the planner
         :param sfo_cache: Cached SFO data keyed by source path
+        :param log_start: When True, log the start of execution
+        :param log_summary: When True, log the execution summary
         :return: Tuple of (updated SFO cache, stats dict)
         """
-        log("info", "Executing planned changes...", module="WATCHER_EXECUTOR")
+        if log_start:
+            log("info", "Executing planned changes...", module=module_name)
         error_dir = Path(os.environ["ERROR_DIR"])
         error_dir.mkdir(parents=True, exist_ok=True)
         log_dir = Path(os.environ.get("LOG_DIR", error_dir))
@@ -64,7 +76,7 @@ class WatcherExecutor:
                 conflict_path = error_dir / f"{pkg_path.stem}_{counter}{pkg_path.suffix}"
                 counter += 1
             pkg_path.rename(conflict_path)
-            log("warn", "PKG moved to errors folder", message=f"{pkg_path} -> {conflict_path}", module="WATCHER_EXECUTOR")
+            log("warn", "PKG moved to errors folder", message=f"{pkg_path} -> {conflict_path}", module=module_name)
             reason = item.get("pkg", {}).get("reason") or "unknown"
             log_path = log_dir / "errors.log"
             timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -74,8 +86,9 @@ class WatcherExecutor:
                 f"moved_to={conflict_path}\n"
             )
             log_path.parent.mkdir(parents=True, exist_ok=True)
-            with log_path.open("a", encoding="utf-8") as handle:
-                handle.write(line)
+            with self._error_log_lock:
+                with log_path.open("a", encoding="utf-8") as handle:
+                    handle.write(line)
             moved_to_error += 1
 
         icons_extracted = 0
@@ -83,7 +96,7 @@ class WatcherExecutor:
         for item in icon_allowed:
             pkg_path = Path(item["source"])
             icon_log_path = item["icon"]["planned_path"] or ""
-            log("debug", "Extracting icon", message=icon_log_path, module="WATCHER_EXECUTOR")
+            log("debug", "Extracting icon", message=icon_log_path, module=module_name)
             sfo_data = sfo_cache.get(str(pkg_path))
             if not sfo_data:
                 continue
@@ -100,16 +113,16 @@ class WatcherExecutor:
                     except Exception:
                         pass
                     icon_failed.add(item["source"])
-                    log("error", "Invalid icon extracted", message=str(pkg_path), module="WATCHER_EXECUTOR")
+                    log("error", "Invalid icon extracted", message=str(pkg_path), module=module_name)
                     continue
                 if self.pkg_utils.optimize_png(extracted_path):
                     log("debug", "Icon optimized", message=str(extracted_path), module="WATCHER_EXECUTOR")
                 if not pre_exists:
                     icons_extracted += 1
-                    log("info", "Icon extracted", message=str(extracted_path), module="WATCHER_EXECUTOR")
+                    log("info", "Icon extracted", message=str(extracted_path), module=module_name)
             else:
                 icon_failed.add(item["source"])
-                log("error", "Failed to extract icon", message=str(pkg_path), module="WATCHER_EXECUTOR")
+                log("error", "Failed to extract icon", message=str(pkg_path), module=module_name)
 
         if icon_failed:
             for source in icon_failed:
@@ -122,7 +135,7 @@ class WatcherExecutor:
                     conflict_path = error_dir / f"{pkg_path.stem}_{counter}{pkg_path.suffix}"
                     counter += 1
                 pkg_path.rename(conflict_path)
-                log("warn", "PKG moved to errors folder", message=f"{pkg_path} -> {conflict_path}", module="WATCHER_EXECUTOR")
+                log("warn", "PKG moved to errors folder", message=f"{pkg_path} -> {conflict_path}", module=module_name)
                 reason = "icon_extract_failed"
                 log_path = log_dir / "errors.log"
                 timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -132,8 +145,9 @@ class WatcherExecutor:
                     f"moved_to={conflict_path}\n"
                 )
                 log_path.parent.mkdir(parents=True, exist_ok=True)
-                with log_path.open("a", encoding="utf-8") as handle:
-                    handle.write(line)
+                with self._error_log_lock:
+                    with log_path.open("a", encoding="utf-8") as handle:
+                        handle.write(line)
                 moved_to_error += 1
 
         renamed_count = 0
@@ -142,7 +156,7 @@ class WatcherExecutor:
             if item["source"] in icon_failed:
                 continue
             pkg_path = Path(item["source"])
-            log("debug", "Processing PKG for format/sort", message=str(pkg_path), module="WATCHER_EXECUTOR")
+            log("debug", "Processing PKG for format/sort", message=str(pkg_path), module=module_name)
             sfo_data = sfo_cache.get(str(pkg_path))
             if not sfo_data:
                 continue
@@ -161,12 +175,13 @@ class WatcherExecutor:
             if item["pkg"]["action"] == PlanOutput.SKIP or item["icon"]["action"] == PlanOutput.SKIP
         }
         skipped_count = len(skipped_sources - rejected_sources)
-        log(
-            "info",
-            f"Planned changes executed: Moves: {moved_count}, Renames: {renamed_count}, "
-            f"Extractions: {icons_extracted}, Errors: {moved_to_error}, Skipped: {skipped_count}",
-            module="WATCHER_EXECUTOR",
-        )
+        if log_summary:
+            log(
+                "info",
+                f"Planned changes executed: Moves: {moved_count}, Renames: {renamed_count}, "
+                f"Extractions: {icons_extracted}, Errors: {moved_to_error}, Skipped: {skipped_count}",
+                module=module_name,
+            )
 
         stats = {
             "moves": moved_count,
