@@ -32,6 +32,7 @@ class PkgUtils:
         self.env = {
             "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": os.environ["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"],
         }
+        self.timeout_seconds = 120
 
     @staticmethod
     def is_valid_png(path: Path, max_bytes: int = 8 * 1024 * 1024) -> bool:
@@ -106,6 +107,7 @@ class PkgUtils:
                     stderr=subprocess.STDOUT,
                     text=True,
                     env=self.env,
+                    timeout=self.timeout_seconds,
                 )
 
                 param_sfo_index = None
@@ -138,11 +140,12 @@ class PkgUtils:
                     stderr=subprocess.STDOUT,
                     text=True,
                     env=self.env,
+                    timeout=self.timeout_seconds,
                 )
 
                 with open(param_sfo_path, "rb") as f:
                     data = f.read()
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             return self.ExtractResult.ERROR, str(pkg)
 
         result = {}
@@ -237,8 +240,9 @@ class PkgUtils:
                 stderr=subprocess.STDOUT,
                 text=True,
                 env=self.env,
+                timeout=self.timeout_seconds,
             )
-        except subprocess.CalledProcessError:
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
             return None
 
         icon_index = None
@@ -274,8 +278,9 @@ class PkgUtils:
                     stderr=subprocess.STDOUT,
                     text=True,
                     env=self.env,
+                    timeout=self.timeout_seconds,
                 )
-            except subprocess.CalledProcessError:
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
                 return None
 
         return final_path

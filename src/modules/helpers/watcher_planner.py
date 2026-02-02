@@ -41,7 +41,18 @@ class WatcherPlanner:
         """
         log("info", "Detecting changes...", module="WATCHER_PLANNER")
         pkg_dir = Path(os.environ["PKG_DIR"])
-        scan_results, has_changes = scan_pkgs(pkg_dir, self.pkg_utils)
+        pkg_list = list(pkg_dir.rglob("*.pkg"))
+        log("info", f"Scanning {len(pkg_list)} PKG(s) for changes...", module="WATCHER_PLANNER")
+        batch_size = int(os.environ.get("WATCHER_SCAN_BATCH_SIZE", "50"))
+        if batch_size < 1:
+            batch_size = None
+        scan_results, has_changes = scan_pkgs(
+            pkg_dir,
+            self.pkg_utils,
+            pkg_list,
+            batch_size=batch_size,
+            log_module="WATCHER_PLANNER",
+        )
         sfo_cache = {str(pkg): sfo for pkg, sfo in scan_results if sfo}
         if not has_changes:
             log("info", "No changes detected.", module="WATCHER_PLANNER")
