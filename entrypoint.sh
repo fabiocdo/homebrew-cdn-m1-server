@@ -4,11 +4,27 @@ set -e
 TERM="${TERM:-xterm}"
 export TERM
 
-if [ -f /app/settings.env ]; then
-  set -a
-  . /app/settings.env
-  set +a
-fi
+load_env_file_if_unset() {
+  file="$1"
+  [ -f "$file" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      ""|\#*) continue ;;
+    esac
+    line="${line#export }"
+    key="${line%%=*}"
+    value="${line#*=}"
+    key="$(printf "%s" "$key" | tr -d ' ')"
+    [ -z "$key" ] && continue
+    value="${value%$'\r'}"
+    eval "isset=\${$key+x}"
+    if [ -z "$isset" ]; then
+      export "$key=$value"
+    fi
+  done < "$file"
+}
+
+load_env_file_if_unset /app/settings.env
 
 # DEFAULT ENVIRONMENT VARIABLES
 DEFAULT_BASE_URL="http://127.0.0.1:8080"
@@ -20,14 +36,18 @@ DEFAULT_WATCHER_ACCESS_LOG_INTERVAL="5"
 DEFAULT_AUTO_INDEXER_OUTPUT_FORMAT="db,json"
 DEFAULT_AUTO_FORMATTER_TEMPLATE="{title}_[{region}]_[{app_type}]_[{version}]"
 DEFAULT_AUTO_FORMATTER_MODE="snake_uppercase"
+DEFAULT_ENV_VARS=""
 
 # ENVIRONMENT VARIABLES
 use_default_if_unset() {
   var="$1"
+  default="$2"
   eval "isset=\${$var+x}"
   if [ -z "$isset" ]; then
-    eval "$var=\$2"
+    eval "$var=\$default"
+    DEFAULT_ENV_VARS="${DEFAULT_ENV_VARS}${DEFAULT_ENV_VARS:+,}${var}"
   fi
+  export "$var"
 }
 
 use_default_if_unset BASE_URL "$DEFAULT_BASE_URL"
@@ -39,6 +59,7 @@ use_default_if_unset WATCHER_ACCESS_LOG_TAIL "$DEFAULT_WATCHER_ACCESS_LOG_TAIL"
 use_default_if_unset WATCHER_ACCESS_LOG_INTERVAL "$DEFAULT_WATCHER_ACCESS_LOG_INTERVAL"
 use_default_if_unset AUTO_FORMATTER_MODE "$DEFAULT_AUTO_FORMATTER_MODE"
 use_default_if_unset AUTO_FORMATTER_TEMPLATE "$DEFAULT_AUTO_FORMATTER_TEMPLATE"
+export DEFAULT_ENV_VARS
 
 # Normalize boolean-like values
 WATCHER_ENABLED=$(printf "%s" "$WATCHER_ENABLED" | tr '[:upper:]' '[:lower:]')

@@ -57,6 +57,7 @@ def _print_startup_info() -> None:
         "AUTO_INDEXER": MODULE_COLORS.get("AUTO_INDEXER", ""),
         "AUTO_FORMATTER": MODULE_COLORS.get("AUTO_FORMATTER", ""),
     }
+    muted = MODULE_COLORS.get("WATCHER_EXECUTOR", "\033[0;90m")
 
     entries = [
         ("", "", None),
@@ -76,6 +77,11 @@ def _print_startup_info() -> None:
     ]
 
     key_width = max(len(key) for key, _value, _color in entries if key)
+    default_keys = {
+        key.strip()
+        for key in os.environ.get("DEFAULT_ENV_VARS", "").split(",")
+        if key.strip()
+    }
 
     plain_lines: list[str] = [title.upper()]
     colored_lines: list[str] = [title.upper()]
@@ -86,13 +92,22 @@ def _print_startup_info() -> None:
             colored_lines.append("")
             continue
         val = (value or "").upper()
+        is_default = key in default_keys
+        default_suffix = " (DEFAULT)" if is_default else ""
         padding = " " * (key_width - len(key) + 2)
-        plain = f"{key}{padding}{val}"
+        plain = f"{key}{padding}{val}{default_suffix}"
         if group and color_map.get(group):
             color = color_map[group]
-            colored = f"{color}{key}{reset}{padding}{color}{val}{reset}"
+            if is_default:
+                colored_val = f"{color}{val}{reset}{muted}{default_suffix}{reset}"
+            else:
+                colored_val = f"{color}{val}{reset}"
+            colored = f"{color}{key}{reset}{padding}{colored_val}"
         else:
-            colored = plain
+            if is_default:
+                colored = f"{key}{padding}{val}{muted}{default_suffix}{reset}"
+            else:
+                colored = plain
         plain_lines.append(plain)
         colored_lines.append(colored)
 
