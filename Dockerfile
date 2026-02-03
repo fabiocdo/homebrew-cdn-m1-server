@@ -22,11 +22,12 @@ RUN mkdir -p /app/bin \
 
 # NGINX configuration
 RUN rm /etc/nginx/sites-enabled/default
-COPY nginx.conf nginx.http.conf /app/
+COPY example/nginx.conf example/nginx.http.conf /app/
 
 # Copy app files
 COPY entrypoint.sh /entrypoint.sh
-COPY settings.env pyproject.toml /app/
+COPY example/settings.env /app/settings.env
+COPY pyproject.toml /app/
 COPY src/ /app/src/
 RUN chmod +x /entrypoint.sh
 
