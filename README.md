@@ -1,8 +1,7 @@
 # homebrew-store-cdn
 
-Local CDN for PS4 homebrew PKG files using Docker Compose + Nginx, with automatic
-formatting, sorting, icon extraction, and index/database generation.
-
+### Local CDN for PS4 homebrew PKG files using Docker Compose + Nginx with automatic formatting, sorting, icon extraction, and index/database generation.
+![512.png](assets/512.png)
 ## Overview
 
 - Serves `.pkg` files over HTTP with range requests.
