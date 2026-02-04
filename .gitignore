@@ -5,6 +5,7 @@ data/
 bin/
 certs/
 configs/
+logs/
 
 *.env
 *.conf

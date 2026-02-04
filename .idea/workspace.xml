@@ -5,14 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="62e8cde7-fcb2-411a-a294-806f60604699" name="Changes" comment="reworking architecture">
-      <change beforePath="$PROJECT_DIR$/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/__main__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/extraction_result.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/formatter_models.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/requirements.txt" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/src/models/globals.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/globals.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/models/watcher_models.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/watcher_models.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/modules/auto_formatter.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/modules/auto_formatter.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -20,7 +16,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="67" />
+    <option name="cachedIndexableFilesCount" value="44" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="FileTemplateManagerImpl">
@@ -100,11 +96,11 @@
       <recent name="$PROJECT_DIR$/src/utils" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/configs/nginx" />
+      <recent name="$PROJECT_DIR$/configs" />
       <recent name="$PROJECT_DIR$/src/models" />
       <recent name="$PROJECT_DIR$/assets" />
       <recent name="$PROJECT_DIR$/logo.png" />
-      <recent name="$PROJECT_DIR$/hb-store-m1" />
-      <recent name="$PROJECT_DIR$/example" />
     </key>
   </component>
   <component name="RunManager" selected="Python.main">
@@ -233,15 +229,7 @@
       <workItem from="1770121639174" duration="42465000" />
       <workItem from="1770214217182" duration="47000" />
       <workItem from="1770214785450" duration="260000" />
-      <workItem from="1770215053167" duration="3888000" />
-    </task>
-    <task id="LOCAL-00017" summary="auto-commit">
-      <option name="closed" value="true" />
-      <created>1769956217071</created>
-      <option name="number" value="00017" />
-      <option name="presentableId" value="LOCAL-00017" />
-      <option name="project" value="LOCAL" />
-      <updated>1769956217071</updated>
+      <workItem from="1770215053167" duration="13518000" />
     </task>
     <task id="LOCAL-00018" summary="auto-commit">
       <option name="closed" value="true" />
@@ -627,11 +615,22 @@
       <option name="project" value="LOCAL" />
       <updated>1770217667754</updated>
     </task>
-    <option name="localTasksCounter" value="66" />
+    <task id="LOCAL-00066" summary="reworking architecture">
+      <option name="closed" value="true" />
+      <created>1770219897927</created>
+      <option name="number" value="00066" />
+      <option name="presentableId" value="LOCAL-00066" />
+      <option name="project" value="LOCAL" />
+      <updated>1770219897927</updated>
+    </task>
+    <option name="localTasksCounter" value="67" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="UnknownFeatures">
+    <option featureType="com.intellij.fileTypeFactory" implementationName="*.template" />
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="auto-commit" />

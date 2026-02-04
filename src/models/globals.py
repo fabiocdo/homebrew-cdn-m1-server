@@ -97,7 +97,7 @@ class GlobalFiles:
 
     @property
     def ERRORS_LOG_FILE_PATH(self) -> _Path:
-        return self.paths.ERRORS_DIR_PATH / "errors.log"
+        return self.paths.ERRORS_DIR_PATH / "app_errors.log"
 
 
 class GlobalEnvs:
