@@ -6,10 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="62e8cde7-fcb2-411a-a294-806f60604699" name="Changes" comment="reworking architecture">
       <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/homebrew-store-cdn.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/homebrew-store-cdn.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Dockerfile" beforeDir="false" afterPath="$PROJECT_DIR$/Dockerfile" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -230,15 +226,7 @@
       <workItem from="1770121639174" duration="42465000" />
       <workItem from="1770214217182" duration="47000" />
       <workItem from="1770214785450" duration="260000" />
-      <workItem from="1770215053167" duration="16679000" />
-    </task>
-    <task id="LOCAL-00019" summary="auto-commit">
-      <option name="closed" value="true" />
-      <created>1769958541137</created>
-      <option name="number" value="00019" />
-      <option name="presentableId" value="LOCAL-00019" />
-      <option name="project" value="LOCAL" />
-      <updated>1769958541137</updated>
+      <workItem from="1770215053167" duration="16719000" />
     </task>
     <task id="LOCAL-00020" summary="auto-commit">
       <option name="closed" value="true" />
@@ -624,7 +612,15 @@
       <option name="project" value="LOCAL" />
       <updated>1770241801791</updated>
     </task>
-    <option name="localTasksCounter" value="68" />
+    <task id="LOCAL-00068" summary="reworking architecture">
+      <option name="closed" value="true" />
+      <created>1770244935668</created>
+      <option name="number" value="00068" />
+      <option name="presentableId" value="LOCAL-00068" />
+      <option name="project" value="LOCAL" />
+      <updated>1770244935668</updated>
+    </task>
+    <option name="localTasksCounter" value="69" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
