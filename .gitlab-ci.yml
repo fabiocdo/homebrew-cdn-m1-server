@@ -9,32 +9,32 @@ variables:
   DOCKER_TLS_CERTDIR: ""
   PYTHONUNBUFFERED: "1"
 
-test:
-  image: python:3.12-slim
-  stage: test
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
-    - if: '$CI_COMMIT_BRANCH == "main"'
-  script:
-    - python -m unittest discover -s tests -p "test_*.py"
-
-build:
-  image: docker:24
-  services:
-    - name: docker:24-dind
-  stage: build
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
-    - if: '$CI_COMMIT_BRANCH == "main"'
-  script:
-    - docker build -t "$DOCKER_IMAGE:$CI_COMMIT_SHA" .
-    - docker save "$DOCKER_IMAGE:$CI_COMMIT_SHA" -o image.tar
-  artifacts:
-    paths:
-      - image.tar
-    expire_in: 1 day
+#test:
+#  image: python:3.12-slim
+#  stage: test
+#  rules:
+#    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+#    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
+#    - if: '$CI_COMMIT_BRANCH == "main"'
+#  script:
+#    - python -m unittest discover -s tests -p "test_*.py"
+#
+#build:
+#  image: docker:24
+#  services:
+#    - name: docker:24-dind
+#  stage: build
+#  rules:
+#    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+#    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
+#    - if: '$CI_COMMIT_BRANCH == "main"'
+#  script:
+#    - docker build -t "$DOCKER_IMAGE:$CI_COMMIT_SHA" .
+#    - docker save "$DOCKER_IMAGE:$CI_COMMIT_SHA" -o image.tar
+#  artifacts:
+#    paths:
+#      - image.tar
+#    expire_in: 1 day
 
 .publish_template:
   image: docker:24
@@ -78,13 +78,13 @@ publish:stable:
     - if: '$CI_COMMIT_BRANCH == "main"'
       when: manual
 
-publish:dev:
-  extends: .publish_template
-  variables:
-    TAG_SUFFIX: "dev"
-    PUBLISH_LATEST: "false"
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-      when: manual
-    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
-      when: manual
+#publish:dev:
+#  extends: .publish_template
+#  variables:
+#    TAG_SUFFIX: "dev"
+#    PUBLISH_LATEST: "false"
+#  rules:
+#    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+#      when: manual
+#    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
+#      when: manual

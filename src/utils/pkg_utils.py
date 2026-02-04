@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 import subprocess
 import shutil
@@ -6,43 +6,40 @@ import tempfile
 import struct
 from pathlib import Path
 import os
-from src.utils.models.pkg_models import ExtractResult, REGION_MAP, APP_TYPE_MAP, SELECTED_FIELDS
+from src.models.extraction_result import ExtractResult, REGION_MAP, APP_TYPE_MAP, SELECTED_FIELDS
 
 
 class PkgUtils:
-    """
-    PkgUtils provides methods to interact with PKG files via pkgtool.
+    
 
-    It handles entry listing, SFO metadata extraction and icon extraction.
 
-    :param: None
-    :return: None
-    """
+
+
+
+
+
 
     ExtractResult = ExtractResult
 
     def __init__(self):
-        """
-        Initialize PkgUtils.
+        
 
-        :param: None
-        :return: None
-        """
-        self.pkgtool_path = os.environ["PKGTOOL_PATH"]
-        self.env = {
-            "DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": os.environ["DOTNET_SYSTEM_GLOBALIZATION_INVARIANT"],
-        }
+
+
+
+
+        self.env = {"DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1" }
         self.timeout_seconds = 120
 
     @staticmethod
     def is_valid_png(path: Path, max_bytes: int = 8 * 1024 * 1024) -> bool:
-        """
-        Validate a PNG file using header and basic IHDR checks.
+        
 
-        :param path: Path to PNG file
-        :param max_bytes: Maximum file size in bytes
-        :return: True if valid PNG, otherwise False
-        """
+
+
+
+
+
         try:
             if not path.exists():
                 return False
@@ -68,12 +65,12 @@ class PkgUtils:
 
     @staticmethod
     def optimize_png(path: Path) -> bool:
-        """
-        Optimize a PNG file using optipng when available.
+        
 
-        :param path: Path to PNG file
-        :return: True if optimization ran, otherwise False
-        """
+
+
+
+
         try:
             if not path.exists():
                 return False
@@ -91,12 +88,12 @@ class PkgUtils:
             return False
 
     def extract_pkg_data(self, pkg: Path) -> tuple[ExtractResult, dict | str]:
-        """
-        Extract and parse PARAM.SFO data from a PKG.
+        
 
-        :param pkg: Path to the PKG file
-        :return: Tuple of (ExtractResult, dict on success or pkg path on error)
-        """
+
+
+
+
 
         try:
             with tempfile.TemporaryDirectory() as tmp_dir:
@@ -220,14 +217,14 @@ class PkgUtils:
         content_id: str,
         dry_run: bool = False,
     ) -> Path | None:
-        """
-        Extract ICON0.PNG from a PKG.
+        
 
-        :param pkg: Path to the PKG file
-        :param content_id: Content ID used as icon filename (without extension)
-        :param dry_run: When True, do not extract; only return the expected output path
-        :return: Path to the icon or None if not found/extraction fails
-        """
+
+
+
+
+
+
         output_dir = Path(os.environ["MEDIA_DIR"])
         output_dir.mkdir(parents=True, exist_ok=True)
         final_path = output_dir / f"{content_id}.png"

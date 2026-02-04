@@ -12,86 +12,84 @@
 
 ## Quick start
 
+The image bundles the watcher/indexer and nginx inside a single container. Update `./configs/settings.env` with the host, port, and `ENABLE_SSL` switch you want (the repository ships with a minimal example under `configs/settings.env`), and drop TLS files into `./configs/certs/` when HTTPS should be enabled. At startup the entrypoint sources that file, so changing the scheme, logging level, or any of the optional `WATCHER_*` / `AUTO_INDEXER_*` overrides only requires editing `configs/settings.env` (you can still layer additional `-e` flags or `--env-file` overrides when you run the container). `SERVER_IP`, `SERVER_PORT`, and `ENABLE_SSL` also control the `SERVER_URL` the indexer embeds in each entry, so make sure they match how clients reach the service.
+
+Mount your PKG directory and caches at `./data` so the watcher and nginx can share `/app/data`.
+
 ### Docker run
 
 ```bash
 docker run -d \
   --name homebrew-store-cdn \
-  -p 8080:80 \
-  -e SERVER_IP=127.0.0.1:8080 \
-  -e LOG_LEVEL=info \
-  -e NGINX_ENABLE_HTTPS=false \
-  -e WATCHER_ENABLED=true \
-  -e AUTO_INDEXER_OUTPUT_FORMAT=db,json \
-  -e WATCHER_PERIODIC_SCAN_SECONDS=30 \
-  -v ./data:/data \
-  -v ./nginx.conf:/app/nginx.conf:ro \
-  -v ./nginx.http.conf:/app/nginx.http.conf:ro \
-  -v ./certs:/etc/nginx/certs \
+  -p 80:80 \
+  -p 443:443 \
+  -v ./data:/app/data \
+  -v ./configs:/app/configs:ro \
   fabiocdo/homebrew-store-cdn:latest
 ```
 
 ### Docker Compose
 
 ```yaml
+version: "3.9"
 services:
   homebrew-store-cdn:
+    build: .
     image: fabiocdo/homebrew-store-cdn:latest
     container_name: homebrew-store-cdn
     ports:
       - "80:80"
-    env_file:
-      - ./settings.env
+      - "443:443"
     volumes:
-      - ./data:/data
-      - ./nginx.conf:/app/nginx.conf:ro
-      - ./nginx.http.conf:/app/nginx.http.conf:ro
-      - ./certs:/etc/nginx/certs
+      - ./data:/app/data
+      - ./configs:/app/configs:ro
     restart: unless-stopped
 ```
 
 ## Environment variables
 
-| Variable | Description | Default |
-|---|---|---|
-| `SERVER_IP` | Host (or host:port) used to build URLs in the index. Scheme is derived from `NGINX_ENABLE_HTTPS`. | `127.0.0.1:8080` |
-| `LOG_LEVEL` | Log verbosity: `debug`, `info`, `warn`, `error`. | `info` |
-| `NGINX_ENABLE_HTTPS` | Serve Nginx via HTTPS when `true`; otherwise HTTP only. | `false` |
-| `WATCHER_ENABLED` | Master switch for watcher-driven automation. | `true` |
-| `WATCHER_PERIODIC_SCAN_SECONDS` | Periodic scan interval in seconds. | `30` |
-| `WATCHER_SCAN_BATCH_SIZE` | Batch size for PKG scanning (use a large value to effectively disable batching). | `50` |
-| `WATCHER_EXECUTOR_WORKERS` | Number of parallel executor workers for planned batches. | `4` |
-| `WATCHER_SCAN_WORKERS` | Number of parallel scan workers for PKG scanning. | `4` |
-| `WATCHER_ACCESS_LOG_TAIL` | Enable tailing Nginx access log from watcher. | `true` |
-| `WATCHER_ACCESS_LOG_INTERVAL` | Tail interval in seconds. | `5` |
-| `AUTO_INDEXER_OUTPUT_FORMAT` | Output targets: `DB`, `JSON` (comma-separated). | `db,json` |
+| Variable                        | Description                                                                               | Default |
+|---------------------------------|-------------------------------------------------------------------------------------------|---|
+| `SERVER_IP`                     | Host used to build URLs in the index. Scheme is derived from `ENABLE_SSL`.                | `127.0.0.1` |
+| `SERVER_PORT`                   | Port used to build URLs in the index. Scheme is derived from `ENABLE_SSL`.                | `80` |
+| `LOG_LEVEL`                     | Log verbosity: `debug`, `info`, `warn`, `error`.                                          | `info` |
+| `ENABLE_SSL`                    | Serve Nginx via HTTPS when `true`; otherwise HTTP only. Controls the `SERVER_URL` scheme. | `false` |
+| `TLS_CRT`                      | Path to the certificate used when HTTPS is enabled (defaults to the files in `configs/certs/`). | `/app/configs/certs/tls.crt` |
+| `TLS_KEY`                      | Path to the private key used when HTTPS is enabled (defaults to the files in `configs/certs/`). | `/app/configs/certs/tls.key` |
+| `WATCHER_ENABLED`               | Master switch for watcher-driven automation.                                              | `true` |
+| `WATCHER_PERIODIC_SCAN_SECONDS` | Periodic scan interval in seconds.                                                        | `30` |
+| `WATCHER_SCAN_BATCH_SIZE`       | Batch size for PKG scanning (use a large value to effectively disable batching).          | `50` |
+| `WATCHER_EXECUTOR_WORKERS`      | Number of parallel executor workers for planned batches.                                  | `4` |
+| `WATCHER_SCAN_WORKERS`          | Number of parallel scan workers for PKG scanning.                                         | `4` |
+| `WATCHER_ACCESS_LOG_TAIL`       | Enable tailing Nginx access log from watcher.                                             | `true` |
+| `WATCHER_ACCESS_LOG_INTERVAL`   | Tail interval in seconds.                                                                 | `5` |
+| `AUTO_INDEXER_OUTPUT_FORMAT`    | Output targets: `DB`, `JSON` (comma-separated).                                           | `db,json` |
 
 Notes:
 
+- The runtime sources `configs/settings.env` before starting the watcher, so updating that file is all you need to tweak `SERVER_*`, `ENABLE_SSL`, `LOG_LEVEL`, or any optional watcher/index overrides; you can still layer extra `-e` / `--env-file` overrides when you run the container.
 - `WATCHER_ENABLED=false` stops all automation.
 - `AUTO_INDEXER_OUTPUT_FORMAT` controls output: include `JSON` to write `index.json`, include `DB` to update `store.db`.
-- When `NGINX_ENABLE_HTTPS=true`, mount TLS certs at `/etc/nginx/certs` or allow the entrypoint to generate a self-signed cert.
+- When `ENABLE_SSL=true`, drop TLS certificates under `configs/certs/` (or point `TLS_CRT`/`TLS_KEY` somewhere else) so the entrypoint can configure HTTPS.
 - `SERVER_IP` should be just the host (or host:port) without `http://` or `https://`.
-- Ensure `SERVER_IP` matches the host/port used by clients, and toggle `NGINX_ENABLE_HTTPS` to select the scheme.
-- Data paths are fixed to `/data` inside the container.
-- Conflicts are moved to `/data/_error/` with a reason appended to `/data/_logs/errors.log`.
-- Access log tailing writes lines as `WATCHER` debug logs.
+- Ensure `SERVER_IP` matches the host/port used by clients, and toggle `ENABLE_SSL` to select the scheme.
+- Data paths are fixed to `/app/data` inside the container.
+- Conflicts are moved to `/app/data/_error/` with a reason appended to `/app/data/_logs/errors.log`.
+- Access log tailing writes lines as `WATCHER` debug logs (`/app/data/_logs/access.log`).
 
 ## Volumes
 
 | Volume | Description | Default |
 |---|---|---|
-| `./data:/data` | Host data directory mapped to `/data`. | `./data` |
-| `./nginx.conf:/app/nginx.conf:ro` | HTTPS Nginx config (optional). | `./nginx.conf` |
-| `./nginx.http.conf:/app/nginx.http.conf:ro` | HTTP-only Nginx config (optional). | `./nginx.http.conf` |
-| `./certs:/etc/nginx/certs` | TLS certificates (required for HTTPS). | `./certs` |
+| `./data:/app/data` | PKG tree, caches, logs, and generated indexes served by both the watcher and nginx. | `./data` |
+| `./configs:/app/configs:ro` | Configuration directory containing `settings.env` and (when HTTPS is enabled) TLS material under `configs/certs/`. | `./configs` |
 
 ## Data layout
 
-The `/data` volume follows this layout:
+The `/app/data` volume follows this layout:
 
 ```
-/data
+/app/data
 |-- pkg/
 |   |-- game/
 |   |-- update/
@@ -155,8 +153,8 @@ Example payload:
 - Periodically scans `pkg/` and orchestrates the pipeline.
 - Uses `WATCHER_PERIODIC_SCAN_SECONDS` for the scan interval.
 - Skips execution when cache detects no changes.
-- When `WATCHER_ACCESS_LOG_TAIL=true`, tails `/data/_logs/access.log` in a background thread.
-- Downloads missing HB-Store update assets into `/data/_cache/`.
+- When `WATCHER_ACCESS_LOG_TAIL=true`, tails `/app/data/_logs/access.log` in a background thread.
+- Downloads missing HB-Store update assets into `/app/data/_cache/`.
 
 ### Auto Formatter (`src/modules/auto_formatter.py`)
 
@@ -172,7 +170,7 @@ Example payload:
 
 - Writes `index.json` and updates `store.db` based on the current plan.
 - Uses `AUTO_INDEXER_OUTPUT_FORMAT` to decide which outputs to write.
-- Builds URLs using `SERVER_IP` + `NGINX_ENABLE_HTTPS` and percent-encodes path segments.
+- Builds URLs using `SERVER_IP` + `ENABLE_SSL` and percent-encodes path segments.
 
 ## Helpers
 
@@ -185,7 +183,7 @@ Example payload:
 ### WatcherExecutor (`src/modules/helpers/watcher_executor.py`)
 
 - Executes the plan in order: move errors, extract icons, rename/sort PKGs.
-- Appends reasons to `/data/_logs/errors.log` when rejecting.
+- Appends reasons to `/app/data/_logs/errors.log` when rejecting.
 - Returns execution stats (moves, renames, extractions, errors, skipped).
 
 ## Utils
@@ -200,7 +198,7 @@ Example payload:
 
 - Scans the PKG tree and detects changes using size/mtime/hash.
 - Reuses cached SFO data when files are unchanged.
-- Marks changes when `SERVER_IP` or `NGINX_ENABLE_HTTPS` changes (index URLs must update).
+- Marks changes when `SERVER_IP` or `ENABLE_SSL` changes (index URLs must update).
 
 ### IndexCache (`src/utils/index_cache.py`)
 
@@ -242,27 +240,27 @@ Watcher.start()
 - Duplicate planned names or existing target paths -> PKG moved to `_error/`.
 - Missing or invalid `ICON0_PNG` -> PKG moved to `_error/`.
 - If a PKG is already in the correct folder and name, it is marked `skip`.
-- If `SERVER_IP` or `NGINX_ENABLE_HTTPS` changes, the index is regenerated even when PKGs are unchanged.
+- If `SERVER_IP` or `ENABLE_SSL` changes, the index is regenerated even when PKGs are unchanged.
 - Encrypted PKGs may cause `pkgtool` to fail; these are moved to `_error/`.
 - Icons are only extracted when needed (non-existent and not duplicated by another plan item).
 - Extracted icons are optimized with `optipng` when available (lossless).
 
 ## Nginx behavior
 
-- Serves `/data` directly and supports HTTP range requests for `.pkg`.
+- Serves `/app/data` directly and supports HTTP range requests for `.pkg`.
 - `index.json` and `store.db` are served with `no-store` to avoid stale caches.
 - Images and PKGs use long-lived cache headers.
-- Access logs are written to `/data/_logs/access.log` (tail with `tail -f`).
-- Update endpoints are served from `/data/_cache/`:
+- Access logs are written to `/app/data/_logs/access.log` (tail with `tail -f`).
+- Update endpoints are served from `/app/data/_cache/`:
   - `/update/remote.md5`
   - `/update/homebrew.elf`
   - `/update/homebrew.elf.sig`
   - `/update/store.prx`
   - `/update/store.prx.sig`
-- `/api.php?db_check_hash=true` returns `/data/_cache/store.db.json`.
+- `/api.php?db_check_hash=true` returns `/app/data/_cache/store.db.json`.
 
 ## Troubleshooting
 
-- If the index is not updating, delete `/data/_cache/index-cache.json` to force a rebuild.
-- If files are stuck in `_error/`, check `/data/_logs/errors.log` for the reason.
+- If the index is not updating, delete `/app/data/_cache/index-cache.json` to force a rebuild.
+- If files are stuck in `_error/`, check `/app/data/_logs/errors.log` for the reason.
 - Ensure `SERVER_IP` matches the host and port used by clients.

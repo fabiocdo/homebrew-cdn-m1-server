@@ -7,8 +7,7 @@ from unittest.mock import MagicMock, patch
 from src.modules.helpers.watcher_planner import WatcherPlanner
 from src.modules.auto_formatter import AutoFormatter
 from src.modules.auto_sorter import AutoSorter
-from src.modules.models.watcher_models import PlanOutput
-from tests.fixtures.fixtures import SFO_GAME
+from src.models.watcher_models import PlanOutput
 
 
 class TestWatcherPlanner(unittest.TestCase):

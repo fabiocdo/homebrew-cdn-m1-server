@@ -1,0 +1,13 @@
+version: "3.9"
+services:
+  homebrew-store-cdn:
+    build: .
+    image: fabiocdo/homebrew-store-cdn:latest
+    container_name: homebrew-store-cdn
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./data:/app/data
+      - ./configs:/app/configs:ro
+    restart: unless-stopped

@@ -1,44 +1,44 @@
-from __future__ import annotations
+
 
 import os
 from pathlib import Path
 from src.utils import PkgUtils, log
 from src.modules.auto_formatter import AutoFormatter
 from src.modules.auto_sorter import AutoSorter
-from src.modules.models.watcher_models import PlanOutput
+from src.models.watcher_models import PlanOutput
 from src.utils.pkg_scanner import scan_pkgs
 
 
 class WatcherPlanner:
-    """
-    Plans PKG changes using the current filesystem and cache state.
+    
 
-    :param pkg_utils: PkgUtils instance
-    :param formatter: AutoFormatter instance
-    :param sorter: AutoSorter instance
-    :return: None
-    """
+
+
+
+
+
+
 
     def __init__(self, pkg_utils: PkgUtils, formatter: AutoFormatter, sorter: AutoSorter):
-        """
-        Initialize planner dependencies.
+        
 
-        :param pkg_utils: PkgUtils instance
-        :param formatter: AutoFormatter instance
-        :param sorter: AutoSorter instance
-        :return: None
-        """
+
+
+
+
+
+
         self.pkg_utils = pkg_utils
         self.formatter = formatter
         self.sorter = sorter
 
     def plan(self) -> tuple[list[dict], dict[str, dict]]:
-        """
-        Plan changes for all PKGs.
+        
 
-        :param: None
-        :return: Tuple of (planned items, SFO cache)
-        """
+
+
+
+
         log("info", "Detecting changes...", module="WATCHER_PLANNER")
         pkg_dir = Path(os.environ["PKG_DIR"])
         pkg_list = list(pkg_dir.rglob("*.pkg"))

@@ -5,7 +5,7 @@ from unittest import mock
 from pathlib import Path
 
 from src.modules.auto_indexer import AutoIndexer
-from src.modules.models.watcher_models import PlanOutput
+from src.models.watcher_models import PlanOutput
 
 
 class TestAutoIndexer(unittest.TestCase):
@@ -31,7 +31,7 @@ class TestAutoIndexer(unittest.TestCase):
                     "DATA_DIR": str(data_dir),
                     "PKG_DIR": str(pkg_dir),
                     "SERVER_IP": "localhost:8080",
-                    "NGINX_ENABLE_HTTPS": "false",
+                    "ENABLE_SSL": "false",
                     "AUTO_INDEXER_OUTPUT_FORMAT": "json",
                 },
                 clear=False,

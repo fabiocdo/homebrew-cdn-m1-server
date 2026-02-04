@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 import json
 import urllib.request
@@ -7,13 +7,13 @@ from typing import Iterable
 
 
 class UpdateFetcher:
-    """
-    Fetch update assets from a GitHub releases endpoint.
+    
 
-    :param source_url: GitHub releases API URL
-    :param required_files: Iterable of required asset file names
-    :param optional_files: Iterable of optional asset file names
-    """
+
+
+
+
+
 
     def __init__(
         self,
@@ -21,26 +21,26 @@ class UpdateFetcher:
         required_files: Iterable[str],
         optional_files: Iterable[str] | None = None,
     ):
-        """
-        Initialize the update fetcher.
+        
 
-        :param source_url: GitHub releases API URL
-        :param required_files: Iterable of required asset file names
-        :param optional_files: Iterable of optional asset file names
-        :return: None
-        """
+
+
+
+
+
+
         self.source_url = source_url
         self.required_files = list(required_files)
         self.optional_files = list(optional_files or [])
 
     def ensure_assets(self, cache_dir: Path) -> dict:
-        """
-        Ensure assets exist under cache_dir, downloading missing files.
+        
 
-        :param cache_dir: Directory where update assets should be stored
-        :return: Dict with keys: missing_required, missing_optional,
-            downloaded, unavailable_required, unavailable_optional, errors
-        """
+
+
+
+
+
         cache_dir.mkdir(parents=True, exist_ok=True)
         missing_required = [name for name in self.required_files if not (cache_dir / name).exists()]
         missing_optional = [name for name in self.optional_files if not (cache_dir / name).exists()]
@@ -84,11 +84,11 @@ class UpdateFetcher:
         }
 
     def _fetch_release_assets(self) -> dict:
-        """
-        Fetch the latest release asset map from GitHub.
+        
 
-        :return: Dict of asset name to download URL
-        """
+
+
+
         headers = {
             "User-Agent": "homebrew-store-cdn",
             "Accept": "application/vnd.github+json",
@@ -113,13 +113,13 @@ class UpdateFetcher:
 
     @staticmethod
     def _download(url: str, dest: Path) -> None:
-        """
-        Download a file from url to dest.
+        
 
-        :param url: Download URL
-        :param dest: Destination path
-        :return: None
-        """
+
+
+
+
+
         headers = {"User-Agent": "homebrew-store-cdn"}
         req = urllib.request.Request(url, headers=headers)
         tmp_path = dest.with_suffix(dest.suffix + ".part")
