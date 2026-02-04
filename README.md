@@ -12,7 +12,7 @@
 
 ## Quick start
 
-The image bundles the watcher/indexer and nginx inside a single container. Update `./configs/settings.env` with the host, port, and `ENABLE_SSL` switch you want (the repository ships with a minimal example under `configs/settings.env`), and drop TLS files into `./configs/certs/` when HTTPS should be enabled. At startup the entrypoint sources that file, so changing the scheme, logging level, or any of the optional `WATCHER_*` / `AUTO_INDEXER_*` overrides only requires editing `configs/settings.env` (you can still layer additional `-e` flags or `--env-file` overrides when you run the container). `SERVER_IP`, `SERVER_PORT`, and `ENABLE_SSL` also control the `SERVER_URL` the indexer embeds in each entry, so make sure they match how clients reach the service.
+The image bundles the watcher/indexer and nginx inside a single container. Run `docker compose up --build` from the repo root: Docker Compose creates `./configs`/`./data` for you, mounts `./configs` read-write into `/app/configs`, and the entrypoint generates `configs/settings.env` plus `configs/certs/` (if they don’t already exist). After the first run you only need to edit `configs/settings.env` to customize `SERVER_IP`, `SERVER_PORT`, `ENABLE_SSL`, or any optional `WATCHER_*` / `AUTO_INDEXER_*` overrides. When HTTPS is enabled, drop `tls.crt`/`tls.key` into `./configs/certs/` and restart; those files already live under `/app/configs/certs/` inside the container, which is where the entrypoint looks for them when scaffolding `servers.conf`. `SERVER_IP`, `SERVER_PORT`, and `ENABLE_SSL` also control the `SERVER_URL` the indexer embeds in each entry, so make sure they match how clients reach the service.
 
 Mount your PKG directory and caches at `./data` so the watcher and nginx can share `/app/data`.
 
@@ -24,7 +24,7 @@ docker run -d \
   -p 80:80 \
   -p 443:443 \
   -v ./data:/app/data \
-  -v ./configs:/app/configs:ro \
+  -v ./configs:/app/configs \
   fabiocdo/homebrew-store-cdn:latest
 ```
 
@@ -42,7 +42,7 @@ services:
       - "443:443"
     volumes:
       - ./data:/app/data
-      - ./configs:/app/configs:ro
+      - ./configs:/app/configs
     restart: unless-stopped
 ```
 
@@ -54,8 +54,6 @@ services:
 | `SERVER_PORT`                   | Port used to build URLs in the index. Scheme is derived from `ENABLE_SSL`.                | `80` |
 | `LOG_LEVEL`                     | Log verbosity: `debug`, `info`, `warn`, `error`.                                          | `info` |
 | `ENABLE_SSL`                    | Serve Nginx via HTTPS when `true`; otherwise HTTP only. Controls the `SERVER_URL` scheme. | `false` |
-| `TLS_CRT`                      | Path to the certificate used when HTTPS is enabled (defaults to the files in `configs/certs/`). | `/app/configs/certs/tls.crt` |
-| `TLS_KEY`                      | Path to the private key used when HTTPS is enabled (defaults to the files in `configs/certs/`). | `/app/configs/certs/tls.key` |
 | `WATCHER_ENABLED`               | Master switch for watcher-driven automation.                                              | `true` |
 | `WATCHER_PERIODIC_SCAN_SECONDS` | Periodic scan interval in seconds.                                                        | `30` |
 | `WATCHER_SCAN_BATCH_SIZE`       | Batch size for PKG scanning (use a large value to effectively disable batching).          | `50` |
@@ -76,13 +74,15 @@ Notes:
 - Data paths are fixed to `/app/data` inside the container.
 - Conflicts are moved to `/app/data/_error/` with a reason appended to `/app/data/_logs/errors.log`.
 - Access log tailing writes lines as `WATCHER` debug logs (`/app/data/_logs/access.log`).
+- If `configs/settings.env` is absent, the entrypoint writes a minimal template before continuing; edit that file (or replace it with your own) whenever you want to customize the defaults.
+- TLS certificates must be placed as `configs/certs/tls.crt` and `configs/certs/tls.key` when `ENABLE_SSL=true`; those are the defaults under `/app/configs/certs/`, and you only need to set `TLS_CRT`/`TLS_KEY` if you mount them elsewhere.
 
 ## Volumes
 
 | Volume | Description | Default |
 |---|---|---|
 | `./data:/app/data` | PKG tree, caches, logs, and generated indexes served by both the watcher and nginx. | `./data` |
-| `./configs:/app/configs:ro` | Configuration directory containing `settings.env` and (when HTTPS is enabled) TLS material under `configs/certs/`. | `./configs` |
+| `./configs:/app/configs` | Configuration directory containing `settings.env` (auto-generated on first run) and TLS material under `configs/certs/`. | `./configs` |
 
 ## Data layout
 

@@ -19,12 +19,9 @@ RUN mkdir -p /app/bin
 COPY --from=toolchain /lib/OpenOrbisSDK/bin/linux/PkgTool.Core /app/bin/pkgtool
 RUN chmod +x /app/bin/pkgtool
 
-# Default configs (settings, certs, helpers)
-COPY configs/ /app/configs/
-
 # Bake nginx base config + locations
-COPY configs/nginx/nginx.template.conf /etc/nginx/nginx.conf
-COPY configs/nginx/common.locations.conf /etc/nginx/templates/common.locations.conf
+COPY docker/nginx/nginx.template.conf /etc/nginx/nginx.conf
+COPY docker/nginx/common.locations.conf /etc/nginx/templates/common.locations.conf
 
 # Entrypoint
 COPY docker/entrypoint.sh /entrypoint.sh

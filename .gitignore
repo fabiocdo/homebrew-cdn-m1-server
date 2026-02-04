@@ -4,5 +4,6 @@ __pycache__/
 **/__pycache__/
 data/
 bin/
+configs/
 */certs/
 logs/*

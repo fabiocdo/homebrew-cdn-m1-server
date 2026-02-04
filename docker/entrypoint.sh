@@ -4,6 +4,34 @@ set -eu
 CONFIG_DIR="${CONFIG_DIR:-/app/configs}"
 SETTINGS_FILE="${SETTINGS_FILE:-$CONFIG_DIR/settings.env}"
 mkdir -p "$CONFIG_DIR"
+mkdir -p "$CONFIG_DIR/certs"
+
+# If the settings file is missing, write a minimal default so Docker Compose can boot right away.
+if [ ! -f "$SETTINGS_FILE" ]; then
+  cat <<'EOF' > "$SETTINGS_FILE"
+# Minimal configuration; edit SERVER_* and ENABLE_SSL to match your environment.
+
+# Server Configuration
+# SERVER_IP: Host that clients use to reach the service.
+# SERVER_PORT: Port that nginx listens on inside the container.
+# ENABLE_SSL: Set true to serve HTTPS; tls.crt/tls.key must live under configs/certs/.
+# LOG_LEVEL: Logging verbosity (debug/info/warn/error).
+SERVER_IP=0.0.0.0
+SERVER_PORT=80
+ENABLE_SSL=false
+LOG_LEVEL=info
+
+WATCHER_ENABLED=true         # Set false to pause automatic scanning/sorting/indexing.
+WATCHER_PERIODIC_SCAN_SECONDS=30
+WATCHER_SCAN_BATCH_SIZE=50
+WATCHER_EXECUTOR_WORKERS=4
+WATCHER_SCAN_WORKERS=4
+WATCHER_ACCESS_LOG_TAIL=true  # Tail nginx access.log (set false to skip).
+WATCHER_ACCESS_LOG_INTERVAL=5
+AUTO_INDEXER_OUTPUT_FORMAT=db,json  # Comma-separated: include JSON to write index.json, include db to update store.db.
+EOF
+  echo "[info] Generated default settings.env at $SETTINGS_FILE"
+fi
 
 # Load user settings and keep defaults exported
 set -a
@@ -68,5 +96,5 @@ fi
 nginx -t
 
 # Start the watcher (background) and run nginx in the foreground
-python -m src.main &
+python -m main &
 exec nginx -g 'daemon off;'
