@@ -14,5 +14,6 @@ def start():
     welcome()
     init_directories()
 
+
 if __name__ == "__main__":
     start()
