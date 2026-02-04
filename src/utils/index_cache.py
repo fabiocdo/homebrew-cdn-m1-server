@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 import json
 import os
@@ -11,22 +11,22 @@ CACHE_FILENAME = "index-cache.json"
 
 
 def _cache_path() -> Path:
-    """
-    Resolve the path to the index cache file.
+    
 
-    :param: None
-    :return: Cache file path
-    """
+
+
+
+
     return Path(os.environ["CACHE_DIR"]) / CACHE_FILENAME
 
 
 def load_cache() -> tuple[dict[str, dict], dict[str, dict], dict[str, str]]:
-    """
-    Load file and index cache contents from disk.
+    
 
-    :param: None
-    :return: Tuple of (files cache, index cache, meta)
-    """
+
+
+
+
     path = _cache_path()
     if not path.exists():
         return {}, {}, {}
@@ -51,14 +51,14 @@ def load_cache() -> tuple[dict[str, dict], dict[str, dict], dict[str, str]]:
 
 
 def save_cache(files: dict[str, dict], index: dict[str, dict], meta: dict[str, str]) -> None:
-    """
-    Persist file and index cache contents to disk.
+    
 
-    :param files: File cache data
-    :param index: Index cache data
-    :param meta: Cache metadata
-    :return: None
-    """
+
+
+
+
+
+
     path = _cache_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {"version": CACHE_VERSION, "files": files, "index": index, "meta": meta}
@@ -66,13 +66,13 @@ def save_cache(files: dict[str, dict], index: dict[str, dict], meta: dict[str, s
 
 
 def hash_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
-    """
-    Compute a SHA-256 hash for a file.
+    
 
-    :param path: File path to hash
-    :param chunk_size: Read chunk size in bytes
-    :return: Hex digest string
-    """
+
+
+
+
+
     digest = hashlib.sha256()
     with path.open("rb") as f:
         for chunk in iter(lambda: f.read(chunk_size), b""):

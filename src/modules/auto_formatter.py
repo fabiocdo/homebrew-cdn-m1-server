@@ -1,29 +1,14 @@
-from __future__ import annotations
-
 import os
 from pathlib import Path
 from src.utils import log
-from src.modules.models.formatter_models import FormatterPlanResult
+from src.models.formatter_models import FormatterPlanResult
 
 
 class AutoFormatter:
-    """
-    Renames PKG files based on the CONTENT_ID field from SFO metadata.
-
-    :param: None
-    :return: None
-    """
-
     PlanResult = FormatterPlanResult
 
     def dry_run(self, pkg: Path, sfo_data: dict) -> tuple[PlanResult, str | None]:
-        """
-        Plan the final PKG filename and check for conflicts.
 
-        :param pkg: Path object representing the source PKG file
-        :param sfo_data: Parsed PARAM.SFO data
-        :return: Tuple of (PlanResult, planned filename or current name)
-        """
         if not pkg.exists():
             return self.PlanResult.NOT_FOUND, pkg.name
 
@@ -49,13 +34,7 @@ class AutoFormatter:
         return self.PlanResult.OK, planned_name
 
     def run(self, pkg: Path, sfo_data: dict) -> str | None:
-        """
-        Rename the PKG file based on SFO metadata.
 
-        :param pkg: Path object representing the PKG file
-        :param sfo_data: Parsed PARAM.SFO data
-        :return: New filename if renamed, otherwise None
-        """
         plan_result, planned_name = self.dry_run(pkg, sfo_data)
 
         if plan_result == self.PlanResult.NOT_FOUND:
@@ -76,7 +55,8 @@ class AutoFormatter:
             return None
 
         if plan_result == self.PlanResult.CONFLICT:
-            log("error", "Failed to rename PKG. Target name already exists", message=f"{pkg.name} -> {planned_name}", module="AUTO_FORMATTER")
+            log("error", "Failed to rename PKG. Target name already exists", message=f"{pkg.name} -> {planned_name}",
+                module="AUTO_FORMATTER")
             error_dir = Path(os.environ["ERROR_DIR"])
             error_dir.mkdir(parents=True, exist_ok=True)
             conflict_path = error_dir / pkg.name
@@ -85,7 +65,8 @@ class AutoFormatter:
                 conflict_path = error_dir / f"{pkg.stem}_{counter}{pkg.suffix}"
                 counter += 1
             pkg.rename(conflict_path)
-            log("warn", "PKG moved to errors folder", message=f"{pkg.name} -> {conflict_path.name}", module="AUTO_FORMATTER")
+            log("warn", "PKG moved to errors folder", message=f"{pkg.name} -> {conflict_path.name}",
+                module="AUTO_FORMATTER")
             return None
 
         target_path = pkg.with_name(planned_name)

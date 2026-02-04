@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 import json
 import os
@@ -7,27 +7,27 @@ import hashlib
 from pathlib import Path
 from urllib.parse import quote
 from src.utils.log_utils import log
-from src.modules.models.watcher_models import PlanOutput
+from src.models.watcher_models import PlanOutput
 from src.utils.index_cache import load_cache, save_cache, DB_SCHEMA_VERSION
-from src.utils.models.pkg_models import STORE_APP_TYPE_MAP
+from src.models.extraction_result import STORE_APP_TYPE_MAP
 from src.utils.url_utils import build_base_url
 
 
 class AutoIndexer:
-    """
-    Builds and persists the JSON index and store DB using a delta strategy.
+    
 
-    :param: None
-    :return: None
-    """
+
+
+
+
 
     def __init__(self):
-        """
-        Initialize the indexer with output formats from env.
+        
 
-        :param: None
-        :return: None
-        """
+
+
+
+
         raw_formats = os.environ["AUTO_INDEXER_OUTPUT_FORMAT"]
         self.output_formats = {
             part.strip().upper()
@@ -36,16 +36,16 @@ class AutoIndexer:
         }
 
     def run(self, items: list[dict], sfo_cache: dict[str, dict]) -> None:
-        """
-        Apply JSON/DB updates using the planned items and SFO cache.
+        
 
-        This method computes added/updated/removed entries from the cache
-        and only writes when changes are detected.
 
-        :param items: Planned items from the watcher
-        :param sfo_cache: Cached SFO data keyed by source path
-        :return: None
-        """
+
+
+
+
+
+
+
         files_cache, index_cache, meta = load_cache()
         current_index, db_rows = self._build_entries(items, sfo_cache)
 
@@ -97,13 +97,13 @@ class AutoIndexer:
         save_cache(files_cache, current_index, meta)
 
     def _build_entries(self, items: list[dict], sfo_cache: dict[str, dict]) -> tuple[dict[str, dict], dict[str, dict]]:
-        """
-        Build index entries and DB rows for the current plan.
+        
 
-        :param items: Planned items from the watcher
-        :param sfo_cache: Cached SFO data keyed by source path
-        :return: Tuple of (index entries, db rows) keyed by pkg_url
-        """
+
+
+
+
+
         data_dir = Path(os.environ["DATA_DIR"])
         pkg_dir = Path(os.environ["PKG_DIR"])
         base_url = build_base_url().rstrip("/")
@@ -198,15 +198,15 @@ class AutoIndexer:
         removed: dict,
         db_rows: dict[str, dict],
     ) -> None:
-        """
-        Apply DB changes using delete + insert for removed and updated rows.
+        
 
-        :param added: Added entries keyed by pkg_url
-        :param updated: Updated entries keyed by pkg_url
-        :param removed: Removed entries keyed by pkg_url
-        :param db_rows: Full DB rows keyed by pkg_url
-        :return: None
-        """
+
+
+
+
+
+
+
         db_dir = Path(os.environ["STORE_DIR"])
         db_dir.mkdir(parents=True, exist_ok=True)
         db_path = db_dir / "store.db"
@@ -311,14 +311,14 @@ class AutoIndexer:
             conn.close()
 
     def write_store_db_md5(self) -> None:
-        """
-        Write the store.db checksum files to _cache/.
+        
 
-        - store.db.md5 (plain hash)
-        - store.db.json ({"hash": "<md5>"})
 
-        :return: None
-        """
+
+
+
+
+
         cache_dir = Path(os.environ["CACHE_DIR"])
         cache_dir.mkdir(parents=True, exist_ok=True)
         md5_path = cache_dir / "store.db.md5"

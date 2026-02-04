@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 import os
 import concurrent.futures
@@ -17,17 +17,17 @@ def scan_pkgs(
     workers: int | None = None,
     log_module: str | None = None,
 ) -> tuple[list[tuple[Path, dict | None]], bool]:
-    """
-    Scan for PKGs, extract SFO data, and detect changes.
+    
 
-    :param pkg_dir: Directory to scan for PKG files
-    :param pkg_utils: PkgUtils instance
-    :param pkgs: Optional list of PKG paths to scan
-    :param batch_size: Optional batch size for scanning
-    :param workers: Optional number of parallel workers
-    :param log_module: Optional module tag for progress logs
-    :return: (list of (pkg path, sfo data or None), has_changes flag)
-    """
+
+
+
+
+
+
+
+
+
     results: list[tuple[Path, dict | None]] = []
     files_cache, index_cache, meta = load_cache()
     new_cache: dict[str, dict] = {}

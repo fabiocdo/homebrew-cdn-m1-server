@@ -1,92 +1,42 @@
-from __future__ import annotations
-
 import datetime
-import os
-import re
-from src.utils.models.log_models import LOG_LEVELS, MODULE_COLORS, LEVEL_COLORS
 
-class Logger:
-    """
-    Logger class with modular tagging and color support.
+from src.models import GlobalEnvs
+from src.models.log_constants import LogLevel, LoggingModule, LogColor
 
-    Provides a centralized logging mechanism that supports different severity levels
-    and modular tags with colorized output for better readability in the terminal.
+LOG_PRIORITY: LogLevel = LogLevel[GlobalEnvs.LOG_LEVEL.upper()].priority()
 
-    :param: None
-    :return: None
-    """
+class LogUtils:
 
-    def __init__(self, log_level="info"):
-        """
-        Initialize the Logger with a minimum log level.
+    @staticmethod
+    def _log(log_level: LogLevel, message=None, module: LoggingModule | None = None):
+        timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        log_color = log_level.color()
 
-        :param log_level: Minimum severity level to log ("debug", "info", "warn", "error")
-        :return: None
-        """
-        self.levels = LOG_LEVELS
-        self.log_level = self.levels.get(log_level.lower(), 1)
-        
-        self.colors = MODULE_COLORS
-        self.level_colors = LEVEL_COLORS
+        module_log_tag = "" if not module else f"{module.color()}[{module.name}] {LogColor.RESET}"
 
-    def log(self, level, action, message=None, module=None):
-        """
-        Emit a log message if its level is greater than or equal to the configured log level.
+        print(f"{timestamp} | {module_log_tag}{log_color}{message}{LogColor.RESET}")
 
-        The output format is: <timestamp UTC> | [module] action: message
+    @staticmethod
+    def log_debug(message=None, module: LoggingModule | None = None):
+        if LOG_PRIORITY <= LogLevel.DEBUG.priority():
+            LogUtils._log(LogLevel.DEBUG, message, module)
 
-        :param level: Severity level ("debug", "info", "warn", "error")
-        :param action: The main action or event being logged
-        :param message: Optional detailed message or context
-        :param module: Optional module tag (e.g., "WATCHER", "AUTO_FORMATTER")
-        :return: None
-        """
-        level_val = self.levels.get(level.lower(), 1)
-        if level_val >= self.log_level:
-            timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-            
-            module_color = ""
-            if module:
-                module_key = module
-                if module_key not in self.colors:
-                    normalized = module.replace("-", "_")
-                    module_key = normalized
-                    if module_key not in self.colors:
-                        module_key = re.sub(r"_\d+$", "", normalized)
-                module_color = self.colors.get(module_key, "")
-            level_color = self.level_colors.get(level.lower(), "")
-            reset = self.colors["RESET"]
-            
-            module_str = f"{module_color}[{module}]{reset} " if module else ""
-            msg_str = f": {message}" if message else ""
-            
-            print(f"{timestamp} | {module_str}{level_color}{action}{msg_str}{reset}")
+    @staticmethod
+    def log_info(message=None, module: LoggingModule | None = None):
+        if LOG_PRIORITY <= LogLevel.INFO.priority():
+            LogUtils._log(LogLevel.INFO, message, module)
 
+    @staticmethod
+    def log_warn(message=None, module: LoggingModule | None = None):
+        if LOG_PRIORITY <= LogLevel.WARN.priority():
+            LogUtils._log(LogLevel.WARN, message, module)
 
-_LOGGER = None
+    @staticmethod
+    def log_error(message=None, module: LoggingModule | None = None):
+        if LOG_PRIORITY <= LogLevel.ERROR.priority():
+            LogUtils._log(LogLevel.ERROR, message, module)
 
-
-def _get_logger() -> Logger:
-    """
-    Lazily initialize and return the global logger.
-
-    :param: None
-    :return: Logger instance
-    """
-    global _LOGGER
-    if _LOGGER is None:
-        _LOGGER = Logger(os.environ["LOG_LEVEL"])
-    return _LOGGER
-
-
-def log(level, action, message=None, module=None):
-    """
-    Log a message using the shared Logger instance.
-
-    :param level: Severity level ("debug", "info", "warn", "error")
-    :param action: The main action or event being logged
-    :param message: Optional detailed message or context
-    :param module: Optional module tag (e.g., "WATCHER", "AUTO_FORMATTER")
-    :return: None
-    """
-    _get_logger().log(level, action, message=message, module=module)
+log_debug = LogUtils.log_debug
+log_info = LogUtils.log_info
+log_warn = LogUtils.log_warn
+log_error = LogUtils.log_error

@@ -1,4 +1,4 @@
-from __future__ import annotations
+
 
 import os
 import threading
@@ -7,28 +7,28 @@ import datetime
 from src.utils import PkgUtils, log
 from src.modules.auto_formatter import AutoFormatter
 from src.modules.auto_sorter import AutoSorter
-from src.modules.models.watcher_models import PlanOutput
+from src.models.watcher_models import PlanOutput
 
 
 class WatcherExecutor:
-    """
-    Executes planned PKG operations and returns updated cache and stats.
+    
 
-    :param pkg_utils: PkgUtils instance
-    :param formatter: AutoFormatter instance
-    :param sorter: AutoSorter instance
-    :return: None
-    """
+
+
+
+
+
+
 
     def __init__(self, pkg_utils: PkgUtils, formatter: AutoFormatter, sorter: AutoSorter):
-        """
-        Initialize executor dependencies.
+        
 
-        :param pkg_utils: PkgUtils instance
-        :param formatter: AutoFormatter instance
-        :param sorter: AutoSorter instance
-        :return: None
-        """
+
+
+
+
+
+
         self.pkg_utils = pkg_utils
         self.formatter = formatter
         self.sorter = sorter
@@ -42,15 +42,15 @@ class WatcherExecutor:
         log_summary: bool = True,
         module_name: str = "WATCHER_EXECUTOR",
     ) -> tuple[dict, dict]:
-        """
-        Execute a planned set of PKG operations and return updated cache and stats.
+        
 
-        :param results: Planned items from the planner
-        :param sfo_cache: Cached SFO data keyed by source path
-        :param log_start: When True, log the start of execution
-        :param log_summary: When True, log the execution summary
-        :return: Tuple of (updated SFO cache, stats dict)
-        """
+
+
+
+
+
+
+
         if log_start:
             log("info", "Executing planned changes...", module=module_name)
         error_dir = Path(os.environ["ERROR_DIR"])

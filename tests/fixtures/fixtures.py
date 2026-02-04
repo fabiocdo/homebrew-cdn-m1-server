@@ -1,6 +1,6 @@
-"""
-Shared test fixtures for the homebrew-store-cdn project.
-"""
+
+
+
 
 SFO_GAME = {
     "title": "Horizon Zero Dawn",

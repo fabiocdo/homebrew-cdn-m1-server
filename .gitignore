@@ -1,12 +1,8 @@
 .idea
+.venv
 __pycache__/
 **/__pycache__/
-!example/**
 data/
 bin/
-certs/
-
-*.env
-*.conf
-docker-compose.yml
-!nginx.http.conf
+certs/*
+logs/*

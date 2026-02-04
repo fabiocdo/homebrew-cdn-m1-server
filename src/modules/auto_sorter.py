@@ -1,31 +1,31 @@
-from __future__ import annotations
+
 
 import os
 from pathlib import Path
 from src.utils import log
-from src.modules.models.sorter_models import SorterPlanResult
+from src.models.sorter_models import SorterPlanResult
 
 
 class AutoSorter:
-    """
-    AutoSorter organizes PKGs into app-type folders.
+    
 
-    It supports dry-run planning and real moving based on app_type.
 
-    :param: None
-    :return: None
-    """
+
+
+
+
+
 
     PlanResult = SorterPlanResult
 
     def dry_run(self, pkg: Path, app_type: str) -> tuple[PlanResult, Path | None]:
-        """
-        Plan the PKG destination directory and check for conflicts.
+        
 
-        :param pkg: Path object representing the PKG file
-        :param app_type: App type (e.g. "game", "dlc")
-        :return: Tuple of (PlanResult, Planned directory Path or None)
-        """
+
+
+
+
+
         if not pkg.exists():
             return self.PlanResult.NOT_FOUND, None
 
@@ -43,13 +43,13 @@ class AutoSorter:
         return self.PlanResult.OK, target_dir
 
     def run(self, pkg: Path, app_type: str) -> str | None:
-        """
-        Move the PKG file to its app-type folder.
+        
 
-        :param pkg: Path object representing the PKG file
-        :param app_type: App type (e.g. "game", "dlc")
-        :return: New path string if moved, otherwise None
-        """
+
+
+
+
+
         plan_result, target_dir = self.dry_run(pkg, app_type)
 
         if plan_result == self.PlanResult.NOT_FOUND:
