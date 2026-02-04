@@ -1,15 +1,19 @@
-from models.globals import GlobalPaths
-from models.log_constants import LoggingModule
-from utils import log_info, log_debug, log_warn, log_error
+from src.models.globals import Global
+from src.models.log_constants import LoggingModule
+from src.utils import log_debug, log_info, log_warn, log_error
 
 
 def welcome():
     print("Welcome! TODO: ADD box")
 
 def init_directories():
-    paths = GlobalPaths()
+    log_debug("Initializing directories...")
+
+    paths = Global.PATHS
     for p in vars(paths).values():
         p.mkdir(parents=True, exist_ok=True)
+
+    log_debug("Directories OK.")
 
 def start():
     welcome()

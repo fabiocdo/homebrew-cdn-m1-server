@@ -68,5 +68,5 @@ fi
 nginx -t
 
 # Start the watcher (background) and run nginx in the foreground
-python /app/main.py &
+python -m src.main &
 exec nginx -g 'daemon off;'
