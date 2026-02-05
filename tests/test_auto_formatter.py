@@ -17,7 +17,7 @@ class TestAutoFormatter(unittest.TestCase):
         mock_pkg.name = "test.pkg"
         mock_pkg.exists.return_value = True
 
-        result, planned_name = formatter.dry_run(mock_pkg, {"title": "Game"})
+        result, planned_name = dry_run(mock_pkg, {"title": "Game"})
 
         self.assertEqual(result, AutoFormatter.PlanResult.INVALID)
         self.assertEqual(planned_name, "test.pkg")
@@ -28,7 +28,7 @@ class TestAutoFormatter(unittest.TestCase):
         mock_pkg.name = "test.pkg"
         mock_pkg.exists.return_value = True
 
-        result, planned_name = formatter.dry_run(mock_pkg, {"content_id": "BAD/ID"})
+        result, planned_name = dry_run(mock_pkg, {"content_id": "BAD/ID"})
 
         self.assertEqual(result, AutoFormatter.PlanResult.INVALID)
         self.assertEqual(planned_name, "test.pkg")
@@ -39,7 +39,7 @@ class TestAutoFormatter(unittest.TestCase):
         mock_pkg.name = f"{SFO_GAME['content_id']}.pkg"
         mock_pkg.exists.return_value = True
 
-        result, planned_name = formatter.dry_run(mock_pkg, SFO_GAME)
+        result, planned_name = dry_run(mock_pkg, SFO_GAME)
 
         self.assertEqual(result, AutoFormatter.PlanResult.SKIP)
         self.assertEqual(planned_name, f"{SFO_GAME['content_id']}.pkg")
@@ -54,7 +54,7 @@ class TestAutoFormatter(unittest.TestCase):
         mock_target.exists.return_value = False
         mock_pkg.with_name.return_value = mock_target
 
-        result, planned_name = formatter.dry_run(mock_pkg, SFO_GAME)
+        result, planned_name = dry_run(mock_pkg, SFO_GAME)
 
         self.assertEqual(result, AutoFormatter.PlanResult.OK)
         self.assertEqual(planned_name, f"{SFO_GAME['content_id']}.pkg")
@@ -70,7 +70,7 @@ class TestAutoFormatter(unittest.TestCase):
                 mock_pkg.suffix = ".pkg"
 
                 with patch.object(AutoFormatter, "dry_run", return_value=(AutoFormatter.PlanResult.CONFLICT, "new.pkg")):
-                    result = formatter.run(mock_pkg, SFO_GAME)
+                    result = run(mock_pkg, SFO_GAME)
 
                     self.assertIsNone(result)
                     mock_pkg.rename.assert_called_once()
@@ -84,7 +84,7 @@ class TestAutoFormatter(unittest.TestCase):
         mock_pkg.with_name.return_value = mock_target
 
         with patch.object(AutoFormatter, "dry_run", return_value=(AutoFormatter.PlanResult.OK, "new.pkg")):
-            result = formatter.run(mock_pkg, SFO_GAME)
+            result = run(mock_pkg, SFO_GAME)
 
             self.assertEqual(result, "new.pkg")
             mock_pkg.with_name.assert_called_once_with("new.pkg")

@@ -1,6 +1,6 @@
 from enum import Enum
 
-class Outputs(Enum):
+class Output(Enum):
     OK = "ok"
     SKIP = "skip"
     CONFLICT = "conflict"

@@ -2,7 +2,7 @@ import os
 import concurrent.futures
 from pathlib import Path
 from src.utils.pkg_utils import PkgUtils
-from src.utils.log_utils import log
+from src.utils.log import log
 from src.utils.index_cache import load_cache, save_cache, DB_SCHEMA_VERSION
 from src.utils.url_utils import build_base_url
 

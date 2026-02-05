@@ -1,50 +1,20 @@
-
-
 import json
 import os
 import sqlite3
 import hashlib
 from pathlib import Path
 from urllib.parse import quote
-from src.utils.log_utils import log
-from src.models.watcher_models import PlanOutput
-from src.utils.index_cache import load_cache, save_cache, DB_SCHEMA_VERSION
-from src.models.extraction_result import STORE_APP_TYPE_MAP
-from src.utils.url_utils import build_base_url
 
+from src.models import Global, LoggingModule, Store
+from src.utils import log_info, log_debug
+from src.utils.index_cache import load_cache, save_cache, DB_SCHEMA_VERSION
 
 class AutoIndexer:
-    
-
-
-
-
-
-
-    def __init__(self):
-        
-
-
-
-
-
-        raw_formats = os.environ["AUTO_INDEXER_OUTPUT_FORMAT"]
-        self.output_formats = {
-            part.strip().upper()
-            for part in raw_formats.split(",")
-            if part.strip()
-        }
 
     def run(self, items: list[dict], sfo_cache: dict[str, dict]) -> None:
-        
 
-
-
-
-
-
-
-
+        output_formats = Global.ENVS.AUTO_INDEXER_OUTPUT_FORMAT
+        index_json_file = Global.FILES.INDEX_JSON_FILE_PATH
 
         files_cache, index_cache, meta = load_cache()
         current_index, db_rows = self._build_entries(items, sfo_cache)
@@ -68,41 +38,30 @@ class AutoIndexer:
             has_changes = True
             meta["db_schema_version"] = DB_SCHEMA_VERSION
 
-        if "JSON" in self.output_formats:
+        if "JSON" in output_formats:
             if has_changes:
-                log("info", "Generating index.json and index-cache.json", module="AUTO_INDEXER")
-                index_dir = Path(os.environ["INDEX_DIR"])
-                index_dir.mkdir(parents=True, exist_ok=True)
-                index_path = index_dir / "index.json"
-                with open(index_path, "w", encoding="utf-8") as f:
-                    json.dump({"DATA": current_index}, f, ensure_ascii=False, indent=2, sort_keys=True)
-                log(
-                    "info",
-                    f"Index update complete (added: {len(added)}, updated: {len(updated)}, removed: {len(removed)})",
-                    module="AUTO_INDEXER",
-                )
-            else:
-                log("debug", "Index unchanged. Skipping index.json", module="AUTO_INDEXER")
-        else:
-            log("debug", "JSON output disabled. Skipping index.json", module="AUTO_INDEXER")
+                log_info("Generating index.json and index-cache.json", LoggingModule.AUTO_INDEXER)
 
-        if "DB" in self.output_formats:
+                with open(index_json_file, "w", encoding="utf-8") as f:
+                    json.dump({"data": current_index}, f, ensure_ascii=False, indent=2, sort_keys=True)
+
+                log_info(f"Index update complete (added: {len(added)}, updated: {len(updated)}, removed: {len(removed)})",LoggingModule.AUTO_INDEXER)
+            else:
+                log_debug( "Index unchanged. Skipping index.json", LoggingModule.AUTO_INDEXER)
+        else:
+            log_debug( "JSON output disabled. Skipping index.json", LoggingModule.AUTO_INDEXER)
+
+        if "DB" in output_formats:
             if has_changes:
-                log("info", "Applying DB changes...", module="AUTO_INDEXER")
+                log_info( "Applying DB changes...", LoggingModule.AUTO_INDEXER)
                 self._write_db(added, updated, removed, db_rows)
                 self.write_store_db_md5()
             else:
-                log("debug", "Index unchanged. Skipping DB update", module="AUTO_INDEXER")
+                log_debug( "Index unchanged. Skipping DB update", LoggingModule.AUTO_INDEXER)
 
         save_cache(files_cache, current_index, meta)
 
     def _build_entries(self, items: list[dict], sfo_cache: dict[str, dict]) -> tuple[dict[str, dict], dict[str, dict]]:
-        
-
-
-
-
-
 
         data_dir = Path(os.environ["DATA_DIR"])
         pkg_dir = Path(os.environ["PKG_DIR"])
@@ -161,7 +120,8 @@ class AutoIndexer:
             }
 
             app_type = str(sfo_payload.get("app_type", "")).lower()
-            store_app_type = STORE_APP_TYPE_MAP.get(app_type, "Other")
+
+            store_app_type = Store.AppType.value(app_type, "Other")
 
             db_rows[pkg_url] = {
                 "id": sfo_payload.get("content_id"),
@@ -190,22 +150,13 @@ class AutoIndexer:
 
         return index_data, db_rows
 
-
     def _write_db(
-        self,
-        added: dict,
-        updated: dict,
-        removed: dict,
-        db_rows: dict[str, dict],
+            self,
+            added: dict,
+            updated: dict,
+            removed: dict,
+            db_rows: dict[str, dict],
     ) -> None:
-        
-
-
-
-
-
-
-
 
         db_dir = Path(os.environ["STORE_DIR"])
         db_dir.mkdir(parents=True, exist_ok=True)
@@ -262,12 +213,12 @@ class AutoIndexer:
             conn.execute("DELETE FROM homebrews")
 
             insert_sql = """
-                INSERT INTO homebrews (
-                  pid, id, name, "desc", image, package, version, picpath, desc_1, desc_2,
-                  ReviewStars, Size, Author, apptype, pv, main_icon_path, main_menu_pic, releaseddate,
-                  number_of_downloads, github, video, twitter, md5
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """
+                         INSERT INTO homebrews (pid, id, name, "desc", image, package, version, picpath, desc_1, desc_2,
+                                                ReviewStars, Size, Author, apptype, pv, main_icon_path, main_menu_pic,
+                                                releaseddate,
+                                                number_of_downloads, github, video, twitter, md5)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) \
+                         """
 
             rows = []
             for idx, pkg_url in enumerate(sorted(db_rows.keys()), start=1):
@@ -311,13 +262,6 @@ class AutoIndexer:
             conn.close()
 
     def write_store_db_md5(self) -> None:
-        
-
-
-
-
-
-
 
         cache_dir = Path(os.environ["CACHE_DIR"])
         cache_dir.mkdir(parents=True, exist_ok=True)
@@ -326,7 +270,7 @@ class AutoIndexer:
         db_path = Path(os.environ["STORE_DIR"]) / "store.db"
 
         if not db_path.exists():
-            log("warn", "store.db not found. Skipping store.db.md5", module="AUTO_INDEXER")
+            log("warn", "store.db not found. Skipping store.db.md5", LoggingModule.AUTO_INDEXER)
             return
 
         md5 = hashlib.md5()
@@ -341,5 +285,5 @@ class AutoIndexer:
             "info",
             "Generated store.db checksum files",
             message=f"{db_path} -> {md5_path}, {json_path}",
-            module="AUTO_INDEXER",
+            LoggingModule.AUTO_INDEXER,
         )
