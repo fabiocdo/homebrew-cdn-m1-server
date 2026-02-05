@@ -12,7 +12,7 @@
 
 ## Quick start
 
-The image bundles the watcher/indexer and nginx inside a single container. Run `docker compose up --build` from the repo root: Docker Compose creates `./configs`/`./data` for you, mounts `./configs` read-write into `/app/configs`, and the entrypoint generates `configs/settings.env` plus `configs/certs/` (if they don’t already exist). After the first run you only need to edit `configs/settings.env` to customize `SERVER_IP`, `SERVER_PORT`, `ENABLE_SSL`, or any optional `WATCHER_*` / `AUTO_INDEXER_*` overrides. When HTTPS is enabled, drop `tls.crt`/`tls.key` into `./configs/certs/` and restart; those files already live under `/app/configs/certs/` inside the container, which is where the entrypoint looks for them when scaffolding `servers.conf`. `SERVER_IP`, `SERVER_PORT`, and `ENABLE_SSL` also control the `SERVER_URL` the indexer embeds in each entry, so make sure they match how clients reach the service.
+The image bundles the watcher/indexer and nginx inside a single container. Run `docker compose up --build` from the repo root: Docker Compose creates `./configs`/`./data` for you, mounts `./configs` read-write into `/app/configs`, and the entrypoint generates `configs/settings.env` plus `configs/certs/` (if they don’t already exist). After the first run you only need to edit `configs/settings.env` to customize `SERVER_IP`, `SERVER_PORT`, the TLS toggle (`ENABLE_TLS`), or any optional `WATCHER_*` / `AUTO_INDEXER_*` overrides. When HTTPS is enabled, drop `tls.crt`/`tls.key` into `./configs/certs/` and restart; those files already live under `/app/configs/certs/` inside the container, which is where the entrypoint looks for them when scaffolding `servers.conf`. `SERVER_IP`, `SERVER_PORT`, and the TLS toggle (`ENABLE_TLS`) also control the `SERVER_URL` the indexer embeds in each entry, so make sure they match how clients reach the service.
 
 Mount your PKG directory and caches at `./data` so the watcher and nginx can share `/app/data`.
 
@@ -50,10 +50,10 @@ services:
 
 | Variable                        | Description                                                                               | Default |
 |---------------------------------|-------------------------------------------------------------------------------------------|---|
-| `SERVER_IP`                     | Host used to build URLs in the index. Scheme is derived from `ENABLE_SSL`.                | `127.0.0.1` |
-| `SERVER_PORT`                   | Port used to build URLs in the index. Scheme is derived from `ENABLE_SSL`.                | `80` |
+| `SERVER_IP`                     | Host used to build URLs in the index. Scheme is derived from the TLS toggle (`ENABLE_TLS`).| `127.0.0.1` |
+| `SERVER_PORT`                   | Port used to build URLs in the index. Scheme is derived from the TLS toggle (`ENABLE_TLS`).| `80` |
 | `LOG_LEVEL`                     | Log verbosity: `debug`, `info`, `warn`, `error`.                                          | `info` |
-| `ENABLE_SSL`                    | Serve Nginx via HTTPS when `true`; otherwise HTTP only. Controls the `SERVER_URL` scheme. | `false` |
+| `ENABLE_TLS`                   | Serve Nginx via TLS/HTTPS when `true`; otherwise HTTP only. Controls the `SERVER_URL` scheme. | `false` |
 | `WATCHER_ENABLED`               | Master switch for watcher-driven automation.                                              | `true` |
 | `WATCHER_PERIODIC_SCAN_SECONDS` | Periodic scan interval in seconds.                                                        | `30` |
 | `WATCHER_SCAN_BATCH_SIZE`       | Batch size for PKG scanning (use a large value to effectively disable batching).          | `50` |
@@ -65,17 +65,17 @@ services:
 
 Notes:
 
-- The runtime sources `configs/settings.env` before starting the watcher, so updating that file is all you need to tweak `SERVER_*`, `ENABLE_SSL`, `LOG_LEVEL`, or any optional watcher/index overrides; you can still layer extra `-e` / `--env-file` overrides when you run the container.
+- The runtime sources `configs/settings.env` before starting the watcher, so updating that file is all you need to tweak `SERVER_*`, the TLS toggle (`ENABLE_TLS`), `LOG_LEVEL`, or any optional watcher/index overrides; you can still layer extra `-e` / `--env-file` overrides when you run the container.
 - `WATCHER_ENABLED=false` stops all automation.
 - `AUTO_INDEXER_OUTPUT_FORMAT` controls output: include `JSON` to write `index.json`, include `DB` to update `store.db`.
-- When `ENABLE_SSL=true`, drop TLS certificates under `configs/certs/` (or point `TLS_CRT`/`TLS_KEY` somewhere else) so the entrypoint can configure HTTPS.
+- When `ENABLE_TLS=true`, drop TLS certificates under `configs/certs/` (or point `TLS_CRT`/`TLS_KEY` somewhere else) so the entrypoint can configure HTTPS.
 - `SERVER_IP` should be just the host (or host:port) without `http://` or `https://`.
-- Ensure `SERVER_IP` matches the host/port used by clients, and toggle `ENABLE_SSL` to select the scheme.
+- Ensure `SERVER_IP` matches the host/port used by clients, and toggle `ENABLE_TLS` to select TLS vs HTTP.
 - Data paths are fixed to `/app/data` inside the container.
 - Conflicts are moved to `/app/data/_error/` with a reason appended to `/app/data/_logs/errors.log`.
 - Access log tailing writes lines as `WATCHER` debug logs (`/app/data/_logs/access.log`).
 - If `configs/settings.env` is absent, the entrypoint writes a minimal template before continuing; edit that file (or replace it with your own) whenever you want to customize the defaults.
-- TLS certificates must be placed as `configs/certs/tls.crt` and `configs/certs/tls.key` when `ENABLE_SSL=true`; those are the defaults under `/app/configs/certs/`, and you only need to set `TLS_CRT`/`TLS_KEY` if you mount them elsewhere.
+- TLS certificates must be placed as `configs/certs/tls.crt` and `configs/certs/tls.key` when `ENABLE_TLS=true`; those are the defaults under `/app/configs/certs/`, and you only need to set `TLS_CRT`/`TLS_KEY` if you mount them elsewhere.
 
 ## Volumes
 
@@ -170,7 +170,7 @@ Example payload:
 
 - Writes `index.json` and updates `store.db` based on the current plan.
 - Uses `AUTO_INDEXER_OUTPUT_FORMAT` to decide which outputs to write.
-- Builds URLs using `SERVER_IP` + `ENABLE_SSL` and percent-encodes path segments.
+- Builds URLs using `SERVER_IP` and the TLS toggle (`ENABLE_TLS`) and percent-encodes path segments.
 
 ## Helpers
 
@@ -198,7 +198,7 @@ Example payload:
 
 - Scans the PKG tree and detects changes using size/mtime/hash.
 - Reuses cached SFO data when files are unchanged.
-- Marks changes when `SERVER_IP` or `ENABLE_SSL` changes (index URLs must update).
+- Marks changes when `SERVER_IP` or the TLS toggle (`ENABLE_TLS`) changes (index URLs must update).
 
 ### IndexCache (`src/utils/index_cache.py`)
 
@@ -240,7 +240,7 @@ Watcher.start()
 - Duplicate planned names or existing target paths -> PKG moved to `_error/`.
 - Missing or invalid `ICON0_PNG` -> PKG moved to `_error/`.
 - If a PKG is already in the correct folder and name, it is marked `skip`.
-- If `SERVER_IP` or `ENABLE_SSL` changes, the index is regenerated even when PKGs are unchanged.
+- If `SERVER_IP` or the TLS toggle (`ENABLE_TLS`) changes, the index is regenerated even when PKGs are unchanged.
 - Encrypted PKGs may cause `pkgtool` to fail; these are moved to `_error/`.
 - Icons are only extracted when needed (non-existent and not duplicated by another plan item).
 - Extracted icons are optimized with `optipng` when available (lossless).

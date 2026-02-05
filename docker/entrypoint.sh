@@ -9,26 +9,33 @@ mkdir -p "$CONFIG_DIR/certs"
 # If the settings file is missing, write a minimal default so Docker Compose can boot right away.
 if [ ! -f "$SETTINGS_FILE" ]; then
   cat <<'EOF' > "$SETTINGS_FILE"
-# Minimal configuration; edit SERVER_* and ENABLE_SSL to match your environment.
-
 # Server Configuration
-# SERVER_IP: Host that clients use to reach the service.
-# SERVER_PORT: Port that nginx listens on inside the container.
-# ENABLE_SSL: Set true to serve HTTPS; tls.crt/tls.key must live under configs/certs/.
-# LOG_LEVEL: Logging verbosity (debug/info/warn/error).
+# Host clients use to reach the service. Value type: string.
 SERVER_IP=0.0.0.0
+# Port that nginx listens on inside the container. Value type: integer.
 SERVER_PORT=80
-ENABLE_SSL=false
+# Set true to serve TLS/HTTPS; If enabled, "tls.crt" and "tls.key" are required and must live under configs/certs/. Value type: boolean.
+ENABLE_TLS=false
+# Logging verbosity (debug | info | warn | error). Value type: string.
 LOG_LEVEL=info
 
-WATCHER_ENABLED=true         # Set false to pause automatic scanning/sorting/indexing.
+# CDN Automation
+# Operates scanning/sorting/indexing when true. Value type: boolean.
+WATCHER_ENABLED=true
+# Interval in seconds between directory scans. Value type: integer.
 WATCHER_PERIODIC_SCAN_SECONDS=30
+# Number of PKGs processed per batch; larger values reduce scan frequency. Value type: integer.
 WATCHER_SCAN_BATCH_SIZE=50
+# Parallel workers handling planned PKG operations. Value type: integer.
 WATCHER_EXECUTOR_WORKERS=4
+# Parallel workers scanning PKGs for metadata changes. Value type: integer.
 WATCHER_SCAN_WORKERS=4
-WATCHER_ACCESS_LOG_TAIL=true  # Tail nginx access.log (set false to skip).
+# Tail nginx access.log (set false to skip). Value type: boolean.
+WATCHER_ACCESS_LOG_TAIL=true
+# Seconds between access-log tail outputs. Value type: integer.
 WATCHER_ACCESS_LOG_INTERVAL=5
-AUTO_INDEXER_OUTPUT_FORMAT=db,json  # Comma-separated: include JSON to write index.json, include db to update store.db.
+# Comma-separated list (db | json); include `json` to write index.json and `db` to update store.db. Value type: string list.
+AUTO_INDEXER_OUTPUT_FORMAT=db,json
 EOF
   echo "[info] Generated default settings.env at $SETTINGS_FILE"
 fi
@@ -44,7 +51,7 @@ fi
 
 : "${SERVER_IP:=0.0.0.0}"
 : "${SERVER_PORT:=80}"
-: "${ENABLE_SSL:=false}"
+: "${ENABLE_TLS:=false}"
 
 TLS_DIR="${TLS_DIR:-$CONFIG_DIR/certs}"
 : "${TLS_CRT:=${TLS_DIR}/tls.crt}"
@@ -56,13 +63,13 @@ set +a
 mkdir -p /tmp/nginx/client_body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi
 mkdir -p /var/log/nginx /etc/nginx/conf.d
 
-# Normalize ENABLE_SSL to lowercase for comparison
-ENABLE_SSL_LC="$(printf "%s" "$ENABLE_SSL" | tr '[:upper:]' '[:lower:]')"
+# Normalize the TLS toggle
+ENABLE_TLS_LC="$(printf "%s" "$ENABLE_TLS" | tr '[:upper:]' '[:lower:]')"
 
 # Build the appropriate server block
-if [ "$ENABLE_SSL_LC" = "true" ] || [ "$ENABLE_SSL_LC" = "1" ] || [ "$ENABLE_SSL_LC" = "yes" ]; then
+if [ "$ENABLE_TLS_LC" = "true" ] || [ "$ENABLE_TLS_LC" = "1" ] || [ "$ENABLE_TLS_LC" = "yes" ]; then
   if [ ! -f "$TLS_CRT" ] || [ ! -f "$TLS_KEY" ]; then
-    echo "[FATAL] ENABLE_SSL=true but cert/key missing:"
+    echo "[FATAL] ENABLE_TLS=true but cert/key missing:"
     echo "        TLS_CRT=$TLS_CRT"
     echo "        TLS_KEY=$TLS_KEY"
     exit 1

@@ -107,7 +107,8 @@ class GlobalEnvs:
         self.SERVER_IP: str = _env("SERVER_IP", "127.0.0.1", str)
         self.SERVER_PORT: int = _env("SERVER_PORT", 80, int)
         self.LOG_LEVEL: str = _env("LOG_LEVEL", "DEBUG", str)
-        self.ENABLE_SSL: bool = _env("ENABLE_SSL", False, bool)
+
+        self.ENABLE_TLS: bool = _env("ENABLE_TLS", False, bool)
 
         self.WATCHER_ENABLED: bool = _env("WATCHER_ENABLED", True, bool)
         self.WATCHER_PERIODIC_SCAN_SECONDS: int = _env("WATCHER_PERIODIC_SCAN_SECONDS", 30, int)
@@ -130,8 +131,8 @@ class GlobalEnvs:
 
     @property
     def SERVER_URL(self) -> str:
-        scheme = "https" if self.ENABLE_SSL else "http"
-        default_port = 443 if self.ENABLE_SSL else 80
+        scheme = "https" if self.ENABLE_TLS else "http"
+        default_port = 443 if self.ENABLE_TLS else 80
         return (
             f"{scheme}://{self.SERVER_IP}"
             if self.SERVER_PORT == default_port

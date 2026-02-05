@@ -6,7 +6,7 @@ rm -f /etc/nginx/conf.d/default.conf
 OUT_SERVERS="/etc/nginx/conf.d/servers.conf"
 COMMON="/etc/nginx/templates/common.locations.conf"
 
-ENABLE_SSL="${ENABLE_SSL:-false}"
+ENABLE_TLS="${ENABLE_TLS:-false}"
 CERT_CRT="${CERT_CRT:-/etc/nginx/certs/localhost.crt}"
 CERT_KEY="${CERT_KEY:-/etc/nginx/certs/localhost.key}"
 
@@ -17,9 +17,9 @@ LIMITS_BLOCK='
   limit_conn perserver 80;
 '
 
-if [ "$ENABLE_SSL" = "true" ]; then
+if [ "$ENABLE_TLS" = "true" ]; then
   if [ ! -f "$CERT_CRT" ] || [ ! -f "$CERT_KEY" ]; then
-    echo "[nginx] ENABLE_SSL=true but cert files missing:"
+    echo "[nginx] ENABLE_TLS=true but cert files missing:"
     echo "  CRT: $CERT_CRT"
     echo "  KEY: $CERT_KEY"
     exit 1
@@ -47,7 +47,7 @@ $COMMON_LOCATIONS
 }
 EOF
 
-  echo "[nginx] wrote $OUT_SERVERS (ENABLE_SSL=true)"
+  echo "[nginx] wrote $OUT_SERVERS (ENABLE_TLS=true)"
 else
   cat > "$OUT_SERVERS" <<EOF
 server {
@@ -59,5 +59,5 @@ $COMMON_LOCATIONS
 }
 EOF
 
-  echo "[nginx] wrote $OUT_SERVERS (ENABLE_SSL=false)"
+  echo "[nginx] wrote $OUT_SERVERS (ENABLE_TLS=false)"
 fi
