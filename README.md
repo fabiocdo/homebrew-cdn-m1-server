@@ -1,4 +1,4 @@
-# homebrew-store-cdn
+# hb-store-m1
 
 ### Local CDN for PS4 homebrew PKG files using Docker Compose + Nginx with automatic formatting, sorting, icon extraction, and index/database generation.
 ![512.png](assets/512.png)
@@ -20,12 +20,12 @@ Mount your PKG directory and caches at `./data` so the watcher and nginx can sha
 
 ```bash
 docker run -d \
-  --name homebrew-store-cdn \
+  --name hb-store-m1 \
   -p 80:80 \
   -p 443:443 \
   -v ./data:/app/data \
   -v ./configs:/app/configs \
-  fabiocdo/homebrew-store-cdn:latest
+  fabiocdo/hb-store-m1:latest
 ```
 
 ### Docker Compose
@@ -33,10 +33,10 @@ docker run -d \
 ```yaml
 version: "3.9"
 services:
-  homebrew-store-cdn:
+  hb-store-m1:
     build: .
-    image: fabiocdo/homebrew-store-cdn:latest
-    container_name: homebrew-store-cdn
+    image: fabiocdo/hb-store-m1:latest
+    container_name: hb-store-m1
     ports:
       - "80:80"
       - "443:443"

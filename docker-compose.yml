@@ -1,8 +1,8 @@
 services:
-  homebrew-store-cdn:
+  hb-store-m1:
     build: .
-    image: fabiocdo/homebrew-store-cdn:latest
-    container_name: homebrew-store-cdn
+    image: fabiocdo/hb-store-m1:latest
+    container_name: hb-store-m1
     ports:
       - "80:80"
       - "443:443"

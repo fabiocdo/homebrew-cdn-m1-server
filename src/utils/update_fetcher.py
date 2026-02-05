@@ -64,7 +64,7 @@ class UpdateFetcher:
     def _fetch_release_assets(self) -> dict:
 
         headers = {
-            "User-Agent": "homebrew-store-cdn",
+            "User-Agent": "hb-store-m1",
             "Accept": "application/vnd.github+json",
         }
         req = urllib.request.Request(self.source_url, headers=headers)
@@ -88,7 +88,7 @@ class UpdateFetcher:
     @staticmethod
     def _download(url: str, dest: Path) -> None:
 
-        headers = {"User-Agent": "homebrew-store-cdn"}
+        headers = {"User-Agent": "hb-store-m1"}
         req = urllib.request.Request(url, headers=headers)
         tmp_path = dest.with_suffix(dest.suffix + ".part")
         with urllib.request.urlopen(req, timeout=60) as resp:

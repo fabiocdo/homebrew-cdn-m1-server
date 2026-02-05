@@ -123,7 +123,7 @@ class GlobalEnvs:
 
     @property
     def APP_NAME(self) -> str:
-        return _pyproject_value(self.files.PYPROJECT_PATH, "name", "homebrew-store-cdn")
+        return _pyproject_value(self.files.PYPROJECT_PATH, "name", "hb-store-m1")
 
     @property
     def APP_VERSION(self) -> str:

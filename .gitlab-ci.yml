@@ -4,7 +4,7 @@ stages:
   - publish
 
 variables:
-  DOCKER_IMAGE: "fabiocdo/homebrew-store-cdn"
+  DOCKER_IMAGE: "fabiocdo/hb-store-m1"
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: ""
   PYTHONUNBUFFERED: "1"
