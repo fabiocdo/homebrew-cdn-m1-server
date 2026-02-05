@@ -7,8 +7,5 @@ class Outputs(Enum):
     NOT_FOUND = "not_found"
     INVALID = "invalid"
     ERROR = "error"
-
-    class Plan(Enum):
-        ALLOW = "allow"
-        REJECT = "reject"
-        SKIP = "skip"
+    ALLOW = "allow"
+    REJECT = "reject"

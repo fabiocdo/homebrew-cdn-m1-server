@@ -1,5 +1,3 @@
-
-
 import json
 import urllib.request
 from pathlib import Path
@@ -7,39 +5,19 @@ from typing import Iterable
 
 
 class UpdateFetcher:
-    
-
-
-
-
-
-
 
     def __init__(
-        self,
-        source_url: str,
-        required_files: Iterable[str],
-        optional_files: Iterable[str] | None = None,
+            self,
+            source_url: str,
+            required_files: Iterable[str],
+            optional_files: Iterable[str] | None = None,
     ):
-        
-
-
-
-
-
-
 
         self.source_url = source_url
         self.required_files = list(required_files)
         self.optional_files = list(optional_files or [])
 
     def ensure_assets(self, cache_dir: Path) -> dict:
-        
-
-
-
-
-
 
         cache_dir.mkdir(parents=True, exist_ok=True)
         missing_required = [name for name in self.required_files if not (cache_dir / name).exists()]
@@ -84,10 +62,6 @@ class UpdateFetcher:
         }
 
     def _fetch_release_assets(self) -> dict:
-        
-
-
-
 
         headers = {
             "User-Agent": "homebrew-store-cdn",
@@ -113,12 +87,6 @@ class UpdateFetcher:
 
     @staticmethod
     def _download(url: str, dest: Path) -> None:
-        
-
-
-
-
-
 
         headers = {"User-Agent": "homebrew-store-cdn"}
         req = urllib.request.Request(url, headers=headers)

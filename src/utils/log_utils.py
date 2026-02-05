@@ -1,7 +1,7 @@
 import datetime
 
 from src.models import Global
-from src.models.log_constants import LogLevel, LoggingModule, LogColor
+from src.models.log import LogLevel, LoggingModule, LogColor
 
 LOG_PRIORITY: LogLevel = LogLevel[Global.ENVS.LOG_LEVEL.upper()].priority()
 

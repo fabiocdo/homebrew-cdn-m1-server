@@ -1,5 +1,3 @@
-
-
 import os
 import concurrent.futures
 from pathlib import Path
@@ -10,24 +8,13 @@ from src.utils.url_utils import build_base_url
 
 
 def scan_pkgs(
-    pkg_dir: Path,
-    pkg_utils: PkgUtils,
-    pkgs: list[Path] | None = None,
-    batch_size: int | None = None,
-    workers: int | None = None,
-    log_module: str | None = None,
+        pkg_dir: Path,
+        pkg_utils: PkgUtils,
+        pkgs: list[Path] | None = None,
+        batch_size: int | None = None,
+        workers: int | None = None,
+        log_module: str | None = None,
 ) -> tuple[list[tuple[Path, dict | None]], bool]:
-    
-
-
-
-
-
-
-
-
-
-
     results: list[tuple[Path, dict | None]] = []
     files_cache, index_cache, meta = load_cache()
     new_cache: dict[str, dict] = {}
@@ -46,7 +33,7 @@ def scan_pkgs(
     pkg_list = pkgs if pkgs is not None else list(pkg_dir.rglob("*.pkg"))
     if batch_size and batch_size > 0:
         batches = [
-            pkg_list[i : i + batch_size]
+            pkg_list[i: i + batch_size]
             for i in range(0, len(pkg_list), batch_size)
         ]
     else:

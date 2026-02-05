@@ -1,5 +1,5 @@
 from src.models.globals import Global
-from src.models.log_constants import LoggingModule
+from src.models.log import LoggingModule
 from src.utils import log_debug, log_info, log_warn, log_error
 
 
@@ -17,10 +17,6 @@ def init_directories():
 
 def start():
     welcome()
-    log_debug("debug", LoggingModule.AUTO_FORMATTER)
-    log_info("info", LoggingModule.AUTO_FORMATTER)
-    log_warn("warn", LoggingModule.AUTO_FORMATTER)
-    log_error("error", LoggingModule.AUTO_FORMATTER)
     init_directories()
 
 if __name__ == "__main__":
