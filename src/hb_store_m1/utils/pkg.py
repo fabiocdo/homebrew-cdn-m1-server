@@ -13,18 +13,10 @@ from hb_store_m1.utils.log import log_info
 
 
 def _run_pkgtool(pkg: Path, command: PKG.ToolCommand):
-
-    # args = [Global.FILES.PKGTOOL, command, command, pkg] # TODO remove
-    args = [
-        "/home/fabio/dev/hb-store-m1/src/hb_store_m1/utils/bin/pkgtool",
-        command,
-        pkg,
-    ]
     return subprocess.run(
-        args,
+        [Global.FILES.PKGTOOL_PATH, command, pkg],
         check=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        capture_output=True,
         text=True,
         timeout=120,
     )

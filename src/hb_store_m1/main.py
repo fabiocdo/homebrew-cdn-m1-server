@@ -48,6 +48,8 @@ def init_directories():
 def main():
     # welcome()
     init_directories()
-    # Start watcher
     # scan()
+
     validate(Path("/home/fabio/dev/hb-store-m1/data/shovel.pkg"))
+
+    # Start watcher
