@@ -4,10 +4,15 @@
 import subprocess
 from enum import StrEnum
 from pathlib import Path
-from subprocess import CompletedProcess
 
-from hb_store_m1.models import Global, PKG
-from hb_store_m1.utils.log import log_debug, log_info, log_warn
+from hb_store_m1.models import (
+    Global,
+    Output,
+    Status,
+)
+from hb_store_m1.models.pkg import ValidationFields, Severity
+from hb_store_m1.utils import log_debug, log_warn
+from hb_store_m1.utils.log import log_info, log_error
 
 # import os
 # from src.models.extraction_result import ExtractResult, REGION_MAP, APP_TYPE_MAP, SELECTED_FIELDS
@@ -45,48 +50,27 @@ class PkgUtils:
         return scanned_pkgs
 
     @staticmethod
-    def validate(pkg: Path):
-        result: CompletedProcess
-        # try:
-        # TODO Capturar saude do pkg, param, icon0, pic0, pic1,
-        # PKG = {
-        #     "Content Digest",
-        #     "PKG Header Digest",
-        #     "PKG Header Signature",
-        #     "Body Digest",
-        #     "PFS Signed Digest",
-        #     "PFS Image Digest",
-        # }
-        # MEDIA = {
-        #     "ICON0_PNG digest",
-        #     "PIC0_PNG digest",
-        #     "PIC1_PNG digest",
-        # }
-        if not pkg.exists():
-            log_warn(f"PKG not found: {pkg}")
-            return False
-        try:
-            result = _run_pkgtool(pkg, _PKGToolCommand.VALIDATE_PKG)
-        except subprocess.CalledProcessError as exc:
-            log_warn(f"pkgtool validate failed for {pkg} (code={exc.returncode})")
-            if exc.stdout:
-                log_debug(exc.stdout.strip())
-            if exc.stderr:
-                log_debug(exc.stderr.strip())
-            return False
-        except subprocess.TimeoutExpired:
-            log_warn(f"pkgtool validate timed out for {pkg}")
-            return False
+    def validate(pkg: Path) -> Output:
+        validation_result = _run_pkgtool(
+            pkg, _PKGToolCommand.VALIDATE_PKG
+        ).stdout.splitlines()
 
-        log_info(f"PKG validated: {pkg}")
-        if result.stdout:
-            log_debug(result.stdout.strip())
-        if result.stderr:
-            log_debug(result.stderr.strip())
-        return True
-        # except subprocess.CalledProcessError as e:
-        #     print(e)
-        #     TODO jogar pro error_dir com mensagem custom
+        for line in validation_result:
+            print(line)
+            if "[ERROR]" not in line:
+                continue
+
+            for field in ValidationFields:
+                name, level = field.value
+                if name in line:
+                    if level is Severity.CRITICAL:
+                        log_error(f"PKG {pkg} validation failed on [{name}] field")
+                        return Output(Status.ERROR, pkg)
+                    log_warn(f"PKG {pkg} validation warning on [{name}] field")
+                    return Output(Status.WARN, pkg)
+
+        log_debug(f"PKG {pkg} validation successful")
+        return Output(Status.OK, pkg)
 
     @staticmethod
     def extract_data(pkg: Path):

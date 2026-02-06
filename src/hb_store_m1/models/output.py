@@ -10,6 +10,7 @@ class Status(Enum):
     NOT_FOUND = auto()
     INVALID = auto()
     ERROR = auto()
+    WARN = auto()
     ALLOW = auto()
     REJECT = auto()
 

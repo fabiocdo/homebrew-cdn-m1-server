@@ -1,25 +1,49 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import StrEnum
+from enum import StrEnum, auto, Enum
 
 
 class EntryKey(StrEnum):
-    PARAM_SFO = "PARAM_SFO"
-    ICON0_PNG = "ICON0_PNG"
-    PIC0_PNG = "PIC0_PNG"
-    PIC1_PNG = "PIC1_PNG"
+    PARAM_SFO = auto()
+    ICON0_PNG = auto()
+    PIC0_PNG = auto()
+    PIC1_PNG = auto()
 
 
 class ParamSFOKey(StrEnum):
-    APP_VER = "APP_VER"
-    CATEGORY = "CATEGORY"
-    CONTENT_ID = "CONTENT_ID"
-    PUBTOOLINFO = "PUBTOOLINFO"
-    SYSTEM_VER = "SYSTEM_VER"
-    TITLE = "TITLE"
-    TITLE_ID = "TITLE_ID"
-    VERSION = "VERSION"
+    APP_VER = auto()
+    CATEGORY = auto()
+    CONTENT_ID = auto()
+    PUBTOOLINFO = auto()
+    SYSTEM_VER = auto()
+    TITLE = auto()
+    TITLE_ID = auto()
+    VERSION = auto()
+
+
+class Severity(StrEnum):
+    CRITICAL = auto()
+    NON_CRITICAL = auto()
+
+
+class ValidationFields(Enum):
+    # Critical
+    CONTENT_DIGEST = ["Content Digest", Severity.CRITICAL]
+    BODY_DIGEST = ["Body Digest", Severity.CRITICAL]
+    PFS_IMAGE_DIGEST = ["PFS Image Digest", Severity.CRITICAL]
+    PFS_SIGNED_DIGEST = ["PFS Signed Digest", Severity.CRITICAL]
+    DIGEST_TABLE_HASH = ["Digest Table Hash", Severity.CRITICAL]
+    SC_ENTRIES_HASH_1 = ["SC Entries Hash 1", Severity.CRITICAL]
+    SC_ENTRIES_HASH_2 = ["SC Entries Hash 2", Severity.CRITICAL]
+    PKG_HEADER_DIGEST = ["PKG Header Digest", Severity.CRITICAL]
+    PKG_HEADER_SIGNATURE = ["PKG Header Signature", Severity.CRITICAL]
+    ICON0_PNG = ["ICON0_PNG digest", Severity.CRITICAL]
+    # Non-Critical
+    MAJOR_PARAM_DIGEST = ["Major Param Digest", Severity.NON_CRITICAL]
+    PARAM_DIGEST = ["Param Digest", Severity.NON_CRITICAL]
+    PIC0_PNG_DIGEST = ["PIC0_PNG digest", Severity.NON_CRITICAL]
+    PIC1_PNG_DIGEST = ["PIC1_PNG digest", Severity.NON_CRITICAL]
 
 
 class Region(StrEnum):
