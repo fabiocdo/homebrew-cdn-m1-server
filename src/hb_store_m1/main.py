@@ -3,7 +3,7 @@ from pathlib import Path
 from tabulate import tabulate
 
 from hb_store_m1.models import Global
-from hb_store_m1.utils import log_debug, scan, validate
+from hb_store_m1.utils import log_debug, scan, validate, log_info, log_warn, log_error
 
 
 def welcome():
@@ -49,7 +49,6 @@ def main():
     # welcome()
     init_directories()
     # scan()
-
     validate(Path("/home/fabio/dev/hb-store-m1/data/shovel.pkg"))
 
     # Start watcher

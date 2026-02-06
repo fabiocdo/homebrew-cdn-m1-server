@@ -1,10 +1,7 @@
-from enum import Enum
+from enum import Enum, StrEnum
 
 
-class LogColor(Enum):
-    def __str__(self):
-        return self.value
-
+class LogColor(StrEnum):
     RESET = "\033[0m"
     # Regular
     GRAY = "\033[0;90m"
@@ -20,7 +17,7 @@ class LogColor(Enum):
     BRIGHT_GRAY = "\033[1;90m"
 
 
-class LoggingModule(Enum):
+class LoggingModule(StrEnum):
     AUTO_INDEXER = LogColor.BRIGHT_GREEN
     AUTO_SORTER = LogColor.BRIGHT_YELLOW
     AUTO_FORMATTER = LogColor.BRIGHT_BLUE
