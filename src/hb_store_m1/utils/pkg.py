@@ -6,7 +6,7 @@ from pathlib import Path
 from subprocess import CompletedProcess
 
 from hb_store_m1.models import Global, PKG
-from hb_store_m1.utils.log import log_info
+from hb_store_m1.utils.log import log_debug, log_info, log_warn
 
 # import os
 # from src.models.extraction_result import ExtractResult, REGION_MAP, APP_TYPE_MAP, SELECTED_FIELDS
@@ -18,6 +18,7 @@ def _run_pkgtool(pkg: Path, command: PKG.ToolCommand):
         check=True,
         capture_output=True,
         text=True,
+        env={"DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1"},
         timeout=120,
     )
 
@@ -38,26 +39,46 @@ class PkgUtils:
     @staticmethod
     def validate(pkg: Path):
         result: CompletedProcess
+        # try:
+        # TODO Capturar saude do pkg, param, icon0, pic0, pic1,
+        # PKG = {
+        #     "Content Digest",
+        #     "PKG Header Digest",
+        #     "PKG Header Signature",
+        #     "Body Digest",
+        #     "PFS Signed Digest",
+        #     "PFS Image Digest",
+        # }
+        # MEDIA = {
+        #     "ICON0_PNG digest",
+        #     "PIC0_PNG digest",
+        #     "PIC1_PNG digest",
+        # }
+        if not pkg.exists():
+            log_warn(f"PKG not found: {pkg}")
+            return False
         try:
-            # TODO Capturar saude do pkg, param, icon0, pic0, pic1,
-            # PKG = {
-            #     "Content Digest",
-            #     "PKG Header Digest",
-            #     "PKG Header Signature",
-            #     "Body Digest",
-            #     "PFS Signed Digest",
-            #     "PFS Image Digest",
-            # }
-            # MEDIA = {
-            #     "ICON0_PNG digest",
-            #     "PIC0_PNG digest",
-            #     "PIC1_PNG digest",
-            # }
             result = _run_pkgtool(pkg, PKG.ToolCommand.VALIDATE_PKG)
-            print(result.stdout)
-        except subprocess.CalledProcessError as e:
-            print(e.output)
-            # TODO jogar pro error_dir com mensagem custom
+        except subprocess.CalledProcessError as exc:
+            log_warn(f"pkgtool validate failed for {pkg} (code={exc.returncode})")
+            if exc.stdout:
+                log_debug(exc.stdout.strip())
+            if exc.stderr:
+                log_debug(exc.stderr.strip())
+            return False
+        except subprocess.TimeoutExpired:
+            log_warn(f"pkgtool validate timed out for {pkg}")
+            return False
+
+        log_info(f"PKG validated: {pkg}")
+        if result.stdout:
+            log_debug(result.stdout.strip())
+        if result.stderr:
+            log_debug(result.stderr.strip())
+        return True
+        # except subprocess.CalledProcessError as e:
+        #     print(e)
+        #     TODO jogar pro error_dir com mensagem custom
 
     @staticmethod
     def extract_data(pkg: Path):

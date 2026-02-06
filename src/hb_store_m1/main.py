@@ -120,9 +120,9 @@ def init_template_json():
 def main():
     # welcome()
     init_directories()
-    init_db()
-    init_template_json()
+    # init_db()
+    # init_template_json()
     # scan()
-    validate(Path("/home/fabio/dev/hb-store-m1/data/shovel.pkg"))
+    validate(Path("/home/fabio/dev/hb-store-m1/data/pkg/game/shovel_game.pkg"))
 
     # Start watcher
