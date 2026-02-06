@@ -1,14 +1,14 @@
-stages:
-  - test
-  - build
-  - publish
-
-variables:
-  DOCKER_IMAGE: "fabiocdo/hb-store-m1"
-  DOCKER_DRIVER: overlay2
-  DOCKER_TLS_CERTDIR: ""
-  PYTHONUNBUFFERED: "1"
-
+#stages:
+#  - test
+#  - build
+#  - publish
+#
+#variables:
+#  DOCKER_IMAGE: "fabiocdo/hb-store-m1"
+#  DOCKER_DRIVER: overlay2
+#  DOCKER_TLS_CERTDIR: ""
+#  PYTHONUNBUFFERED: "1"
+#
 #test:
 #  image: python:3.12-slim
 #  stage: test
@@ -35,49 +35,59 @@ variables:
 #    paths:
 #      - image.tar
 #    expire_in: 1 day
-
-.publish_template:
-  image: docker:24
-  services:
-    - name: docker:24-dind
-  stage: publish
-  needs:
-    - job: build
-      artifacts: true
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: manual
-  script:
-    - VERSION="$(awk -F'\"' '/^version[[:space:]]*=/ {print $2; exit}' pyproject.toml)"
-    - if [ -z "$VERSION" ]; then echo "Failed to read version from pyproject.toml"; exit 1; fi
-    - SUFFIX="${TAG_SUFFIX:-}"
-    - if [ -n "$SUFFIX" ] && [ "${SUFFIX#-}" = "$SUFFIX" ]; then SUFFIX="-$SUFFIX"; fi
-    - DOCKER_TAG="${VERSION}${SUFFIX}"
-    - if [ -z "$DOCKER_HUB_USER" ] || [ -z "$DOCKER_HUB_TOKEN" ]; then echo "Missing DOCKER_HUB_USER/DOCKER_HUB_TOKEN."; exit 1; fi
-    - docker load -i image.tar
-    - echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USER" --password-stdin
-    - docker tag "$DOCKER_IMAGE:$CI_COMMIT_SHA" "$DOCKER_IMAGE:$DOCKER_TAG"
-    - docker push "$DOCKER_IMAGE:$DOCKER_TAG"
-    - if [ "${PUBLISH_LATEST:-false}" = "true" ]; then docker tag "$DOCKER_IMAGE:$CI_COMMIT_SHA" "$DOCKER_IMAGE:latest" && docker push "$DOCKER_IMAGE:latest"; fi
-
-publish:release:
-  extends: .publish_template
-  variables:
-    TAG_SUFFIX: ""
-    PUBLISH_LATEST: "true"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: manual
-
-publish:stable:
-  extends: .publish_template
-  variables:
-    TAG_SUFFIX: "stable"
-    PUBLISH_LATEST: "false"
-  rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-      when: manual
-
+#
+#.publish_template:
+#  image: docker:24
+#  services:
+#    - name: docker:24-dind
+#  stage: publish
+#  needs:
+#    - job: build
+#      artifacts: true#publish:dev:
+##  extends: .publish_template
+##  variables:
+##    TAG_SUFFIX: "dev"
+##    PUBLISH_LATEST: "false"
+##  rules:
+##    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+##      when: manual
+##    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
+##      when: manual
+#
+#  rules:
+#    - if: '$CI_COMMIT_BRANCH == "main"'
+#      when: manual
+#  script:
+#    - VERSION="$(awk -F'\"' '/^version[[:space:]]*=/ {print $2; exit}' pyproject.toml)"
+#    - if [ -z "$VERSION" ]; then echo "Failed to read version from pyproject.toml"; exit 1; fi
+#    - SUFFIX="${TAG_SUFFIX:-}"
+#    - if [ -n "$SUFFIX" ] && [ "${SUFFIX#-}" = "$SUFFIX" ]; then SUFFIX="-$SUFFIX"; fi
+#    - DOCKER_TAG="${VERSION}${SUFFIX}"
+#    - if [ -z "$DOCKER_HUB_USER" ] || [ -z "$DOCKER_HUB_TOKEN" ]; then echo "Missing DOCKER_HUB_USER/DOCKER_HUB_TOKEN."; exit 1; fi
+#    - docker load -i image.tar
+#    - echo "$DOCKER_HUB_TOKEN" | docker login -u "$DOCKER_HUB_USER" --password-stdin
+#    - docker tag "$DOCKER_IMAGE:$CI_COMMIT_SHA" "$DOCKER_IMAGE:$DOCKER_TAG"
+#    - docker push "$DOCKER_IMAGE:$DOCKER_TAG"
+#    - if [ "${PUBLISH_LATEST:-false}" = "true" ]; then docker tag "$DOCKER_IMAGE:$CI_COMMIT_SHA" "$DOCKER_IMAGE:latest" && docker push "$DOCKER_IMAGE:latest"; fi
+#
+#publish:release:
+#  extends: .publish_template
+#  variables:
+#    TAG_SUFFIX: ""
+#    PUBLISH_LATEST: "true"
+#  rules:
+#    - if: '$CI_COMMIT_BRANCH == "main"'
+#      when: manual
+#
+#publish:stable:
+#  extends: .publish_template
+#  variables:
+#    TAG_SUFFIX: "stable"
+#    PUBLISH_LATEST: "false"
+#  rules:
+#    - if: '$CI_COMMIT_BRANCH == "main"'
+#      when: manual
+#
 #publish:dev:
 #  extends: .publish_template
 #  variables:
