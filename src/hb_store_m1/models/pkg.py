@@ -3,14 +3,14 @@ from enum import Enum, StrEnum
 
 class PKG:
 
+    # Usage: EXTRACT_PKG_ENTRY <input.pkg> <entry_id> <output.*>
     # Usage: LIST_PKG_ENTRIES <input.pkg>
     # Usage: LIST_SFO_ENTRIES <param.sfo>
-    # Usage: EXTRACT_PKG_ENTRY <input.pkg> <entry_id> <output.bin>
-    # Usage: VALIDATE_PKG [--verbose] <input.pkg>
+    # Usage: VALIDATE_PKG <input.pkg>
     class ToolCommand(StrEnum):
+        EXTRACT_PKG_ENTRY = "pkg_extractentry"
         LIST_PKG_ENTRIES = "pkg_listentries"
         LIST_SFO_ENTRIES = "sfo_listentries"
-        EXTRACT_PKG_ENTRY = "pkg_extractentry"
         VALIDATE_PKG = "pkg_validate"
 
     class Region(Enum):

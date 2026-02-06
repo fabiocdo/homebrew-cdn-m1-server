@@ -14,7 +14,7 @@ from hb_store_m1.utils.log import log_info
 
 def _run_pkgtool(pkg: Path, command: PKG.ToolCommand):
     return subprocess.run(
-        [Global.FILES.PKGTOOL_PATH, command, pkg],
+        [Global.FILES.PKGTOOL_FILE_PATH, command, pkg],
         check=True,
         capture_output=True,
         text=True,

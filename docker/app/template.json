@@ -1,0 +1,12 @@
+[
+  {
+    "id": "EP0000-CUSA00000_00-GAME000000000000",
+    "name": "Game Title Name",
+    "version": "01.00",
+    "package": "https://url-to-your-pkg-file.pkg",
+    "size": 1024000000,
+    "desc": "Game Description",
+    "icon": "https://url-to-icon.png",
+    "bg_image": "https://url-to-background.png"
+  }
+]

@@ -45,6 +45,7 @@ def _env(name: str, default, type_):
 @dataclass(frozen=True)
 class GlobalPaths:
     APP_ROOT_PATH: _Path = _Path.cwd()
+    INIT_DIR_PATH: _Path = _Path.cwd() / "init"
     DATA_DIR_PATH: _Path = APP_ROOT_PATH / "data"
     CACHE_DIR_PATH: _Path = DATA_DIR_PATH / "_cache"
     ERRORS_DIR_PATH: _Path = DATA_DIR_PATH / "_errors"
@@ -68,7 +69,15 @@ class GlobalFiles:
         return self.paths.APP_ROOT_PATH / "pyproject.toml"
 
     @property
-    def PKGTOOL_PATH(self) -> _Path:
+    def STORE_DB_INIT_SCRIPT_FILE_PATH(self) -> _Path:
+        return self.paths.INIT_DIR_PATH / "store_db.sql"
+
+    @property
+    def JSON_TEMPLATE_INIT_FILE_PATH(self) -> _Path:
+        return self.paths.INIT_DIR_PATH / "json_template.json"
+
+    @property
+    def PKGTOOL_FILE_PATH(self) -> _Path:
         return self.paths.APP_ROOT_PATH / "bin" / "pkgtool"
 
     @property
@@ -131,11 +140,15 @@ class GlobalEnvs:
 
     @property
     def APP_NAME(self) -> str:
-        return _pyproject_value(self.files.PYPROJECT_PATH, "name", "hb-store-m1")
+        return _pyproject_value(
+            self.files.JSON_TEMPLATE_INIT_FILE_PATH, "name", "hb-store-m1"
+        )
 
     @property
     def APP_VERSION(self) -> str:
-        return _pyproject_value(self.files.PYPROJECT_PATH, "version", "0.0.1")
+        return _pyproject_value(
+            self.files.JSON_TEMPLATE_INIT_FILE_PATH, "version", "0.0.1"
+        )
 
     @property
     def SERVER_URL(self) -> str:

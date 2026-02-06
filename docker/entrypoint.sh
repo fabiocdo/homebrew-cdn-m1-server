@@ -57,7 +57,14 @@ TLS_DIR="${TLS_DIR:-$CONFIG_DIR/certs}"
 : "${TLS_CRT:=${TLS_DIR}/tls.crt}"
 : "${TLS_KEY:=${TLS_DIR}/tls.key}"
 
+: "${INIT_DB_SQL:=/app/init/store_db.sql}"
+: "${INIT_TEMPLATE_JSON:=/app/init/template.json}"
+
 set +a
+
+if [ ! -f "$INIT_DB_SQL" ]; then
+  echo "[warn] init_db.sql not found at $INIT_DB_SQL; DB init may fail"
+fi
 
 # Prepare nginx runtime directories
 mkdir -p /tmp/nginx/client_body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi

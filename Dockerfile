@@ -34,6 +34,8 @@ RUN mkdir -p /app/bin && ln -sf /usr/local/bin/pkgtool /app/bin/pkgtool
 
 COPY docker/nginx/nginx.template.conf /etc/nginx/nginx.conf
 COPY docker/nginx/common.locations.conf /etc/nginx/templates/common.locations.conf
+COPY docker/app/init_db.sql /app/init/store_db.sql
+COPY docker/app/template.json /app/init/template.json
 
 COPY docker/entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh \
