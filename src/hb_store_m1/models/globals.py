@@ -161,7 +161,7 @@ class GlobalEnvs:
         )
 
 
-class Global:
+class Globals:
     PATHS = GlobalPaths()
     FILES = GlobalFiles(PATHS)
     ENVS = GlobalEnvs(FILES)

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from tabulate import tabulate
 
-from hb_store_m1.models.globals import Global
+from hb_store_m1.models.globals import Globals
 from hb_store_m1.utils.log import LogUtils
 from hb_store_m1.utils.pkg import PkgUtils
 
@@ -15,21 +15,21 @@ def welcome():
     █ █ █▀▄     █▀▀ ▀█▀ █▀█ █▀▄ █▀▀     █▄█ ▀█ 
     █▀█ █▀▄ ▄▄▄ ▀▀█  █  █ █ █▀▄ █▀▀ ▄▄▄ █ █  █ 
     ▀ ▀ ▀▀      ▀▀▀  ▀  ▀▀▀ ▀ ▀ ▀▀▀     ▀ ▀ ▀▀▀
-    v{Global.ENVS.APP_VERSION}"""
+    v{Globals.ENVS.APP_VERSION}"""
     print(app_banner)
     rows = []
     items = [
-        ("SERVER_URL", Global.ENVS.SERVER_URL),
-        ("ENABLE_TLS", Global.ENVS.ENABLE_TLS),
-        ("LOG_LEVEL", Global.ENVS.LOG_LEVEL),
-        ("WATCHER_ENABLED", Global.ENVS.WATCHER_ENABLED),
-        ("WATCHER_PERIODIC_SCAN_SECONDS", Global.ENVS.WATCHER_PERIODIC_SCAN_SECONDS),
-        ("WATCHER_SCAN_BATCH_SIZE", Global.ENVS.WATCHER_SCAN_BATCH_SIZE),
-        ("WATCHER_EXECUTOR_WORKERS", Global.ENVS.WATCHER_EXECUTOR_WORKERS),
-        ("WATCHER_SCAN_WORKERS", Global.ENVS.WATCHER_SCAN_WORKERS),
-        ("WATCHER_ACCESS_LOG_TAIL", Global.ENVS.WATCHER_ACCESS_LOG_TAIL),
-        ("WATCHER_ACCESS_LOG_INTERVAL", Global.ENVS.WATCHER_ACCESS_LOG_INTERVAL),
-        ("AUTO_INDEXER_OUTPUT_FORMAT", Global.ENVS.AUTO_INDEXER_OUTPUT_FORMAT),
+        ("SERVER_URL", Globals.ENVS.SERVER_URL),
+        ("ENABLE_TLS", Globals.ENVS.ENABLE_TLS),
+        ("LOG_LEVEL", Globals.ENVS.LOG_LEVEL),
+        ("WATCHER_ENABLED", Globals.ENVS.WATCHER_ENABLED),
+        ("WATCHER_PERIODIC_SCAN_SECONDS", Globals.ENVS.WATCHER_PERIODIC_SCAN_SECONDS),
+        ("WATCHER_SCAN_BATCH_SIZE", Globals.ENVS.WATCHER_SCAN_BATCH_SIZE),
+        ("WATCHER_EXECUTOR_WORKERS", Globals.ENVS.WATCHER_EXECUTOR_WORKERS),
+        ("WATCHER_SCAN_WORKERS", Globals.ENVS.WATCHER_SCAN_WORKERS),
+        ("WATCHER_ACCESS_LOG_TAIL", Globals.ENVS.WATCHER_ACCESS_LOG_TAIL),
+        ("WATCHER_ACCESS_LOG_INTERVAL", Globals.ENVS.WATCHER_ACCESS_LOG_INTERVAL),
+        ("AUTO_INDEXER_OUTPUT_FORMAT", Globals.ENVS.AUTO_INDEXER_OUTPUT_FORMAT),
     ]
     for key, value in items:
         if isinstance(value, list):
@@ -42,7 +42,7 @@ def welcome():
 def init_directories():
     LogUtils.log_debug("Initializing directories...")
 
-    paths = Global.PATHS
+    paths = Globals.PATHS
     for p in vars(paths).values():
         p.mkdir(parents=True, exist_ok=True)
 
@@ -51,8 +51,8 @@ def init_directories():
 
 # TODO improve
 def init_db():
-    store_db = Global.FILES.STORE_DB_FILE_PATH
-    store_db_init_script = Global.FILES.STORE_DB_INIT_SCRIPT_FILE_PATH
+    store_db = Globals.FILES.STORE_DB_FILE_PATH
+    store_db_init_script = Globals.FILES.STORE_DB_INIT_SCRIPT_FILE_PATH
 
     if store_db.exists():
         LogUtils.log_debug("store.db already exists. Skipping init.")
@@ -86,8 +86,8 @@ def init_db():
 
 # TODO improve
 def init_template_json():
-    index_path = Global.FILES.INDEX_JSON_FILE_PATH
-    default_template = Global.PATHS.INIT_DIR_PATH / "json_template.json"
+    index_path = Globals.FILES.INDEX_JSON_FILE_PATH
+    default_template = Globals.PATHS.INIT_DIR_PATH / "json_template.json"
     template_path = Path(os.getenv("INIT_TEMPLATE_JSON", str(default_template)))
 
     if index_path.exists():

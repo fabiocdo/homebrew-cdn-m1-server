@@ -35,7 +35,7 @@ class PKG:
     release_date: str = ""
     icon0_png: str = ""
     pic0_png: str = ""
-    pic1_pngrelease_date: str = ""
+    pic1_png: str = ""
     region: Region | None = None
     app_type: AppType | None = None
     entries: list[PKGEntry] = field(default_factory=list)

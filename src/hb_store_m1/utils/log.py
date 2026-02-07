@@ -1,9 +1,9 @@
 import datetime
 
-from hb_store_m1.models.globals import Global
+from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogLevel, LogModule, LogColor
 
-CURRENT_LOG_PRIORITY: LogLevel = LogLevel[Global.ENVS.LOG_LEVEL.upper()].priority()
+CURRENT_LOG_PRIORITY: LogLevel = LogLevel[Globals.ENVS.LOG_LEVEL.upper()].priority()
 
 
 class LogUtils:

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from hb_store_m1.models.globals import Global
+from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogModule
 from hb_store_m1.models.output import Output, Status
 from hb_store_m1.utils.log import LogUtils
@@ -36,7 +36,7 @@ class AutoFormatter:
 
     @staticmethod
     def run(pkg: Path, sfo_data: dict) -> str | None:
-        errors_dir = Global.PATHS.ERRORS_DIR_PATH
+        errors_dir = Globals.PATHS.ERRORS_DIR_PATH
         plan_result, planned_name = AutoFormatter.dry_run(pkg, sfo_data)
 
         if plan_result == Status.NOT_FOUND:

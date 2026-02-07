@@ -1,7 +1,8 @@
+import re
 import tempfile
 from pathlib import Path
 
-from hb_store_m1.models.globals import Global
+from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.output import Output, Status
 from hb_store_m1.models.pkg.metadata import EntryKey, ParamSFO, PKGEntry
 from hb_store_m1.models.pkg.pkg import PKG
@@ -11,13 +12,41 @@ from hb_store_m1.utils.log import LogUtils
 
 
 class PkgUtils:
+    _SFO_ENTRY_RE = re.compile(
+        r"^(?P<name>[^:]+?)\s*:\s*(?P<type>[^()]+)\((?P<size>\d+)/(?:\s*)"
+        r"(?P<max_size>\d+)\)\s*=\s*(?P<value>.*)$"
+    )
+
+    @staticmethod
+    def parse_sfo_entries(lines: list[str]) -> dict[str, dict[str, object]]:
+        entries: dict[str, dict[str, object]] = {}
+
+        for line in lines:
+            match = PkgUtils._SFO_ENTRY_RE.match(line.strip())
+            if not match:
+                continue
+
+            name = match.group("name").strip()
+            entry_type = match.group("type").strip()
+            size = int(match.group("size"))
+            max_size = int(match.group("max_size"))
+            value = match.group("value")
+
+            entries[name] = {
+                "type": entry_type,
+                "size": size,
+                "max_size": max_size,
+                "value": value,
+            }
+
+        return entries
 
     @staticmethod
     def scan():
 
         LogUtils.log_info("Scanning PKGs...")
         scanned_pkgs = list(
-            Path(Global.PATHS.PKG_DIR_PATH).rglob("*.pkg", case_sensitive=False)
+            Path(Globals.PATHS.PKG_DIR_PATH).rglob("*.pkg", case_sensitive=False)
         )
         LogUtils.log_info(f"Scanned {len(scanned_pkgs)} packages")
 
@@ -77,9 +106,9 @@ class PkgUtils:
 
                 response = PKGTool.list_sfo_entries(param_sfo).stdout.splitlines()
 
-                # TODO continuar aqui, nao consigo pensar mais
-                for field in response:
-                    print(field)
+                print(response)
+                # for field in response:
+                #     print(field)
 
         # files_to_extract = {}
         # if extract_medias:
