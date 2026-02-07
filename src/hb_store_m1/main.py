@@ -126,5 +126,8 @@ def main():
     init_db()
     init_template_json()
     PkgUtils.scan()
+    PkgUtils.extract_pkg_data(
+        Path("/home/fabio/dev/hb-store-m1/data/pkg/game/shovel_game.pkg")
+    )
 
     # Start watcher

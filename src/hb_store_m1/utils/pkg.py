@@ -1,32 +1,13 @@
-import subprocess
 import tempfile
-from enum import StrEnum
 from pathlib import Path
 
 from hb_store_m1.models.globals import Global
 from hb_store_m1.models.output import Output, Status
-from hb_store_m1.models.pkg.metadata import EntryKey, ParamSFO
+from hb_store_m1.models.pkg.metadata import EntryKey, ParamSFO, PKGEntry
 from hb_store_m1.models.pkg.pkg import PKG
 from hb_store_m1.models.pkg.validation import ValidationFields, Severity
+from hb_store_m1.utils.helper.pkgtool import PKGTool
 from hb_store_m1.utils.log import LogUtils
-
-
-class _PKGToolCommand(StrEnum):
-    EXTRACT_PKG_ENTRY = "pkg_extractentry"  # args <input.pkg> <entry_index> <output.*>
-    LIST_PKG_ENTRIES = "pkg_listentries"  # args <input.pkg>
-    LIST_SFO_ENTRIES = "sfo_listentries"  # args <param.sfo>
-    VALIDATE_PKG = "pkg_validate"  # args <input.pkg>
-
-
-def _run_pkgtool(pkg: Path, command: _PKGToolCommand):
-    return subprocess.run(
-        [Global.FILES.PKGTOOL_FILE_PATH, command, pkg],
-        check=True,
-        capture_output=True,
-        text=True,
-        env={"DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1"},
-        timeout=120,
-    )
 
 
 class PkgUtils:
@@ -44,9 +25,7 @@ class PkgUtils:
 
     @staticmethod
     def validate(pkg: Path) -> Output:
-        validation_result = _run_pkgtool(
-            pkg, _PKGToolCommand.VALIDATE_PKG
-        ).stdout.splitlines()
+        validation_result = PKGTool.validate_pkg(pkg).stdout.splitlines()
 
         for line in validation_result:
             print(line)
@@ -67,58 +46,73 @@ class PkgUtils:
         LogUtils.log_debug(f"PKG {pkg} validation successful")
         return Output(Status.OK, pkg)
 
-    # def build_pkg(pkg_path: Path) -> PKG:
-    #     pkg = PKG()
-    #
-    #     # --- listar entries ---
-    #     stdout = _run_pkgtool(pkg_path, _PKGToolCommand.LIST_ENTRIES).stdout
-    #     lines = stdout.splitlines()
-    #
-    #     param_index = None
-    #
-    #     for line in lines[1:]:
-    #         parts = line.split()
-    #         if len(parts) < 5:
-    #             continue
-    #
-    #         index = int(parts[3])
-    #         name = parts[-1]
-    #
-    #         if name in EntryKey.__members__:
-    #             key = EntryKey[name]
-    #             pkg.Entries[key] = index
-    #
-    #             if key is EntryKey.PARAM_SFO:
-    #                 param_index = index
-    #
-    #     # --- extrair PARAM.SFO ---
-    #     if param_index is not None:
-    #         with tempfile.TemporaryDirectory() as tmp:
-    #             out_path = Path(tmp) / "param.sfo"
-    #
-    #             _run_pkgtool(
-    #                 pkg_path,
-    #                 _PKGToolCommand.EXTRACT_ENTRY,
-    #                 str(param_index),
-    #                 str(out_path),
-    #             )
-    #
-    #             raw_sfo = parse_param_sfo(out_path)  # <-- seu parser
-    #
-    #             for k, v in raw_sfo.items():
-    #                 if k in ParamSFO.__members__:
-    #                     pkg.ParamSFO[ParamSFO[k]] = v
-    #
-    #     # --- copiar campos principais ---
-    #     pkg.title = str(pkg.ParamSFO.get(ParamSFO.TITLE, ""))
-    #     pkg.title_id = str(pkg.ParamSFO.get(ParamSFO.TITLE_ID, ""))
-    #     pkg.content_id = str(pkg.ParamSFO.get(ParamSFO.CONTENT_ID, ""))
-    #     pkg.category = str(pkg.ParamSFO.get(ParamSFO.CATEGORY, ""))
-    #     pkg.version = str(pkg.ParamSFO.get(ParamSFO.VERSION, ""))
-    #
-    #     pkg.__post_init__()
-    #
-    #     return pkg
+    @staticmethod
+    def extract_pkg_data(
+        pkg: Path, extract_sfo: bool = True, extract_medias: bool = True
+    ) -> PKG:
+
+        # Step 1: Track the entries indexes
+        pkg_entries = {}
+        entries_result = PKGTool.list_pkg_entries(pkg).stdout.splitlines()
+
+        for line in entries_result[1:]:
+            parts = line.split()
+            name = str(parts[4])
+            index = str(parts[3])
+
+            entry_key = EntryKey.__members__.get(name)
+            if entry_key is None:
+                continue
+
+            pkg_entries[entry_key] = index
+
+        # Step 2: Extract entries
+        if extract_sfo:
+            with tempfile.TemporaryDirectory() as tmp:
+
+                param_sfo = Path(tmp) / "param.sfo"
+                PKGTool.extract_pkg_entry(
+                    pkg, pkg_entries[EntryKey.PARAM_SFO], str(param_sfo)
+                )
+
+                response = PKGTool.list_sfo_entries(param_sfo).stdout.splitlines()
+
+                # TODO continuar aqui, nao consigo pensar mais
+                for field in response:
+                    print(field)
+
+        # files_to_extract = {}
+        # if extract_medias:
+        #     files_to_extract = {
+        #             EntryKey.ICON0_PNG: "icon0.png",
+        #             EntryKey.PIC0_PNG: "pic0.png",
+        #             EntryKey.PIC1_PNG: "pic1.png",
+        #     }
+
+        # extracted = {}
+        # with tempfile.TemporaryDirectory() as tmp:
+        #     tmp_dir = Path(tmp)
+        #
+        #     for key, filename in files_to_extract.items():
+        #         entry_index = pkg_entries.get(key)
+        #         if entry_index is None:
+        #             continue
+        #
+        #         out_path = tmp_dir / filename
+        #         _run_pkgtool(
+        #             pkg_path,
+        #             _PKGToolCommand.EXTRACT_PKG_ENTRY,
+        #             str(entry_index),
+        #             str(out_path),
+        #         )
+        #
+        #         extracted[key] = out_path
+        #
+        # # Step 4: Build PKG
+        # print(extracted[EntryKey.PARAM_SFO])
+        # print(extracted[EntryKey.ICON0_PNG])
+        # print(extracted[EntryKey.PIC0_PNG])
+        # print(extracted[EntryKey.PIC1_PNG])
 
 
 PkgUtils = PkgUtils()
