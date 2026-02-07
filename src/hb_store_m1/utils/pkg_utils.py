@@ -95,7 +95,7 @@ class PkgUtils:
 
             pkg_entries[entry_key] = index
 
-        # Step 2: Extract PARAM_SFO
+        # Step 2: Extract PARAM.SFO
         param_sfo = None
         if extract_sfo:
             with tempfile.TemporaryDirectory() as tmp:
@@ -112,7 +112,7 @@ class PkgUtils:
                 param_sfo = PkgUtils.parse_param_sfo_entries(entries_list)
                 LogUtils.log_debug(f"PARAM.SFO extracted successfully {param_sfo}")
 
-        # Step 3: Extract ICON0_PNG, PIC0_PNG, PIC1_PNG
+        # Step 3: Extract ICON0.PNG, PIC0.PNG, PIC1.PNG
 
         #
         # # Step 4: Build PKG
