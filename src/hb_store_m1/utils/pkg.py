@@ -4,7 +4,12 @@ from pathlib import Path
 
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.output import Output, Status
-from hb_store_m1.models.pkg.metadata import EntryKey, ParamSFO, PKGEntry
+from hb_store_m1.models.pkg.metadata import (
+    PKGEntryKey,
+    ParamSFO,
+    ParamSFOKey,
+    PKGEntry,
+)
 from hb_store_m1.models.pkg.pkg import PKG
 from hb_store_m1.models.pkg.validation import ValidationFields, Severity
 from hb_store_m1.utils.helper.pkgtool import PKGTool
@@ -12,17 +17,17 @@ from hb_store_m1.utils.log import LogUtils
 
 
 class PkgUtils:
-    _SFO_ENTRY_RE = re.compile(
-        r"^(?P<name>[^:]+?)\s*:\s*(?P<type>[^()]+)\((?P<size>\d+)/(?:\s*)"
-        r"(?P<max_size>\d+)\)\s*=\s*(?P<value>.*)$"
-    )
 
     @staticmethod
     def parse_sfo_entries(lines: list[str]) -> dict[str, dict[str, object]]:
         entries: dict[str, dict[str, object]] = {}
+        entries_regex = re.compile(
+            r"^(?P<name>[^:]+?)\s*:\s*(?P<type>[^()]+)\((?P<size>\d+)/(?:\s*)"
+            r"(?P<max_size>\d+)\)\s*=\s*(?P<value>.*)$"
+        )
 
         for line in lines:
-            match = PkgUtils._SFO_ENTRY_RE.match(line.strip())
+            match = entries_regex.match(line.strip())
             if not match:
                 continue
 
@@ -40,6 +45,31 @@ class PkgUtils:
             }
 
         return entries
+
+    @staticmethod
+    def parse_param_sfo_entries(
+        lines: list[str],
+    ) -> dict[ParamSFOKey, dict[str, object]]:
+        entries = PkgUtils.parse_sfo_entries(lines)
+        mapped: dict[ParamSFOKey, dict[str, object]] = {}
+
+        for key, entry in entries.items():
+            enum_key = ParamSFOKey.__members__.get(key)
+            if enum_key is None:
+                continue
+            mapped[enum_key] = entry
+
+        return mapped
+
+    @staticmethod
+    def parse_param_sfo(lines: list[str]) -> ParamSFO:
+        entries = PkgUtils.parse_param_sfo_entries(lines)
+
+        def get_value(key: ParamSFOKey) -> str:
+            entry = entries.get(key)
+            if not entry:
+                return ""
+            return str(entry.get("value", "")).strip()
 
     @staticmethod
     def scan():
@@ -89,7 +119,7 @@ class PkgUtils:
             name = str(parts[4])
             index = str(parts[3])
 
-            entry_key = EntryKey.__members__.get(name)
+            entry_key = PKGEntryKey.__members__.get(name)
             if entry_key is None:
                 continue
 
@@ -101,14 +131,16 @@ class PkgUtils:
 
                 param_sfo = Path(tmp) / "param.sfo"
                 PKGTool.extract_pkg_entry(
-                    pkg, pkg_entries[EntryKey.PARAM_SFO], str(param_sfo)
+                    pkg, pkg_entries[PKGEntryKey.PARAM_SFO], str(param_sfo)
                 )
 
                 response = PKGTool.list_sfo_entries(param_sfo).stdout.splitlines()
 
-                print(response)
-                # for field in response:
-                #     print(field)
+                sfo_entries = PkgUtils.parse_sfo_entries(response)
+
+                print(sfo_entries)
+                for field in sfo_entries:
+                    print(field)
 
         # files_to_extract = {}
         # if extract_medias:
