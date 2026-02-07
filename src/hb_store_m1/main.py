@@ -6,8 +6,8 @@ from pathlib import Path
 from tabulate import tabulate
 
 from hb_store_m1.models.globals import Globals
-from hb_store_m1.utils.log import LogUtils
-from hb_store_m1.utils.pkg import PkgUtils
+from hb_store_m1.utils.log_utils import LogUtils
+from hb_store_m1.utils.pkg_utils import PkgUtils
 
 
 def welcome():

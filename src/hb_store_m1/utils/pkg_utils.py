@@ -4,16 +4,16 @@ from pathlib import Path
 
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.output import Output, Status
-from hb_store_m1.models.pkg.metadata import (
-    PKGEntryKey,
-    ParamSFO,
+from hb_store_m1.models.pkg.metadata.param_sfo import (
     ParamSFOKey,
-    PKGEntry,
+    ParamSFOValue,
+    ParamSFO,
 )
+from hb_store_m1.models.pkg.metadata.pkg_entry import PKGEntryKey
 from hb_store_m1.models.pkg.pkg import PKG
 from hb_store_m1.models.pkg.validation import ValidationFields, Severity
 from hb_store_m1.utils.helper.pkgtool import PKGTool
-from hb_store_m1.utils.log import LogUtils
+from hb_store_m1.utils.log_utils import LogUtils
 
 
 class PkgUtils:
@@ -49,27 +49,22 @@ class PkgUtils:
     @staticmethod
     def parse_param_sfo_entries(
         lines: list[str],
-    ) -> dict[ParamSFOKey, dict[str, object]]:
+    ) -> dict[ParamSFOKey, ParamSFOValue]:
         entries = PkgUtils.parse_sfo_entries(lines)
-        mapped: dict[ParamSFOKey, dict[str, object]] = {}
+        mapped: dict[ParamSFOKey, ParamSFOValue] = {}
 
         for key, entry in entries.items():
             enum_key = ParamSFOKey.__members__.get(key)
             if enum_key is None:
                 continue
-            mapped[enum_key] = entry
+            mapped[enum_key] = value
 
         return mapped
 
     @staticmethod
     def parse_param_sfo(lines: list[str]) -> ParamSFO:
         entries = PkgUtils.parse_param_sfo_entries(lines)
-
-        def get_value(key: ParamSFOKey) -> str:
-            entry = entries.get(key)
-            if not entry:
-                return ""
-            return str(entry.get("value", "")).strip()
+        return ParamSFO(entries)
 
     @staticmethod
     def scan():

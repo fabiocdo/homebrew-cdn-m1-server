@@ -27,8 +27,8 @@ class PKGTool:
         )
 
     @staticmethod
-    def list_sfo_entries(sfo_path: Path):
-        return PKGTool._run_pkgtool("sfo_listentries", str(sfo_path))
+    def list_sfo_entries(sfo: Path):
+        return PKGTool._run_pkgtool("sfo_listentries", str(sfo))
 
     @staticmethod
     def validate_pkg(pkg: Path):

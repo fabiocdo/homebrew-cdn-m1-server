@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import StrEnum
-
-from hb_store_m1.models.pkg.metadata import PKGEntry, ParamSFO
 
 
 class Region(StrEnum):
@@ -38,8 +36,6 @@ class PKG:
     pic1_png: str = ""
     region: Region | None = None
     app_type: AppType | None = None
-    entries: list[PKGEntry] = field(default_factory=list)
-    param_sfo: ParamSFO = field(default_factory=ParamSFO)
 
     def __post_init__(self) -> None:
         # app_type
