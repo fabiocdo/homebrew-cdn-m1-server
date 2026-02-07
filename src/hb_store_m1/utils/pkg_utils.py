@@ -6,7 +6,6 @@ from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.output import Output, Status
 from hb_store_m1.models.pkg.metadata.param_sfo import (
     ParamSFOKey,
-    ParamSFOValue,
     ParamSFO,
 )
 from hb_store_m1.models.pkg.metadata.pkg_entry import PKGEntryKey
@@ -17,54 +16,31 @@ from hb_store_m1.utils.log_utils import LogUtils
 
 
 class PkgUtils:
-
-    @staticmethod
-    def parse_sfo_entries(lines: list[str]) -> dict[str, dict[str, object]]:
-        entries: dict[str, dict[str, object]] = {}
-        entries_regex = re.compile(
-            r"^(?P<name>[^:]+?)\s*:\s*(?P<type>[^()]+)\((?P<size>\d+)/(?:\s*)"
-            r"(?P<max_size>\d+)\)\s*=\s*(?P<value>.*)$"
-        )
-
-        for line in lines:
-            match = entries_regex.match(line.strip())
-            if not match:
-                continue
-
-            name = match.group("name").strip()
-            entry_type = match.group("type").strip()
-            size = int(match.group("size"))
-            max_size = int(match.group("max_size"))
-            value = match.group("value")
-
-            entries[name] = {
-                "type": entry_type,
-                "size": size,
-                "max_size": max_size,
-                "value": value,
-            }
-
-        return entries
+    _SFO_LINE_RE = re.compile(r"^(?P<name>[^:]+?)\s*:\s*[^=]*=\s*(?P<value>.*)$")
 
     @staticmethod
     def parse_param_sfo_entries(
         lines: list[str],
-    ) -> dict[ParamSFOKey, ParamSFOValue]:
-        entries = PkgUtils.parse_sfo_entries(lines)
-        mapped: dict[ParamSFOKey, ParamSFOValue] = {}
+    ) -> dict[ParamSFOKey, ParamSFO]:
+        mapped: dict[ParamSFOKey, ParamSFO] = {}
 
-        for key, entry in entries.items():
-            enum_key = ParamSFOKey.__members__.get(key)
+        for line in lines:
+            match = PkgUtils._SFO_LINE_RE.match(line.strip())
+            if not match:
+                continue
+
+            name = match.group("name").strip()
+            if name == "Entry Name":
+                continue
+
+            enum_key = ParamSFOKey.__members__.get(name)
             if enum_key is None:
                 continue
-            mapped[enum_key] = value
+
+            value = match.group("value").strip()
+            mapped[enum_key] = ParamSFO(enum_key, value)
 
         return mapped
-
-    @staticmethod
-    def parse_param_sfo(lines: list[str]) -> ParamSFO:
-        entries = PkgUtils.parse_param_sfo_entries(lines)
-        return ParamSFO(entries)
 
     @staticmethod
     def scan():
@@ -124,18 +100,25 @@ class PkgUtils:
         if extract_sfo:
             with tempfile.TemporaryDirectory() as tmp:
 
-                param_sfo = Path(tmp) / "param.sfo"
+                extracted_sfo = Path(tmp) / "param.sfo"
                 PKGTool.extract_pkg_entry(
-                    pkg, pkg_entries[PKGEntryKey.PARAM_SFO], str(param_sfo)
+                    pkg, pkg_entries[PKGEntryKey.PARAM_SFO], str(extracted_sfo)
                 )
 
-                response = PKGTool.list_sfo_entries(param_sfo).stdout.splitlines()
+                response = PKGTool.list_sfo_entries(extracted_sfo).stdout.splitlines()
 
-                sfo_entries = PkgUtils.parse_sfo_entries(response)
+                import json
 
-                print(sfo_entries)
-                for field in sfo_entries:
-                    print(field)
+                sfo_entries = PkgUtils.parse_param_sfo_entries(response).items()
+
+                param_sfo = ParamSFO()
+                print(
+                    json.dumps(
+                        {k.value: v.value for k, v in sfo_entries},
+                        indent=2,
+                        ensure_ascii=True,
+                    )
+                )
 
         # files_to_extract = {}
         # if extract_medias:

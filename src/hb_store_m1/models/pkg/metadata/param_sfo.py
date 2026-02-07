@@ -3,7 +3,6 @@ from enum import StrEnum
 
 
 class ParamSFOKey(StrEnum):
-    APP_TYPE = "APP_TYPE"
     APP_VER = "APP_VER"
     CATEGORY = "CATEGORY"
     CONTENT_ID = "CONTENT_ID"
@@ -16,9 +15,7 @@ class ParamSFOKey(StrEnum):
 
 @dataclass(slots=True)
 class ParamSFO:
-    key: ParamSFOKey
-    value: str
+    data: dict[ParamSFOKey, str]
 
-    def __init__(self, key: ParamSFOKey, value: str):
-        self.key = key
-        self.value = value
+    # def __init__(self, data: dict[ParamSFOKey, str]):
+    #     self.data = data
