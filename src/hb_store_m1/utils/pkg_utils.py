@@ -1,4 +1,3 @@
-import json
 import re
 import tempfile
 from pathlib import Path
@@ -10,7 +9,6 @@ from hb_store_m1.models.pkg.metadata.param_sfo import (
     ParamSFO,
 )
 from hb_store_m1.models.pkg.metadata.pkg_entry import PKGEntryKey
-from hb_store_m1.models.pkg.pkg import PKG
 from hb_store_m1.models.pkg.validation import ValidationFields, Severity
 from hb_store_m1.utils.helper.pkgtool import PKGTool
 from hb_store_m1.utils.log_utils import LogUtils
@@ -78,7 +76,7 @@ class PkgUtils:
     @staticmethod
     def extract_pkg_data(
         pkg: Path, extract_sfo: bool = True, extract_medias: bool = True
-    ) -> PKG:
+    ) -> Output:
 
         # Step 1: Track the entries indexes
         pkg_entries = {}
@@ -114,12 +112,71 @@ class PkgUtils:
 
         # Step 3: Extract ICON0.PNG, PIC0.PNG, PIC1.PNG
 
-        #
-        # # Step 4: Build PKG
-        # print(extracted[EntryKey.PARAM_SFO])
-        # print(extracted[EntryKey.ICON0_PNG])
-        # print(extracted[EntryKey.PIC0_PNG])
-        # print(extracted[EntryKey.PIC1_PNG])
+        # Step 4: Build PKG
+        extracted_medias: dict[PKGEntryKey, Path] = {}
+        if extract_medias:
+            LogUtils.log_debug(f"Extracting MEDIAS from PKG {pkg}...")
+            icon0_file_path = Path(Globals.PATHS.MEDIA_DIR_PATH) / str(
+                param_sfo.data[ParamSFOKey.CONTENT_ID] + "_icon0.png"
+            )
+            pic0_file_path = Path(Globals.PATHS.MEDIA_DIR_PATH) / str(
+                param_sfo.data[ParamSFOKey.CONTENT_ID] + "_pic0.png"
+            )
+            pic1_file_path = Path(Globals.PATHS.MEDIA_DIR_PATH) / str(
+                param_sfo.data[ParamSFOKey.CONTENT_ID] + "_pic1.png"
+            )
+
+            if not icon0_file_path.exists():
+                try:
+                    PKGTool.extract_pkg_entry(
+                        pkg,
+                        pkg_entries[PKGEntryKey.ICON0_PNG],
+                        str(icon0_file_path),
+                    )
+                    extracted_medias[PKGEntryKey.ICON0_PNG] = icon0_file_path
+                except KeyError as exception:
+                    LogUtils.log_error(f"{exception.args[0]} not found in {pkg}.")
+            else:
+                LogUtils.log_debug(
+                    f"{icon0_file_path} already exists. Skipping extraction."
+                )
+
+            if not pic0_file_path.exists():
+                try:
+                    PKGTool.extract_pkg_entry(
+                        pkg,
+                        pkg_entries[PKGEntryKey.PIC0_PNG],
+                        str(pic0_file_path),
+                    )
+                    extracted_medias[PKGEntryKey.PIC0_PNG] = pic0_file_path
+                except KeyError as exception:
+                    LogUtils.log_debug(
+                        f"{exception.args[0]} not found in {pkg}. Skipping."
+                    )
+            else:
+                LogUtils.log_debug(
+                    f"{pic1_file_path} already exists. Skipping extraction."
+                )
+
+            if not pic1_file_path.exists():
+                try:
+                    PKGTool.extract_pkg_entry(
+                        pkg,
+                        pkg_entries[PKGEntryKey.PIC1_PNG],
+                        str(pic1_file_path),
+                    )
+                    extracted_medias[PKGEntryKey.PIC1_PNG] = pic1_file_path
+                except KeyError as exception:
+                    LogUtils.log_debug(
+                        f"{exception.args[0]} not found in {pkg}. Skipping."
+                    )
+            else:
+                LogUtils.log_debug(
+                    f"{pic1_file_path} already exists. Skipping extraction."
+                )
+
+        if extracted_medias:
+            print(extracted_medias)
 
 
 PkgUtils = PkgUtils()

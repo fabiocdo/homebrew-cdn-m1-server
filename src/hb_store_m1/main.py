@@ -127,7 +127,10 @@ def main():
     init_template_json()
     PkgUtils.scan()
     PkgUtils.extract_pkg_data(
-        Path("/home/fabio/dev/hb-store-m1/data/pkg/game/shovel_game.pkg")
+        Path("/home/fabio/dev/hb-store-m1/data/pkg/dlc/twinsen-dlc.pkg")
+    )
+    PkgUtils.extract_pkg_data(
+        Path("/home/fabio/dev/hb-store-m1/data/pkg/game/stardew_game.pkg")
     )
 
     # Start watcher
