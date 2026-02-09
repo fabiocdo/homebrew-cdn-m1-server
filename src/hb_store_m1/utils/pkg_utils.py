@@ -75,111 +75,98 @@ class PkgUtils:
         return Output(Status.OK, pkg)
 
     @staticmethod
-    def extract_pkg_data(
-        pkg: Path, extract_sfo: bool = True, extract_medias: bool = True
-    ) -> Output:
+    def extract_pkg_data(pkg: Path) -> Output:
 
-        extracted_pkg = None
-        if extract_sfo or extract_medias:
-            # Step 1: Track the entries indexes
-            pkg_entries = {}
-            entries_result = PKGTool.list_pkg_entries(pkg).stdout.splitlines()
+        # Step 1: Track the entries indexes
+        pkg_entries = {}
+        entries_result = PKGTool.list_pkg_entries(pkg).stdout.splitlines()
 
-            for line in entries_result[1:]:
-                parts = line.split()
-                name = str(parts[4])
-                index = str(parts[3])
+        for line in entries_result[1:]:
+            parts = line.split()
+            name = str(parts[4])
+            index = str(parts[3])
 
-                entry_key = PKGEntryKey.__members__.get(name)
-                if entry_key is None:
-                    continue
+            entry_key = PKGEntryKey.__members__.get(name)
+            if entry_key is None:
+                continue
 
-                pkg_entries[entry_key] = index
+            pkg_entries[entry_key] = index
 
-            # Step 2: Extract PARAM.SFO
-            param_sfo = None
-            if extract_sfo:
-                with tempfile.TemporaryDirectory() as tmp:
-                    LogUtils.log_debug(f"Extracting PARAM.SFO from PKG {pkg}...")
-                    extracted_sfo_file = Path(tmp) / "param.sfo"
-                    PKGTool.extract_pkg_entry(
-                        pkg, pkg_entries[PKGEntryKey.PARAM_SFO], str(extracted_sfo_file)
-                    )
+        # Step 2: Extract PARAM.SFO
+        param_sfo = None
+        with tempfile.TemporaryDirectory() as tmp:
+            LogUtils.log_debug(f"Extracting PARAM.SFO from PKG {pkg}...")
+            extracted_sfo_file = Path(tmp) / "param.sfo"
+            PKGTool.extract_pkg_entry(
+                pkg, pkg_entries[PKGEntryKey.PARAM_SFO], str(extracted_sfo_file)
+            )
 
-                    entries_list = PKGTool.list_sfo_entries(
-                        extracted_sfo_file
-                    ).stdout.splitlines()
+            entries_list = PKGTool.list_sfo_entries(
+                extracted_sfo_file
+            ).stdout.splitlines()
 
-                    param_sfo = PkgUtils.parse_param_sfo_entries(entries_list)
-                    LogUtils.log_debug(f"PARAM.SFO extracted successfully {param_sfo}")
+            param_sfo = PkgUtils.parse_param_sfo_entries(entries_list)
+            LogUtils.log_debug(f"PARAM.SFO extracted successfully {param_sfo}")
 
-            # Step 3: Extract ICON0.PNG, PIC0.PNG, PIC1.PNG
-            extracted_medias: dict[PKGEntryKey, Path | None] = {}
-            if extract_medias:
-                LogUtils.log_debug(f"Extracting MEDIAS from PKG {pkg}...")
+        # Step 3: Extract ICON0.PNG, PIC0.PNG, PIC1.PNG
+        extracted_medias: dict[PKGEntryKey, Path | None] = {}
+        LogUtils.log_debug(f"Extracting MEDIAS from PKG {pkg}...")
 
-                content_id = param_sfo.data[ParamSFOKey.CONTENT_ID]
-                media_dir = Path(Globals.PATHS.MEDIA_DIR_PATH)
+        content_id = param_sfo.data[ParamSFOKey.CONTENT_ID]
+        media_dir = Path(Globals.PATHS.MEDIA_DIR_PATH)
 
-                targets = [
-                    (
-                        PKGEntryKey.ICON0_PNG,
-                        True,
-                        media_dir / f"{content_id}_icon0.png",
-                    ),
-                    (PKGEntryKey.PIC0_PNG, False, media_dir / f"{content_id}_pic0.png"),
-                    (PKGEntryKey.PIC1_PNG, False, media_dir / f"{content_id}_pic1.png"),
-                ]
+        targets = [
+            (
+                PKGEntryKey.ICON0_PNG,
+                True,
+                media_dir / f"{content_id}_icon0.png",
+            ),
+            (PKGEntryKey.PIC0_PNG, False, media_dir / f"{content_id}_pic0.png"),
+            (PKGEntryKey.PIC1_PNG, False, media_dir / f"{content_id}_pic1.png"),
+        ]
 
-                for entry_key, is_critical, file_path in targets:
-                    entry_index = pkg_entries.get(entry_key)
-                    if entry_index is None:
-                        if is_critical:
-                            LogUtils.log_error(f"{entry_key} not found in {pkg}.")
-                            return Output(Status.ERROR, pkg)
+        for entry_key, is_critical, file_path in targets:
+            entry_index = pkg_entries.get(entry_key)
+            if entry_index is None:
+                if is_critical:
+                    LogUtils.log_error(f"{entry_key} not found in {pkg}.")
+                    return Output(Status.ERROR, pkg)
 
-                        else:
-                            LogUtils.log_debug(
-                                f"{entry_key} not found in {pkg}. Skipping."
-                            )
-                            extracted_medias[entry_key] = None
-                        continue
+                else:
+                    LogUtils.log_debug(f"{entry_key} not found in {pkg}. Skipping.")
+                    extracted_medias[entry_key] = None
+                continue
 
-                    if file_path.exists():
-                        LogUtils.log_debug(
-                            f"{file_path} already exists. Skipping extraction."
-                        )
-                        extracted_medias[entry_key] = file_path
-                        continue
+            if file_path.exists():
+                LogUtils.log_debug(f"{file_path} already exists. Skipping extraction.")
+                extracted_medias[entry_key] = file_path
+                continue
 
-                    PKGTool.extract_pkg_entry(pkg, entry_index, str(file_path))
-                    extracted_medias[entry_key] = file_path
+            PKGTool.extract_pkg_entry(pkg, entry_index, str(file_path))
+            extracted_medias[entry_key] = file_path
 
-                # Step 4: Build PKG
-                extracted_pkg = PKG(
-                    title=param_sfo.data[ParamSFOKey.TITLE],
-                    title_id=param_sfo.data[ParamSFOKey.TITLE_ID],
-                    content_id=param_sfo.data[ParamSFOKey.CONTENT_ID],
-                    category=param_sfo.data[ParamSFOKey.CATEGORY],
-                    version=param_sfo.data[ParamSFOKey.VERSION],
-                    pubtoolinfo=param_sfo.data[ParamSFOKey.PUBTOOLINFO],
-                    icon0_png=extracted_medias[PKGEntryKey.ICON0_PNG],
-                    pic0_png=(
-                        extracted_medias[PKGEntryKey.PIC0_PNG]
-                        if extracted_medias[PKGEntryKey.PIC0_PNG]
-                        else None
-                    ),
-                    pic1_png=(
-                        extracted_medias[PKGEntryKey.PIC1_PNG]
-                        if extracted_medias[PKGEntryKey.PIC1_PNG]
-                        else None
-                    ),
-                )
-            return Output(Status.OK, extracted_pkg)
+        # Step 4: Build PKG
+        extracted_pkg = PKG(
+            title=param_sfo.data[ParamSFOKey.TITLE],
+            title_id=param_sfo.data[ParamSFOKey.TITLE_ID],
+            content_id=param_sfo.data[ParamSFOKey.CONTENT_ID],
+            category=param_sfo.data[ParamSFOKey.CATEGORY],
+            version=param_sfo.data[ParamSFOKey.VERSION],
+            pubtoolinfo=param_sfo.data[ParamSFOKey.PUBTOOLINFO],
+            icon0_png=extracted_medias[PKGEntryKey.ICON0_PNG],
+            pic0_png=(
+                extracted_medias[PKGEntryKey.PIC0_PNG]
+                if extracted_medias[PKGEntryKey.PIC0_PNG]
+                else None
+            ),
+            pic1_png=(
+                extracted_medias[PKGEntryKey.PIC1_PNG]
+                if extracted_medias[PKGEntryKey.PIC1_PNG]
+                else None
+            ),
+        )
 
-        else:
-            LogUtils.log_debug("Nothing to extract.")
-            return Output(Status.SKIP, None)
+        return Output(Status.OK, extracted_pkg)
 
 
 PkgUtils = PkgUtils()

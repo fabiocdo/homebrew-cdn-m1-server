@@ -131,9 +131,7 @@ def main():
     )
     print(
         PkgUtils.extract_pkg_data(
-            Path("/home/fabio/dev/hb-store-m1/data/pkg/game/stardew_game.pkg"),
-            True,
-            False,
+            Path("/home/fabio/dev/hb-store-m1/data/pkg/game/stardew_game.pkg")
         )
     )
 
