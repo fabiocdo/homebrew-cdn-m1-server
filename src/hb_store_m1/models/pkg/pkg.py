@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from pathlib import Path
+import re
 
 
 class Region(StrEnum):
@@ -30,10 +32,11 @@ class PKG:
     content_id: str = ""
     category: str = ""
     version: str = ""
+    pubtoolinfo: str = ""
+    icon0_png: Path = None
+    pic0_png: Path = None
+    pic1_png: Path = None
     release_date: str = ""
-    icon0_png: str = ""
-    pic0_png: str = ""
-    pic1_png: str = ""
     region: Region | None = None
     app_type: AppType | None = None
 
@@ -48,3 +51,10 @@ class PKG:
             self.region = Region.__members__.get(prefix, Region.UNKNOWN)
         else:
             self.region = Region.UNKNOWN
+
+        # release_date
+        if not (self.release_date or "").strip() and self.pubtoolinfo:
+            match = re.search(r"\bc_date=(\d{8})\b", self.pubtoolinfo)
+            if match:
+                ymd = match.group(1)
+                self.release_date = f"{ymd[0:4]}-{ymd[4:6]}-{ymd[6:8]}"

@@ -1,6 +1,5 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from pathlib import Path
 
 
 class Status(Enum):
@@ -16,6 +15,6 @@ class Status(Enum):
 
 
 @dataclass(slots=True)
-class Output:
+class Output[T]:
     status: Status
-    content: Path | str | None = None
+    content: T | None = None
