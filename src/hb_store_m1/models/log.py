@@ -6,18 +6,25 @@ class LogColor(StrEnum):
     # Regular
     GRAY = "\033[0;90m"
     WHITE = "\033[0;97m"
+    BLUE = "\033[0;34m"
+    GREEN = "\033[0;32m"
+    CYAN = "\033[0;36m"
+    MAGENTA = "\033[0;35m"
     YELLOW = "\033[0;33m"
     RED = "\033[0;31m"
     # Bright
     BRIGHT_BLUE = "\033[1;94m"
-    BRIGHT_YELLOW = "\033[1;93m"
     BRIGHT_GREEN = "\033[1;92m"
-    BRIGHT_PURPLE = "\033[1;95m"
     BRIGHT_CYAN = "\033[1;96m"
+    BRIGHT_MAGENTA = "\033[1;95m"
+    BRIGHT_RED = "\033[1;91m"
+    BRIGHT_YELLOW = "\033[1;93m"
+    BRIGHT_PURPLE = "\033[1;95m"
     BRIGHT_GRAY = "\033[1;90m"
 
 
 class LogModule(StrEnum):
+    PKG_UTIL = LogColor.BRIGHT_MAGENTA
     AUTO_INDEXER = LogColor.BRIGHT_GREEN
     AUTO_SORTER = LogColor.BRIGHT_YELLOW
     AUTO_FORMATTER = LogColor.BRIGHT_BLUE

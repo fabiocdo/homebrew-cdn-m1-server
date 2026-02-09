@@ -129,10 +129,8 @@ def main():
     PkgUtils.extract_pkg_data(
         Path("/home/fabio/dev/hb-store-m1/data/pkg/dlc/twinsen-dlc.pkg")
     )
-    print(
-        PkgUtils.extract_pkg_data(
-            Path("/home/fabio/dev/hb-store-m1/data/pkg/game/stardew_game.pkg")
-        )
+    PkgUtils.extract_pkg_data(
+        Path("/home/fabio/dev/hb-store-m1/data/pkg/game/stardew_game.pkg")
     )
 
     # Start watcher
