@@ -1,4 +1,4 @@
-from enum import Enum, StrEnum
+from enum import Enum, StrEnum, unique
 
 
 class LogColor(StrEnum):
@@ -19,19 +19,20 @@ class LogColor(StrEnum):
     BRIGHT_MAGENTA = "\033[1;95m"
     BRIGHT_RED = "\033[1;91m"
     BRIGHT_YELLOW = "\033[1;93m"
-    BRIGHT_PURPLE = "\033[1;95m"
+    BRIGHT_PURPLE = "\033[38;5;135m"
     BRIGHT_GRAY = "\033[1;90m"
 
 
 class LogModule(StrEnum):
     DB_UTIL = LogColor.CYAN
-    PKG_UTIL = LogColor.BRIGHT_MAGENTA
-    INIT_UTIL = LogColor.BRIGHT_PURPLE
+    PKG_UTIL = LogColor.MAGENTA
+    INIT_UTIL = LogColor.BLUE
+
     AUTO_INDEXER = LogColor.BRIGHT_GREEN
     AUTO_SORTER = LogColor.BRIGHT_YELLOW
-    AUTO_FORMATTER = LogColor.BRIGHT_BLUE
+    AUTO_FORMATTER = LogColor.BRIGHT_CYAN
     WATCHER = LogColor.BRIGHT_PURPLE
-    WATCHER_PLANNER = LogColor.BRIGHT_CYAN
+    WATCHER_PLANNER = LogColor.BRIGHT_RED
     WATCHER_EXECUTOR = LogColor.BRIGHT_GRAY
 
     def color(self):
