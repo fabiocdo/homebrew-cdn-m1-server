@@ -29,18 +29,18 @@ class DBUtils:
         try:
             conn.execute("BEGIN")
 
-            DBUtils._ensure_content_id_schema(conn)
-
             insert_sql = """
-                         INSERT INTO homebrews (id, content_id, name, "desc", image, package, version, picpath, desc_1, desc_2,
+                         INSERT INTO homebrews (content_id, id, name, "desc", image, package, version, picpath, desc_1, desc_2,
                                                 ReviewStars, Size, Author, apptype, pv, main_icon_path, main_menu_pic,
                                                 releaseddate, number_of_downloads, github, video, twitter, md5)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                          ON CONFLICT(content_id) DO UPDATE SET
+                            id=excluded.id,
                             name=excluded.name,
                             "desc"=excluded."desc",
                             image=excluded.image,
                             package=excluded.package,
+                            version=excluded.version,
                             picpath=excluded.picpath,
                             desc_1=excluded.desc_1,
                             desc_2=excluded.desc_2,
@@ -63,8 +63,8 @@ class DBUtils:
             for pkg in pkgs:
                 rows_to_insert.append(
                     (
-                        pkg.title_id,
                         pkg.content_id,
+                        pkg.title_id,
                         pkg.title,
                         None,  # description
                         str(pkg.icon0_png_path),
@@ -110,26 +110,9 @@ class DBUtils:
                 f"Failed to upsert {len(pkgs)} PKGs in STORE.DB: {e}",
                 LogModule.DB_UTIL,
             )
+            return Output(Status.ERROR, len(pkgs))
         finally:
             conn.close()
-
-    @staticmethod
-    def _ensure_content_id_schema(conn: sqlite3.Connection) -> None:
-        cursor = conn.execute("PRAGMA table_info(homebrews)")
-        existing_cols = {row[1] for row in cursor.fetchall()}
-
-        if "content_id" not in existing_cols:
-            conn.execute("ALTER TABLE homebrews ADD COLUMN content_id TEXT")
-
-        try:
-            conn.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS homebrews_content_id_uq ON homebrews(content_id)"
-            )
-        except sqlite3.Error as exc:
-            LogUtils.log_warn(
-                f"Failed to create unique index on content_id: {exc}",
-                LogModule.DB_UTIL,
-            )
 
 
 DBUtils = DBUtils()
