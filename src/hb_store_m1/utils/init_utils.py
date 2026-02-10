@@ -1,6 +1,7 @@
 import json
 import sqlite3
 
+from hb_store_m1.helpers.store_assets_client import StoreAssetClient
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogModule
 from hb_store_m1.utils.log_utils import LogUtils
@@ -16,7 +17,7 @@ class InitUtils:
         for p in vars(paths).values():
             p.mkdir(parents=True, exist_ok=True)
 
-        LogUtils.log_info("directories OK", LogModule.INIT_UTIL)
+        LogUtils.log_info("Directories OK", LogModule.INIT_UTIL)
 
     @staticmethod
     def init_db():
@@ -114,6 +115,28 @@ class InitUtils:
         LogUtils.log_info(
             f"Initialized index.json at {index_json_file_path}", LogModule.INIT_UTIL
         )
+
+    @staticmethod
+    def init_assets():
+        LogUtils.log_debug("Downloading store assets...", LogModule.INIT_UTIL)
+        StoreAssetClient.download_store_assets()
+
+        assets_file_path = (
+            Globals.FILES.HOMEBREW_ELF_FILE_PATH,
+            Globals.FILES.HOMEBREW_ELF_SIG_FILE_PATH,
+            Globals.FILES.REMOTE_MD5_FILE_PATH,
+            # Globals.FILES.STORE_PRX_FILE_PATH,
+            # Globals.FILES.STORE_PRX_SIG_FILE_PATH,
+        )
+
+        missing = [p.name for p in assets_file_path if not p.exists()]
+        if missing:
+            LogUtils.log_error(
+                f"Store assets missing: {', '.join(missing)}",
+                LogModule.INIT_UTIL,
+            )
+        else:
+            LogUtils.log_info("Store assets OK...", LogModule.INIT_UTIL)
 
 
 InitUtils = InitUtils()

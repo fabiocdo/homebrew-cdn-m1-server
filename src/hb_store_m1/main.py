@@ -39,6 +39,7 @@ def main():
     InitUtils.init_directories()
     InitUtils.init_db()
     InitUtils.init_template_json()
+    InitUtils.init_assets()
     PkgUtils.scan()
     # pkg0 = PkgUtils.extract_pkg_data(
     #     Path("/home/fabio/dev/hb-store-m1/data/pkg/dlc/twinsen-dlc.pkg")

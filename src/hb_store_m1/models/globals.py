@@ -65,7 +65,7 @@ class _GlobalFiles:
     paths: _GlobalPaths
 
     @property
-    def PYPROJECT_PATH(self) -> _Path:
+    def PYPROJECT_FILE_PATH(self) -> _Path:
         return self.paths.APP_ROOT_PATH / "pyproject.toml"
 
     @property
@@ -109,6 +109,18 @@ class _GlobalFiles:
         return self.paths.CACHE_DIR_PATH / "homebrew.elf.sig"
 
     @property
+    def REMOTE_MD5_FILE_PATH(self) -> _Path:
+        return self.paths.CACHE_DIR_PATH / "remote.md5"
+
+    @property
+    def STORE_PRX_FILE_PATH(self) -> _Path:
+        return self.paths.CACHE_DIR_PATH / "store.prx"
+
+    @property
+    def STORE_PRX_SIG_FILE_PATH(self) -> _Path:
+        return self.paths.CACHE_DIR_PATH / "store.prx.sig"
+
+    @property
     def ERRORS_LOG_FILE_PATH(self) -> _Path:
         return self.paths.ERRORS_DIR_PATH / "app_errors.log"
 
@@ -140,15 +152,11 @@ class _GlobalEnvs:
 
     @property
     def APP_NAME(self) -> str:
-        return _pyproject_value(
-            self.files.JSON_TEMPLATE_INIT_FILE_PATH, "name", "hb-store-m1"
-        )
+        return _pyproject_value(self.files.PYPROJECT_FILE_PATH, "name", "hb-store-m1")
 
     @property
     def APP_VERSION(self) -> str:
-        return _pyproject_value(
-            self.files.JSON_TEMPLATE_INIT_FILE_PATH, "version", "0.0.1"
-        )
+        return _pyproject_value(self.files.PYPROJECT_FILE_PATH, "version", "0.0.1")
 
     @property
     def SERVER_URL(self) -> str:
