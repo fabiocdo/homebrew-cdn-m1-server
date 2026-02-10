@@ -30,7 +30,7 @@ class InitUtils:
 
         if store_db_file_path.exists():
             LogUtils.log_info(
-                f"{store_db_file_path.name} OK",
+                f"{store_db_file_path.name.upper()} OK",
                 LogModule.INIT_UTIL,
             )
             return
@@ -60,7 +60,9 @@ class InitUtils:
                 conn.commit()
             finally:
                 conn.close()
-            LogUtils.log_info(f"{store_db_file_path.name} OK", LogModule.INIT_UTIL)
+            LogUtils.log_info(
+                f"{store_db_file_path.name.upper()} OK", LogModule.INIT_UTIL
+            )
         except sqlite3.Error as exc:
             LogUtils.log_error(
                 f"Failed to initialize {store_db_file_path.name}: {exc}",
@@ -78,7 +80,7 @@ class InitUtils:
 
         if index_json_file_path.exists():
             LogUtils.log_info(
-                f"{index_json_file_path.name} OK",
+                f"{index_json_file_path.name.upper()} OK",
                 LogModule.INIT_UTIL,
             )
             return
@@ -118,7 +120,7 @@ class InitUtils:
 
     @staticmethod
     def init_assets():
-        LogUtils.log_debug("Downloading store assets...", LogModule.INIT_UTIL)
+        LogUtils.log_debug("Initializing store assets...", LogModule.INIT_UTIL)
 
         assets = [
             Globals.FILES.HOMEBREW_ELF_FILE_PATH,
@@ -127,18 +129,18 @@ class InitUtils:
         ]
 
         try:
-            StoreAssetClient.download_store_assets(assets)
-            missing = [p.name for p in assets if not p.exists()]
+            downloaded, missing = StoreAssetClient.download_store_assets(assets)
             if missing:
-                LogUtils.log_error(
-                    f"Store assets missing: {', '.join(missing)}",
-                    LogModule.INIT_UTIL,
-                )
+                for asset in missing:
+                    LogUtils.log_warn(
+                        f"Failed to download asset. Assets {asset.name} not found in repository",
+                        LogModule.INIT_UTIL,
+                    )
             else:
                 LogUtils.log_info("Store assets OK...", LogModule.INIT_UTIL)
         except Exception as e:
             LogUtils.log_error(
-                f"Failed to download store assets: {e.__cause__}", LogModule.INIT_UTIL
+                f"Failed to download store assets: {e}", LogModule.INIT_UTIL
             )
 
 

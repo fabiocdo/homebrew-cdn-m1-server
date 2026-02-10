@@ -4,13 +4,12 @@ from pathlib import Path
 from github import Github
 
 from hb_store_m1.models.globals import Globals
-from hb_store_m1.utils.log_utils import LogUtils
 
 
 class StoreAssetClient:
 
     @staticmethod
-    def download_store_assets(assets: list[Path]) -> list[str]:
+    def download_store_assets(assets: list[Path]) -> tuple[list[Path], list[Path]]:
         assets_repo = "LightningMods/PS4-Store"
         client = Github()
 
@@ -24,22 +23,22 @@ class StoreAssetClient:
         }
 
         downloaded = []
+        missing = []
 
         for asset in assets:
             if not asset.exists():
                 asset_url = release_assets.get(asset.name)
 
                 if not asset_url:
-                    LogUtils.log_warn(f"Asset {asset.name} not found in release")
+                    missing.append(asset)
                     continue
 
                 dest = Globals.PATHS.CACHE_DIR_PATH / asset.name
                 StoreAssetClient._download(asset_url, dest)
 
-                LogUtils.log_debug(f"Asset {asset.name} downloaded successfully")
                 downloaded.append(asset)
 
-        return downloaded
+        return downloaded, missing
 
     @staticmethod
     def _download(url: str, destination: Path) -> None:
