@@ -93,12 +93,8 @@ class _GlobalFiles:
         return self.paths.CACHE_DIR_PATH / "index-cache.json"
 
     @property
-    def STORE_DB_JSON_FILE_PATH(self) -> _Path:
-        return self.paths.CACHE_DIR_PATH / "store.db.json"
-
-    @property
-    def STORE_DB_MD5_FILE_PATH(self) -> _Path:
-        return self.paths.CACHE_DIR_PATH / "store.db.md5"
+    def STORE_CACHE_JSON_FILE_PATH(self) -> _Path:
+        return self.paths.CACHE_DIR_PATH / "store-cache.json"
 
     @property
     def HOMEBREW_ELF_FILE_PATH(self) -> _Path:

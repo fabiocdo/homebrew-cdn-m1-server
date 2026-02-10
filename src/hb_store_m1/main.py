@@ -3,6 +3,7 @@ from pathlib import Path
 from tabulate import tabulate
 
 from hb_store_m1.models.globals import Globals
+from hb_store_m1.utils.cache_utils import CacheUtils
 from hb_store_m1.utils.db_utils import DBUtils
 from hb_store_m1.utils.init_utils import InitUtils
 from hb_store_m1.utils.pkg_utils import PkgUtils
@@ -52,5 +53,7 @@ def main():
     ).content
 
     DBUtils.upsert([pkg0, pkg1])
+
+    print(CacheUtils.read_store_db_cache())
 
     # Start watcher
