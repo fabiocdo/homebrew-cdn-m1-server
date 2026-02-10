@@ -10,7 +10,6 @@ from hb_store_m1.utils.log_utils import LogUtils
 class CacheUtils:
     @staticmethod
     def read_store_db_cache() -> Output:
-
         path = Globals.FILES.STORE_CACHE_JSON_FILE_PATH
 
         if not path.exists():
@@ -19,20 +18,17 @@ class CacheUtils:
 
         try:
             data = json.loads(path.read_text("utf-8"))
-
         except (json.JSONDecodeError, OSError) as e:
-
-            LogUtils.error(f"Failed to read STORE CACHE: {e}")
+            LogUtils.log_error(f"Failed to read STORE CACHE: {e}")
             return Output(Status.ERROR, {})
 
-        return data
+        return Output(Status.OK, data)
 
     @staticmethod
-    def write_store_db_cache(rows) -> dict[str, str]:
-
+    def write_store_db_cache(db: StoreDB) -> Output:
         cache: dict[str, str] = {}
 
-        for row in rows:
+        for row in db:
             data = row.row
             key = data[StoreDB.Column.CONTENT_ID]
             values = [data[field] for field in StoreDB.Column]
@@ -47,7 +43,7 @@ class CacheUtils:
             json.dumps(cache, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        return cache
+        return Output(Status.OK, cache)
 
 
 CacheUtils = CacheUtils()
