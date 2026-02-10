@@ -12,7 +12,7 @@ from hb_store_m1.models.pkg.metadata.param_sfo import (
 from hb_store_m1.models.pkg.metadata.pkg_entry import PKGEntryKey
 from hb_store_m1.models.pkg.pkg import PKG
 from hb_store_m1.models.pkg.validation import ValidationFields, Severity
-from hb_store_m1.utils.helper.pkgtool import PKGTool
+from hb_store_m1.helpers.pkgtool import PKGTool
 from hb_store_m1.utils.log_utils import LogUtils
 
 
