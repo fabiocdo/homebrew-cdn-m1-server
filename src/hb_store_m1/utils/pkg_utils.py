@@ -2,6 +2,7 @@ import re
 import tempfile
 from pathlib import Path
 
+from hb_store_m1.models.pkg.section import Section
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogModule
 from hb_store_m1.models.output import Output, Status
@@ -42,37 +43,25 @@ class PkgUtils:
         return ParamSFO(data)
 
     @staticmethod
-    def scan() -> list[Path]:
-
+    def scan(sections: list[str] | None = None) -> list[Path]:
+        section_by_name = {section.name: section for section in Section.ALL}
+        scan_targets = sections or list(section_by_name.keys())
         LogUtils.log_info("Scanning PKGs...", LogModule.PKG_UTIL)
-        scanned_pkgs = list(
-            Path(Globals.PATHS.PKG_DIR_PATH).rglob("*.pkg", case_sensitive=False)
-        )
 
-        pkg_dir = Path(Globals.PATHS.PKG_DIR_PATH)
-        section_paths = {
-            "pkg_root": pkg_dir,
-            "app": Globals.PATHS.APP_DIR_PATH,
-            "dlc": Globals.PATHS.DLC_DIR_PATH,
-            "game": Globals.PATHS.GAME_DIR_PATH,
-            "save": Globals.PATHS.SAVE_DIR_PATH,
-            "unknown": Globals.PATHS.UNKNOWN_DIR_PATH,
-            "update": Globals.PATHS.UPDATE_DIR_PATH,
-        }
-        counts = {name: 0 for name in section_paths}
-        for pkg_path in scanned_pkgs:
-            if pkg_path.parent == pkg_dir:
-                counts["pkg_root"] += 1
+        scanned_pkgs: list[Path] = []
+        counts = {name: 0 for name in scan_targets}
+        for name in scan_targets:
+            root = section_by_name[name].path
+            if not root.exists():
                 continue
-            for name, section_path in section_paths.items():
-                if name == "pkg_root":
-                    continue
-                if pkg_path.is_relative_to(section_path):
+            for pkg_path in root.iterdir():
+                if pkg_path.is_file() and pkg_path.suffix.lower() == ".pkg":
+                    scanned_pkgs.append(pkg_path)
                     counts[name] += 1
-                    break
+
         LogUtils.log_info(
             f"Scanned {len(scanned_pkgs)} PKGs. "
-            + ", ".join(f"{name.upper()}: {count}" for name, count in counts.items()),
+            + ", ".join(f"{name.upper()}: {counts[name]}" for name in scan_targets),
             LogModule.PKG_UTIL,
         )
 

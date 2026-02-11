@@ -1,121 +1,103 @@
 import json
 from pathlib import Path
 
+from hb_store_m1.models.cache import CacheSection, CACHE_ADAPTER
 from hb_store_m1.models.globals import Globals
-from hb_store_m1.models.log import LogColor
+from hb_store_m1.models.log import LogColor, LogModule
 from hb_store_m1.models.output import Output, Status
+from hb_store_m1.models.pkg.section import Section
 from hb_store_m1.utils.log_utils import LogUtils
+from pydantic import ValidationError
 
 
 class CacheUtils:
-    _SECTIONS = (
-        str(Globals.PATHS.PKG_DIR_PATH.name),
-        str(Globals.PATHS.APP_DIR_PATH.name),
-        str(Globals.PATHS.DLC_DIR_PATH.name),
-        str(Globals.PATHS.GAME_DIR_PATH.name),
-        str(Globals.PATHS.SAVE_DIR_PATH.name),
-        str(Globals.PATHS.UNKNOWN_DIR_PATH.name),
-        str(Globals.PATHS.UPDATE_DIR_PATH.name),
-        str(Globals.PATHS.MEDIA_DIR_PATH.name),
-    )
+    _SECTIONS = Section.ALL
 
     @staticmethod
-    def read_pkg_cache() -> (
-        Output[dict[str, dict[str, dict[str, str] | dict[str, int]]]]
-    ):
+    def read_pkg_cache():
         store_cache_json_file_path = Globals.FILES.STORE_CACHE_JSON_FILE_PATH
 
         if not store_cache_json_file_path.exists():
             LogUtils.log_debug(
-                f"Skipping {store_cache_json_file_path.name.upper()} read. File not found"
+                f"Skipping {store_cache_json_file_path.name.upper()} read. File not found",
+                LogModule.CACHE_UTIL,
             )
             return Output(Status.NOT_FOUND, {})
 
         try:
-            data = json.loads(store_cache_json_file_path.read_text("utf-8"))
-
-        except (json.JSONDecodeError, OSError) as e:
-
-            LogUtils.log_error(f"Failed to read {store_cache_json_file_path.name}: {e}")
+            data = CACHE_ADAPTER.validate_json(
+                store_cache_json_file_path.read_text("utf-8")
+            )
+        except (OSError, ValueError, ValidationError) as e:
+            LogUtils.log_error(
+                f"Failed to read {store_cache_json_file_path.name}: {e}",
+                LogModule.CACHE_UTIL,
+            )
             return Output(Status.ERROR, {})
 
         return Output(Status.OK, data)
 
     @staticmethod
-    def write_pkg_cache(
-        path: Path | None = None,
-    ) -> Output[dict[str, dict[str, dict[str, str] | dict[str, int]]]]:
+    def write_pkg_cache(path: Path | None = None):
         store_cache_path = path or Globals.FILES.STORE_CACHE_JSON_FILE_PATH
         pkg_dir_path = Globals.PATHS.PKG_DIR_PATH
 
         if not pkg_dir_path.exists():
             LogUtils.log_debug(
-                f"Skipping {pkg_dir_path.name.upper()} scan. Directory not found"
+                f"Skipping {pkg_dir_path.name.upper()} scan. Directory not found",
+                LogModule.CACHE_UTIL,
             )
             return Output(Status.NOT_FOUND, {})
 
-        cache: dict[str, dict[str, dict[str, str] | dict[str, int]]] = {
-            section: {
-                "meta": {"count": 0, "total_size": 0, "latest_mtime": 0},
-                "content": {},
-            }
-            for section in CacheUtils._SECTIONS
-        }
+        cache = {section.name: CacheSection() for section in CacheUtils._SECTIONS}
 
-        def add_pkg(section: str, pkg_path: Path) -> None:
-            if not pkg_path.is_file():
+        def add_pkg(section_name: str, pkg: Path) -> None:
+            if not pkg.is_file():
                 return
-            suffix = pkg_path.suffix.lower()
-            if section == "_media":
-                if suffix != ".png":
-                    return
-            elif suffix != ".pkg":
+            suffix = pkg.suffix.lower()
+            if section_name == "_media" and suffix != ".png":
+                return
+            if section_name != "_media" and suffix != ".pkg":
                 return
             try:
-                stat = pkg_path.stat()
+                stat = pkg.stat()
             except OSError as exc:
-                LogUtils.log_warn(f"Failed to stat {pkg_path.name}: {exc}")
-                return
-            meta = cache[section]["meta"]
-            if isinstance(meta, dict):
-                meta["count"] = int(meta.get("count", 0)) + 1
-                meta["total_size"] = int(meta.get("total_size", 0)) + int(stat.st_size)
-                meta["latest_mtime"] = max(
-                    int(meta.get("latest_mtime", 0)), int(stat.st_mtime_ns)
+                LogUtils.log_warn(
+                    f"Failed to stat {pkg.name}: {exc}", LogModule.CACHE_UTIL
                 )
-            cache[section]["content"][
-                pkg_path.name
-            ] = f"{stat.st_size}|{stat.st_mtime_ns}"
-
-        for pkg_path in pkg_dir_path.iterdir():
-            add_pkg("pkg", pkg_path)
+                return
+            section_cache = cache[section_name]
+            section_cache.meta.count += 1
+            section_cache.meta.total_size += int(stat.st_size)
+            section_cache.meta.latest_mtime = max(
+                section_cache.meta.latest_mtime, int(stat.st_mtime_ns)
+            )
+            section_cache.content[pkg.name] = f"{stat.st_size}|{stat.st_mtime_ns}"
 
         for section in CacheUtils._SECTIONS:
-            if section == "pkg":
-                continue
-            section_path = pkg_dir_path / section
+            section_name = section.name
+            section_path = section.path
             if not section_path.exists():
                 continue
             for pkg_path in section_path.iterdir():
-                add_pkg(section, pkg_path)
-
-        totals = []
-        for section in CacheUtils._SECTIONS:
-            meta = cache[section]["meta"]
-            count = meta.get("count", 0) if isinstance(meta, dict) else 0
-            totals.append(f"{section}={count}")
-        LogUtils.log_info("Cache scan totals: " + " | ".join(totals))
+                add_pkg(section_name, pkg_path)
 
         store_cache_path.parent.mkdir(parents=True, exist_ok=True)
         store_cache_path.write_text(
-            json.dumps(cache, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+            json.dumps(
+                CACHE_ADAPTER.dump_python(cache),
+                ensure_ascii=True,
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
             encoding="utf-8",
         )
 
         return Output(Status.OK, cache)
 
     @staticmethod
-    def compare_pkg_cache() -> Output[dict[str, dict[str, list[str]] | list[str]]]:
+    def compare_pkg_cache():
         store_cache_path = Globals.FILES.STORE_CACHE_JSON_FILE_PATH
         temp_path = store_cache_path.with_suffix(".tmp")
 
@@ -125,45 +107,42 @@ class CacheUtils:
         current = current_output.content or {}
         cached = cached_output.content or {}
 
-        added: dict[str, list[str]] = {}
-        removed: dict[str, list[str]] = {}
-        updated: dict[str, list[str]] = {}
-        changed_sections: list[str] = []
-        summary_lines: list[str] = []
+        added = {}
+        removed = {}
+        updated = {}
+        changed_sections = []
+        summary_lines = []
 
         for section in CacheUtils._SECTIONS:
-            current_section = current.get(section, {})
-            cached_section = cached.get(section, {})
-            current_meta = current_section.get("meta", {})
-            cached_meta = cached_section.get("meta", {})
-            current_content = current_section.get("content", {})
-            cached_content = cached_section.get("content", {})
-            if not isinstance(current_content, dict):
-                current_content = {}
-            if not isinstance(cached_content, dict):
-                cached_content = {}
+            section_name = section.name
+            current_section = current.get(section_name, CacheSection())
+            cached_section = cached.get(section_name, CacheSection())
+            current_meta = current_section.meta
+            cached_meta = cached_section.meta
+            current_content = current_section.content
+            cached_content = cached_section.content
             current_keys = set(current_content)
             cached_keys = set(cached_content)
 
-            added[section] = sorted(current_keys - cached_keys)
-            removed[section] = sorted(cached_keys - current_keys)
-            updated[section] = sorted(
+            added[section_name] = sorted(current_keys - cached_keys)
+            removed[section_name] = sorted(cached_keys - current_keys)
+            updated[section_name] = sorted(
                 key
                 for key in current_keys & cached_keys
                 if current_content[key] != cached_content[key]
             )
-            added_count = len(added[section])
-            updated_count = len(updated[section])
-            removed_count = len(removed[section])
+            added_count = len(added[section_name])
+            updated_count = len(updated[section_name])
+            removed_count = len(removed[section_name])
             if (
-                current_meta != cached_meta
-                or added[section]
-                or removed[section]
-                or updated[section]
+                current_meta.model_dump() != cached_meta.model_dump()
+                or added[section_name]
+                or removed[section_name]
+                or updated[section_name]
             ):
-                changed_sections.append(section)
+                changed_sections.append(section_name)
                 summary = (
-                    f"{section.upper()} "
+                    f"{section_name.upper()}: "
                     f"{LogColor.GREEN if added_count != 0 else LogColor.RESET}+{added_count}{LogColor.RESET} "
                     f"{LogColor.YELLOW if updated_count != 0 else LogColor.RESET}"
                     f"~{updated_count}{LogColor.RESET} "
@@ -175,10 +154,15 @@ class CacheUtils:
             if temp_path.exists():
                 temp_path.unlink()
         except OSError as exc:
-            LogUtils.log_warn(f"Failed to remove temp cache file: {exc}")
+            LogUtils.log_warn(
+                f"Failed to remove temp cache file: {exc}", LogModule.CACHE_UTIL
+            )
 
         if summary_lines:
-            LogUtils.log_info("Cache changes summary: " + " | ".join(summary_lines))
+            LogUtils.log_info(
+                "Cache changes summary: " + ", ".join(summary_lines),
+                LogModule.CACHE_UTIL,
+            )
 
         return Output(
             Status.OK,
