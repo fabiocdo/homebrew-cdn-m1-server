@@ -5,7 +5,7 @@ from hb_store_m1.models.cache import CacheSection, CACHE_ADAPTER
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogColor, LogModule
 from hb_store_m1.models.output import Output, Status
-from hb_store_m1.models.pkg.section import Section
+from hb_store_m1.models.pkg.section import Section, SectionEntry
 from hb_store_m1.utils.log_utils import LogUtils
 from pydantic import ValidationError
 
@@ -51,36 +51,35 @@ class CacheUtils:
 
         cache = {section.name: CacheSection() for section in CacheUtils._SECTIONS}
 
-        def add_pkg(section_name: str, pkg: Path) -> None:
-            if not pkg.is_file():
-                return
-            suffix = pkg.suffix.lower()
-            if section_name == "_media" and suffix != ".png":
-                return
-            if section_name != "_media" and suffix != ".pkg":
-                return
-            try:
-                stat = pkg.stat()
-            except OSError as exc:
-                LogUtils.log_warn(
-                    f"Failed to stat {pkg.name}: {exc}", LogModule.CACHE_UTIL
-                )
-                return
-            section_cache = cache[section_name]
-            section_cache.meta.count += 1
-            section_cache.meta.total_size += int(stat.st_size)
-            section_cache.meta.latest_mtime = max(
-                section_cache.meta.latest_mtime, int(stat.st_mtime_ns)
-            )
-            section_cache.content[pkg.name] = f"{stat.st_size}|{stat.st_mtime_ns}"
-
         for section in CacheUtils._SECTIONS:
-            section_name = section.name
             section_path = section.path
+
             if not section_path.exists():
                 continue
+
             for pkg_path in section_path.iterdir():
-                add_pkg(section_name, pkg_path)
+                if not section.accepts(pkg_path):
+                    continue
+
+                try:
+                    stat = pkg_path.stat()
+
+                except OSError as exc:
+                    LogUtils.log_warn(
+                        f"Failed to stat {pkg_path.name}: {exc}",
+                        LogModule.CACHE_UTIL,
+                    )
+                    continue
+
+                section_cache = cache[section.name]
+                section_cache.meta.count += 1
+                section_cache.meta.total_size += int(stat.st_size)
+                section_cache.meta.latest_mtime = max(
+                    section_cache.meta.latest_mtime, int(stat.st_mtime_ns)
+                )
+                section_cache.content[pkg_path.name] = (
+                    f"{stat.st_size}|{stat.st_mtime_ns}"
+                )
 
         store_cache_path.parent.mkdir(parents=True, exist_ok=True)
         store_cache_path.write_text(
