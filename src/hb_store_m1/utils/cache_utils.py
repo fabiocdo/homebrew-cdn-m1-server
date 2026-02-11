@@ -99,6 +99,13 @@ class CacheUtils:
             for pkg_path in section_path.iterdir():
                 add_pkg(section, pkg_path)
 
+        totals = []
+        for section in CacheUtils._SECTIONS:
+            meta = cache[section]["meta"]
+            count = meta.get("count", 0) if isinstance(meta, dict) else 0
+            totals.append(f"{section}={count}")
+        LogUtils.log_info("Cache scan totals: " + " | ".join(totals))
+
         store_cache_path.parent.mkdir(parents=True, exist_ok=True)
         store_cache_path.write_text(
             json.dumps(cache, ensure_ascii=True, indent=2, sort_keys=True) + "\n",

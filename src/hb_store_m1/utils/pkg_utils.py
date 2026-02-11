@@ -48,7 +48,33 @@ class PkgUtils:
         scanned_pkgs = list(
             Path(Globals.PATHS.PKG_DIR_PATH).rglob("*.pkg", case_sensitive=False)
         )
-        LogUtils.log_info(f"Scanned {len(scanned_pkgs)} packages", LogModule.PKG_UTIL)
+
+        pkg_dir = Path(Globals.PATHS.PKG_DIR_PATH)
+        section_paths = {
+            "pkg_root": pkg_dir,
+            "app": Globals.PATHS.APP_DIR_PATH,
+            "dlc": Globals.PATHS.DLC_DIR_PATH,
+            "game": Globals.PATHS.GAME_DIR_PATH,
+            "save": Globals.PATHS.SAVE_DIR_PATH,
+            "unknown": Globals.PATHS.UNKNOWN_DIR_PATH,
+            "update": Globals.PATHS.UPDATE_DIR_PATH,
+        }
+        counts = {name: 0 for name in section_paths}
+        for pkg_path in scanned_pkgs:
+            if pkg_path.parent == pkg_dir:
+                counts["pkg_root"] += 1
+                continue
+            for name, section_path in section_paths.items():
+                if name == "pkg_root":
+                    continue
+                if pkg_path.is_relative_to(section_path):
+                    counts[name] += 1
+                    break
+        LogUtils.log_info(
+            f"Scanned {len(scanned_pkgs)} PKGs. "
+            + ", ".join(f"{name.upper()}: {count}" for name, count in counts.items()),
+            LogModule.PKG_UTIL,
+        )
 
         return scanned_pkgs
 
