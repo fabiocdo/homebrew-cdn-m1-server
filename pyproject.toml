@@ -5,6 +5,8 @@ requires-python = ">=3.12"
 dependencies = [
     "PyGithub",
     "pydantic",
+    "pytest",
+    "pytest-cov",
     "tabulate",
 ]
 

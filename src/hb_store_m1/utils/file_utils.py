@@ -6,6 +6,19 @@ from hb_store_m1.utils.log_utils import LogUtils
 
 class FileUtils:
     @staticmethod
+    def optimize_png(
+        path: Path,
+        module: LogModule | None = None,
+    ) -> bool:
+        if not path.exists():
+            return False
+        LogUtils.log_debug(
+            f"PNG optimize skipped for {path.name}. No lossless compressor available.",
+            module,
+        )
+        return False
+
+    @staticmethod
     def move(
         path: Path,
         target_path: Path,

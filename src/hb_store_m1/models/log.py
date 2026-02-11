@@ -1,4 +1,4 @@
-from enum import Enum, StrEnum, unique
+from enum import Enum, StrEnum
 
 
 class LogColor(StrEnum):
