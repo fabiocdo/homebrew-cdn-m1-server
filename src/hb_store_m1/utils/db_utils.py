@@ -20,7 +20,11 @@ class DBUtils:
     def select_by_content_ids(
         conn: sqlite3.Connection | None,
         content_ids: list[str],
-    ) -> list:
+    ) -> Output[list[dict[str, object]]]:
+
+        store_db_file_path = Globals.FILES.STORE_DB_FILE_PATH
+        if not store_db_file_path.exists():
+            InitUtils.init_db()
 
         if not conn:
             conn = sqlite3.connect(Globals.FILES.STORE_DB_FILE_PATH)
@@ -39,7 +43,7 @@ class DBUtils:
         cursor.execute(query, content_ids)
 
         rows = [dict(row) for row in cursor.fetchall()]
-        return rows
+        return Output(Status.OK, rows)
 
     @staticmethod
     def generate_hash_md5(values_by_column: dict[str, object]) -> str:
@@ -54,20 +58,22 @@ class DBUtils:
         return hashlib.md5(payload).hexdigest()
 
     @staticmethod
-    def upsert(pkgs: list[PKG]) -> Output:
+    def upsert(conn: sqlite3.Connection | None, pkgs: list[PKG]) -> Output:
 
         store_db_file_path = Globals.FILES.STORE_DB_FILE_PATH
-
         if not store_db_file_path.exists():
             InitUtils.init_db()
+
+        if not conn:
+            conn = sqlite3.connect(Globals.FILES.STORE_DB_FILE_PATH)
+
+        conn.row_factory = sqlite3.Row
 
         if not pkgs:
             return Output(Status.SKIP, "Nothing to upsert")
 
-        conn = sqlite3.connect(str(store_db_file_path))
-        conn.row_factory = sqlite3.Row
         content_ids = [pkg.content_id for pkg in pkgs if pkg.content_id]
-        existing_rows_by_id = DBUtils.select_by_content_ids(conn, content_ids)
+        existing_rows_by_id = DBUtils.select_by_content_ids(conn, content_ids).content
 
         log.log_info(f"Attempting to upsert {len(pkgs)} PKGs in STORE.DB...")
         try:
