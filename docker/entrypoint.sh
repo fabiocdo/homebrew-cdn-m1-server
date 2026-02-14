@@ -19,23 +19,13 @@ ENABLE_TLS=false
 # Logging verbosity (debug | info | warn | error). Value type: string.
 LOG_LEVEL=info
 
-# CDN Automation
+# Watcher
 # Operates scanning/sorting/indexing when true. Value type: boolean.
 WATCHER_ENABLED=true
 # Interval in seconds between directory scans. Value type: integer.
 WATCHER_PERIODIC_SCAN_SECONDS=30
-# Number of PKGs processed per batch; larger values reduce scan frequency. Value type: integer.
-WATCHER_SCAN_BATCH_SIZE=50
-# Parallel workers handling planned PKG operations. Value type: integer.
-WATCHER_EXECUTOR_WORKERS=4
-# Parallel workers scanning PKGs for metadata changes. Value type: integer.
-WATCHER_SCAN_WORKERS=4
-# Tail nginx access.log (set false to skip). Value type: boolean.
-WATCHER_ACCESS_LOG_TAIL=true
-# Seconds between access-log tail outputs. Value type: integer.
-WATCHER_ACCESS_LOG_INTERVAL=5
-# Comma-separated list (DB | JSON); include `JSON` to write index.json and `DB` to update store.db. Value type: string list.
-AUTO_INDEXER_OUTPUT_FORMAT=DB,JSON
+# Enable FPKGI format output. Value type: boolean.
+FPGKI_FORMAT_ENABLED=false
 EOF
   echo "[info] Generated default settings.env at $SETTINGS_FILE"
 fi
@@ -52,13 +42,16 @@ fi
 : "${SERVER_IP:=0.0.0.0}"
 : "${SERVER_PORT:=80}"
 : "${ENABLE_TLS:=false}"
+: "${LOG_LEVEL:=info}"
+: "${WATCHER_ENABLED:=true}"
+: "${WATCHER_PERIODIC_SCAN_SECONDS:=30}"
+: "${FPGKI_FORMAT_ENABLED:=false}"
 
-TLS_DIR="${TLS_DIR:-$CONFIG_DIR/certs}"
-: "${TLS_CRT:=${TLS_DIR}/tls.crt}"
-: "${TLS_KEY:=${TLS_DIR}/tls.key}"
+TLS_DIR="$CONFIG_DIR/certs"
+TLS_CRT="${TLS_DIR}/tls.crt"
+TLS_KEY="${TLS_DIR}/tls.key"
 
-: "${INIT_DB_SQL:=/app/init/store_db.sql}"
-: "${INIT_TEMPLATE_JSON:=/app/init/template.json}"
+INIT_DB_SQL="/app/init/store_db.sql"
 
 set +a
 

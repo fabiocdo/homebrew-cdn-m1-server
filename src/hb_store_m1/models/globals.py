@@ -127,9 +127,7 @@ class _GlobalEnvs:
         self.WATCHER_PERIODIC_SCAN_SECONDS: int = _env(
             "WATCHER_PERIODIC_SCAN_SECONDS", 30, int
         )
-        self.AUTO_INDEXER_OUTPUT_FORMAT: list[str] = _env(
-            "AUTO_INDEXER_OUTPUT_FORMAT", ["DB", "JSON"], list
-        )
+        self.FPGKI_FORMAT_ENABLED: bool = _env("FPGKI_FORMAT_ENABLED", False, bool)
 
     @property
     def APP_NAME(self) -> str:

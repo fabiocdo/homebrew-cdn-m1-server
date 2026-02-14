@@ -66,7 +66,7 @@ services:
 | `ENABLE_TLS`                    | Serve Nginx via TLS/HTTPS when `true`; otherwise HTTP only. Controls the `SERVER_URL` scheme. | `false`     |
 | `WATCHER_ENABLED`               | Master switch for watcher-driven automation.                                                  | `true`      |
 | `WATCHER_PERIODIC_SCAN_SECONDS` | Periodic scan interval in seconds.                                                            | `30`        |
-| `AUTO_INDEXER_OUTPUT_FORMAT`    | Output targets: `DB`, `JSON` (comma-separated).                                               | `db,json`   |
+| `FPGKI_FORMAT_ENABLED`          | Enable FPKGI format output.                                                                   | `false`     |
 
 Notes:
 
@@ -74,7 +74,7 @@ Notes:
   `SERVER_*`, the TLS toggle (`ENABLE_TLS`), `LOG_LEVEL`, or watcher/index behavior; you can still layer extra `-e` /
   `--env-file` overrides when you run the container.
 - `WATCHER_ENABLED=false` stops all automation.
-- `AUTO_INDEXER_OUTPUT_FORMAT` controls output: include `JSON` to write `index.json`, include `DB` to update `store.db`.
+- Store DB is always updated.
 - When `ENABLE_TLS=true`, drop TLS certificates under `configs/certs/` so the entrypoint can configure HTTPS.
 - `SERVER_IP` should be just the host (or host:port) without `http://` or `https://`.
 - Ensure `SERVER_IP` matches the host/port used by clients, and toggle `ENABLE_TLS` to select TLS vs HTTP.
@@ -126,7 +126,7 @@ Notes:
 
 - PKGs placed in `pkg/` are formatted and sorted, but only indexed once under a category folder.
 - Files under `_error/` are not indexed.
-- `index.json` is written only when `AUTO_INDEXER_OUTPUT_FORMAT` includes `JSON`.
+- `index.json` is written when enabled by a future toggle (not implemented yet).
 - Update assets are downloaded from the official PS4-Store releases if missing:
     - Required: `homebrew.elf`, `homebrew.elf.sig`, `remote.md5`
     - Optional (if present in the release): `store.prx`, `store.prx.sig`
@@ -175,7 +175,6 @@ Example payload:
 ### Auto Indexer (`src/modules/auto_indexer.py`)
 
 - Writes `index.json` and updates `store.db` based on the current plan.
-- Uses `AUTO_INDEXER_OUTPUT_FORMAT` to decide which outputs to write.
 - Builds URLs using `SERVER_IP` and the TLS toggle (`ENABLE_TLS`) and percent-encodes path segments.
 
 ## Helpers

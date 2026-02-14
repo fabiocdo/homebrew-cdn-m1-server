@@ -25,7 +25,7 @@ def welcome():
         ("LOG_LEVEL", Globals.ENVS.LOG_LEVEL),
         ("WATCHER_ENABLED", Globals.ENVS.WATCHER_ENABLED),
         ("WATCHER_PERIODIC_SCAN_SECONDS", Globals.ENVS.WATCHER_PERIODIC_SCAN_SECONDS),
-        ("AUTO_INDEXER_OUTPUT_FORMAT", Globals.ENVS.AUTO_INDEXER_OUTPUT_FORMAT),
+        ("FPGKI_FORMAT_ENABLED", Globals.ENVS.FPGKI_FORMAT_ENABLED),
     ]
     for key, value in items:
         if isinstance(value, list):
