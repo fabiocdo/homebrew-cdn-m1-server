@@ -25,6 +25,9 @@ def _generate_row_md5(values_by_column: dict[str, object]) -> str:
 
 
 def _generate_upsert_params(pkg: PKG) -> dict[str, object]:
+    app_type_raw = str(pkg.app_type or "")
+    app_type_label = URLUtils.to_client_app_type(app_type_raw)
+
     row = {
         "content_id": pkg.content_id,
         "id": pkg.title_id,
@@ -34,7 +37,7 @@ def _generate_upsert_params(pkg: PKG) -> dict[str, object]:
             pkg.content_id, "icon0", pkg.icon0_png_path
         ),
         "package": URLUtils.canonical_pkg_url(
-            pkg.content_id, str(pkg.app_type), pkg.pkg_path
+            pkg.content_id, app_type_raw, pkg.pkg_path
         ),
         "version": pkg.version,
         "picpath": None,
@@ -43,7 +46,7 @@ def _generate_upsert_params(pkg: PKG) -> dict[str, object]:
         "ReviewStars": None,
         "Size": pkg.pkg_path.stat().st_size,
         "Author": None,
-        "apptype": pkg.app_type,
+        "apptype": app_type_label,
         "pv": None,
         "main_icon_path": (
             URLUtils.canonical_media_url(pkg.content_id, "pic0", pkg.pic0_png_path)
@@ -228,13 +231,15 @@ class DBUtils:
                 current = dict(row)
                 content_id = current.get(StoreDB.Column.CONTENT_ID.value)
                 app_type = current.get(StoreDB.Column.APP_TYPE.value)
+                app_type_label = URLUtils.to_client_app_type(str(app_type or ""))
 
                 updated = dict(current)
                 updated[StoreDB.Column.PACKAGE.value] = URLUtils.canonical_pkg_url(
                     str(content_id or ""),
-                    str(app_type or ""),
+                    app_type_label,
                     current.get(StoreDB.Column.PACKAGE.value),
                 )
+                updated[StoreDB.Column.APP_TYPE.value] = app_type_label
                 updated[StoreDB.Column.IMAGE.value] = URLUtils.to_public_url(
                     current.get(StoreDB.Column.IMAGE.value)
                 )
@@ -263,6 +268,8 @@ class DBUtils:
                     == current.get(StoreDB.Column.MAIN_ICON_PATH.value)
                     and updated[StoreDB.Column.MAIN_MENU_PIC.value]
                     == current.get(StoreDB.Column.MAIN_MENU_PIC.value)
+                    and updated[StoreDB.Column.APP_TYPE.value]
+                    == current.get(StoreDB.Column.APP_TYPE.value)
                     and updated[StoreDB.Column.ROW_MD5.value]
                     == current.get(StoreDB.Column.ROW_MD5.value)
                 ):
@@ -276,6 +283,7 @@ class DBUtils:
                         image = ?,
                         main_icon_path = ?,
                         main_menu_pic = ?,
+                        apptype = ?,
                         row_md5 = ?
                     WHERE pid = ?
                     """,
@@ -284,6 +292,7 @@ class DBUtils:
                         updated[StoreDB.Column.IMAGE.value],
                         updated[StoreDB.Column.MAIN_ICON_PATH.value],
                         updated[StoreDB.Column.MAIN_MENU_PIC.value],
+                        updated[StoreDB.Column.APP_TYPE.value],
                         updated[StoreDB.Column.ROW_MD5.value],
                         current.get("pid"),
                     ),

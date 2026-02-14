@@ -110,10 +110,18 @@ class InitUtils:
         db_result = DBUtils.refresh_urls()
         if db_result.status is Status.ERROR:
             log.log_warn("Failed to refresh STORE.DB URLs at startup")
+        elif db_result.status is Status.OK:
+            log.log_info(f"STORE.DB URL sync applied ({db_result.content} rows)")
+        else:
+            log.log_debug("STORE.DB URLs already up to date")
 
         fpkgi_result = FPKGIUtils.refresh_urls()
         if fpkgi_result.status is Status.ERROR:
             log.log_warn("Failed to refresh FPKGI JSON URLs at startup")
+        elif fpkgi_result.status is Status.OK:
+            log.log_info(f"FPKGI JSON URL sync applied ({fpkgi_result.content} files)")
+        else:
+            log.log_debug("FPKGI JSON URLs already up to date")
 
 
 InitUtils = InitUtils()

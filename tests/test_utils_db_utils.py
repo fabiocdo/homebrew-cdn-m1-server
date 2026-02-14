@@ -86,7 +86,7 @@ def test_given_pkg_when_upsert_then_writes_cdn_urls_and_md5(init_paths, tmp_path
     conn = sqlite3.connect(str(Globals.FILES.STORE_DB_FILE_PATH))
     try:
         row = conn.execute(
-            "SELECT package, image, main_icon_path, main_menu_pic, row_md5 FROM homebrews"
+            "SELECT package, image, main_icon_path, main_menu_pic, row_md5, apptype FROM homebrews"
         ).fetchone()
     finally:
         conn.close()
@@ -112,6 +112,7 @@ def test_given_pkg_when_upsert_then_writes_cdn_urls_and_md5(init_paths, tmp_path
     assert row[2] == expected_pic0_url
     assert row[3] == expected_pic1_url
     assert row[4]
+    assert row[5] == "Game"
 
 
 def test_given_old_urls_when_refresh_urls_then_rewrites_base_and_pkg_path(init_paths):
@@ -167,7 +168,7 @@ def test_given_old_urls_when_refresh_urls_then_rewrites_base_and_pkg_path(init_p
 
     conn = sqlite3.connect(str(Globals.FILES.STORE_DB_FILE_PATH))
     row = conn.execute(
-        "SELECT package, image, main_icon_path, main_menu_pic, row_md5 FROM homebrews WHERE content_id = ?",
+        "SELECT package, image, main_icon_path, main_menu_pic, row_md5, apptype FROM homebrews WHERE content_id = ?",
         (content_id,),
     ).fetchone()
     conn.close()
@@ -184,6 +185,56 @@ def test_given_old_urls_when_refresh_urls_then_rewrites_base_and_pkg_path(init_p
         Globals.ENVS.SERVER_URL, f"/pkg/_media/{content_id}_pic1.png"
     )
     assert row[4] != "old-md5"
+    assert row[5] == "Game"
+
+
+def test_given_pkg_categories_when_upsert_then_maps_apptype_to_ps4_store_labels(
+    init_paths,
+):
+    init_sql = (
+        Path(__file__).resolve().parents[1] / "init" / "store_db.sql"
+    ).read_text("utf-8")
+    (init_paths.INIT_DIR_PATH / "store_db.sql").write_text(init_sql, encoding="utf-8")
+    InitUtils.init_db()
+
+    patch_pkg_path = init_paths.UPDATE_DIR_PATH / "patch.pkg"
+    patch_pkg_path.write_text("data", encoding="utf-8")
+    save_pkg_path = init_paths.UNKNOWN_DIR_PATH / "save.pkg"
+    save_pkg_path.write_text("data", encoding="utf-8")
+
+    patch_pkg = PKG(
+        title="Patch",
+        title_id="CUSA00002",
+        content_id="UP0000-TEST00002_00-TEST000000000002",
+        category="GP",
+        version="01.01",
+        pkg_path=patch_pkg_path,
+    )
+    save_pkg = PKG(
+        title="Save",
+        title_id="CUSA00003",
+        content_id="UP0000-TEST00003_00-TEST000000000003",
+        category="SD",
+        version="01.01",
+        pkg_path=save_pkg_path,
+    )
+
+    result = DBUtils.upsert([patch_pkg, save_pkg])
+    assert result.status is Status.OK
+
+    conn = sqlite3.connect(str(Globals.FILES.STORE_DB_FILE_PATH))
+    rows = conn.execute(
+        "SELECT content_id, apptype, package FROM homebrews WHERE content_id IN (?, ?)",
+        (patch_pkg.content_id, save_pkg.content_id),
+    ).fetchall()
+    conn.close()
+    by_content_id = {row[0]: row for row in rows}
+
+    assert by_content_id[patch_pkg.content_id][1] == "Patch"
+    assert by_content_id[patch_pkg.content_id][2] == urljoin(
+        Globals.ENVS.SERVER_URL, f"/pkg/update/{patch_pkg.content_id}.pkg"
+    )
+    assert by_content_id[save_pkg.content_id][1] == "Other"
 
 
 def test_given_existing_rows_when_select_content_ids_then_returns_values(init_paths):
