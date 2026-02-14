@@ -85,8 +85,7 @@ def test_given_unchanged_pkg_when_upsert_then_skips(init_paths):
     second = FPKGIUtils.upsert([pkg])
 
     assert first.status is Status.OK
-    assert second.status is Status.OK
-    assert second.content == 0
+    assert second.status is Status.SKIP
 
 
 def test_given_content_ids_when_delete_then_removes_entries(init_paths):

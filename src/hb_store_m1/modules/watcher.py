@@ -5,7 +5,6 @@ from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogModule
 from hb_store_m1.models.output import Output, Status
 from hb_store_m1.models.pkg.metadata.param_sfo import ParamSFOKey
-from hb_store_m1.models.pkg.pkg import AppType
 from hb_store_m1.models.pkg.pkg import PKG
 from hb_store_m1.models.pkg.section import Section
 from hb_store_m1.modules.auto_organizer import AutoOrganizer
@@ -62,10 +61,22 @@ class Watcher:
             if not Globals.ENVS.FPGKI_FORMAT_ENABLED:
                 log.log_info("No changes detected.")
                 return
+            cached = CacheUtils.read_pkg_cache().content or {}
+            sections_with_content = []
+            for section in Section.ALL:
+                if section.name == "_media":
+                    continue
+                section_cache = cached.get(section.name)
+                if section_cache and section_cache.content:
+                    sections_with_content.append(section.name)
+
+            if not sections_with_content:
+                log.log_info("No changes detected.")
+                return
 
             missing_fpkgi = False
-            for app_type in AppType:
-                json_path = Globals.PATHS.DATA_DIR_PATH / f"{app_type.value}.json"
+            for section_name in sections_with_content:
+                json_path = Globals.PATHS.DATA_DIR_PATH / f"{section_name}.json"
                 if not json_path.exists():
                     missing_fpkgi = True
                     break
@@ -74,7 +85,6 @@ class Watcher:
                 log.log_info("No changes detected.")
                 return
 
-            cached = CacheUtils.read_pkg_cache().content or {}
             current_files = {}
             section_by_name = {section.name: section for section in Section.ALL}
 
