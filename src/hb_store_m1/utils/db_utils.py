@@ -157,9 +157,12 @@ class DBUtils:
             conn.commit()
 
             skipped = len(pkgs) - len(upsert_params)
-            log.log_info(f"{len(upsert_params)} PKGs upserted successfully")
+
             if skipped:
-                log.log_debug(f"Skipped {skipped} unchanged PKGs")
+                log.log_info(f"Skipped {skipped} unchanged PKGs")
+                return Output(Status.SKIP, None)
+
+            log.log_info(f"{len(upsert_params)} PKGs upserted successfully")
             return Output(Status.OK, len(upsert_params))
 
         except Exception as e:

@@ -130,10 +130,11 @@ class FPKGIUtils:
                 _write_json(json_path, entries)
                 updated_total += updated_for_type
 
-        log.log_info(f"{updated_total} PKGs upserted successfully")
         if skipped_total:
-            log.log_debug(f"Skipped {skipped_total} unchanged PKGs")
+            log.log_info(f"Skipped {skipped_total} unchanged PKGs")
+            return Output(Status.SKIP, None)
 
+        log.log_info(f"{updated_total} PKGs upserted successfully")
         return Output(Status.OK, updated_total)
 
     @staticmethod
