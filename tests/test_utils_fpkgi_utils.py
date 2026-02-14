@@ -108,3 +108,114 @@ def test_given_content_ids_when_delete_then_removes_entries(init_paths):
 
     assert delete_result.status is Status.OK
     assert not game_data
+
+
+def test_given_no_pkgs_when_upsert_then_returns_skip():
+    result = FPKGIUtils.upsert([])
+
+    assert result.status is Status.SKIP
+
+
+def test_given_invalid_json_when_upsert_then_returns_error(init_paths):
+    pkg_path = init_paths.GAME_DIR_PATH / "game.pkg"
+    pkg_path.write_text("data", encoding="utf-8")
+    pkg = PKG(
+        title="Game Title",
+        title_id="CUSA00001",
+        content_id="UP0000-TEST00000_00-TEST000000000000",
+        category="GD",
+        version="01.00",
+        pkg_path=pkg_path,
+    )
+    (init_paths.DATA_DIR_PATH / "game.json").write_text("{bad", encoding="utf-8")
+
+    result = FPKGIUtils.upsert([pkg])
+
+    assert result.status is Status.ERROR
+
+
+def test_given_invalid_json_when_delete_then_returns_error(init_paths):
+    (init_paths.DATA_DIR_PATH / "game.json").write_text("{bad", encoding="utf-8")
+
+    result = FPKGIUtils.delete_by_content_ids(["UP0000-TEST00000_00-TEST000000000000"])
+
+    assert result.status is Status.ERROR
+
+
+def test_given_pkg_without_path_when_upsert_then_size_is_zero(init_paths):
+    pkg = PKG(
+        title="Game Title",
+        title_id="CUSA00001",
+        content_id="UP0000-TEST00000_00-TEST000000000000",
+        category="GD",
+        version="01.00",
+        pkg_path=None,
+    )
+
+    result = FPKGIUtils.upsert([pkg])
+    game_data = json.loads((init_paths.DATA_DIR_PATH / "game.json").read_text("utf-8"))
+
+    assert result.status is Status.OK
+    assert game_data[0][FPKGI.Column.SIZE.value] == 0
+
+
+def test_given_empty_ids_when_delete_then_returns_skip():
+    result = FPKGIUtils.delete_by_content_ids([])
+
+    assert result.status is Status.SKIP
+
+
+def test_given_existing_entry_when_upsert_then_replaces_in_place(init_paths):
+    content_id = "UP0000-TEST00000_00-TEST000000000000"
+    path = init_paths.DATA_DIR_PATH / "game.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    FPKGI.Column.ID.value: content_id,
+                    FPKGI.Column.NAME.value: "Old",
+                    FPKGI.Column.VERSION.value: "00.01",
+                    FPKGI.Column.PACKAGE.value: None,
+                    FPKGI.Column.SIZE.value: 1,
+                    FPKGI.Column.DESC.value: None,
+                    FPKGI.Column.ICON.value: None,
+                    FPKGI.Column.BG_IMAGE.value: None,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    pkg_path = init_paths.GAME_DIR_PATH / "game.pkg"
+    pkg_path.write_text("data", encoding="utf-8")
+    pkg = PKG(
+        title="New",
+        title_id="CUSA00001",
+        content_id=content_id,
+        category="GD",
+        version="01.00",
+        pkg_path=pkg_path,
+    )
+
+    result = FPKGIUtils.upsert([pkg])
+    data = json.loads(path.read_text("utf-8"))
+
+    assert result.status is Status.OK
+    assert len(data) == 1
+    assert data[0][FPKGI.Column.NAME.value] == "New"
+
+
+def test_given_pkg_without_content_id_when_upsert_then_ignores_entry(init_paths):
+    pkg_path = init_paths.GAME_DIR_PATH / "game.pkg"
+    pkg_path.write_text("data", encoding="utf-8")
+    pkg = PKG(
+        title="No ID",
+        title_id="CUSA00001",
+        content_id="",
+        category="GD",
+        version="01.00",
+        pkg_path=pkg_path,
+    )
+
+    result = FPKGIUtils.upsert([pkg])
+
+    assert result.status in (Status.OK, Status.SKIP)

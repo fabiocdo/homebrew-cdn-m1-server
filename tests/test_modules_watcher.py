@@ -226,3 +226,82 @@ def test_given_missing_cache_when_run_cycle_then_removes_db_orphans(
     watcher._run_cycle()
 
     assert deleted["ids"] == ["DROP"]
+
+
+def test_given_media_without_suffix_when_content_id_from_media_then_returns_none():
+    watcher = Watcher()
+
+    assert watcher._content_id_from_media("plain.png") is None
+
+
+def test_given_short_cache_entry_when_filename_from_cache_entry_then_falls_back():
+    assert Watcher._filename_from_cache_entry("X", "1|2") == "X.pkg"
+
+
+def test_given_missing_section_path_when_file_map_from_disk_then_returns_empty(tmp_path):
+    section = type("Section", (), {"path": tmp_path / "missing", "accepts": lambda *_: True})()
+
+    assert Watcher._file_map_from_disk(section) == {}
+
+
+def test_given_scanned_changes_with_invalid_section_when_collect_scanned_pkgs_then_skips():
+    watcher = Watcher()
+    changes = type(
+        "Changes",
+        (),
+        {
+            "changed": ["_media", "invalid", "game"],
+            "added": {"game": []},
+            "updated": {"game": []},
+            "removed": {},
+            "current_files": {"game": {}},
+        },
+    )()
+
+    scanned = watcher._collect_scanned_pkgs(changes)
+
+    assert scanned == []
+
+
+def test_given_process_pkg_failures_when_process_pkg_then_returns_none(init_paths, monkeypatch):
+    watcher = Watcher()
+    pkg_path = init_paths.GAME_DIR_PATH / "sample.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+
+    monkeypatch.setattr(
+        watcher._pkg_utils, "validate", lambda _p: Output(Status.OK, _p)
+    )
+    monkeypatch.setattr(
+        watcher._pkg_utils, "extract_pkg_data", lambda _p: Output(Status.ERROR, None)
+    )
+    assert watcher._process_pkg(pkg_path, {"game"}) is None
+
+    sfo = ParamSFO(
+        {
+            ParamSFOKey.TITLE: "t",
+            ParamSFOKey.TITLE_ID: "CUSA00001",
+            ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000",
+            ParamSFOKey.CATEGORY: "GD",
+            ParamSFOKey.VERSION: "01.00",
+            ParamSFOKey.PUBTOOLINFO: "",
+        }
+    )
+    monkeypatch.setattr(
+        watcher._pkg_utils, "extract_pkg_data", lambda _p: Output(Status.OK, sfo)
+    )
+    monkeypatch.setattr(watcher._auto_organizer, "run", lambda _pkg: None)
+    assert watcher._process_pkg(pkg_path, {"game"}) is None
+
+    monkeypatch.setattr(watcher._auto_organizer, "run", lambda _pkg: pkg_path)
+    monkeypatch.setattr(
+        watcher._pkg_utils, "extract_pkg_medias", lambda _p, _cid: Output(Status.ERROR, None)
+    )
+    assert watcher._process_pkg(pkg_path, {"game"}) is None
+
+    monkeypatch.setattr(
+        watcher._pkg_utils, "extract_pkg_medias", lambda _p, _cid: Output(Status.OK, {"icon": _p})
+    )
+    monkeypatch.setattr(
+        watcher._pkg_utils, "build_pkg", lambda _p, _sfo, _m: Output(Status.ERROR, None)
+    )
+    assert watcher._process_pkg(pkg_path, {"game"}) is None
