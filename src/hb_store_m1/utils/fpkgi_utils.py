@@ -1,6 +1,8 @@
 import hashlib
 import json
+import re
 from pathlib import Path
+from urllib.parse import urljoin, urlparse
 
 from hb_store_m1.models.fpkgi import FPKGI
 from hb_store_m1.models.globals import Globals
@@ -14,6 +16,20 @@ log = LogUtils(LogModule.FPKGI_UTIL)
 
 
 class FPKGIUtils:
+    _CONTENT_ID_PATTERN = re.compile(
+        r"^[A-Z]{2}[A-Z0-9]{4}-[A-Z0-9]{9}_[0-9]{2}-[A-Z0-9]{16}$"
+    )
+    _RELEASE_DATE_PATTERN = re.compile(
+        r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})$"
+    )
+    _REGION_BY_PREFIX = {
+        "UP": "USA",
+        "EP": "EUR",
+        "JP": "JAP",
+        "HP": "ASIA",
+        "AP": "ASIA",
+        "KP": "ASIA",
+    }
     _JSON_STEM_BY_APP_TYPE = {
         "app": "APPS",
         "demo": "DEMOS",
@@ -57,22 +73,25 @@ class FPKGIUtils:
     @staticmethod
     def _read_entries_for_app_type(
         app_type: str,
-    ) -> tuple[Path, Path, list[dict[str, object]] | None, bool]:
+    ) -> tuple[Path, Path, dict[str, dict[str, object]] | None, bool]:
         json_path = FPKGIUtils._json_path(app_type)
         legacy_path = FPKGIUtils._legacy_json_path(app_type)
+        has_legacy_file = legacy_path.exists() and legacy_path != json_path
 
         if json_path.exists():
-            return json_path, legacy_path, FPKGIUtils._read_json(json_path), False
+            entries, migrated = FPKGIUtils._read_json(json_path, app_type)
+            return json_path, legacy_path, entries, (migrated or has_legacy_file)
 
         if legacy_path.exists():
+            entries, migrated = FPKGIUtils._read_json(legacy_path, app_type)
             return (
                 json_path,
                 legacy_path,
-                FPKGIUtils._read_json(legacy_path),
-                legacy_path != json_path,
+                entries,
+                migrated or (legacy_path != json_path),
             )
 
-        return json_path, legacy_path, [], False
+        return json_path, legacy_path, {}, False
 
     @staticmethod
     def _cleanup_legacy_json(json_path: Path, legacy_path: Path) -> None:
@@ -94,10 +113,113 @@ class FPKGIUtils:
         return hashlib.md5(payload).hexdigest()
 
     @staticmethod
-    def _path_url(path: Path | None) -> str | None:
+    def _string_or_none(value: object) -> str | None:
+        if value is None:
+            return None
+        text = str(value).strip()
+        return text or None
+
+    @staticmethod
+    def _to_int(value: object, default: int = 0) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _normalize_region(value: object) -> str | None:
+        region = FPKGIUtils._string_or_none(value)
+        if not region:
+            return None
+        region_upper = region.upper()
+        if region_upper in {"USA", "EUR", "JAP", "ASIA"}:
+            return region_upper
+        return None
+
+    @staticmethod
+    def _normalize_release(value: object) -> str | None:
+        text = FPKGIUtils._string_or_none(value)
+        if not text:
+            return None
+        match = FPKGIUtils._RELEASE_DATE_PATTERN.match(text)
+        if not match:
+            return text
+        return f"{match.group('month')}-{match.group('day')}-{match.group('year')}"
+
+    @staticmethod
+    def _normalize_metadata(values: dict[str, object]) -> dict[str, object]:
+        return {
+            FPKGI.Column.TITLE_ID.value: FPKGIUtils._string_or_none(
+                values.get(FPKGI.Column.TITLE_ID.value)
+            ),
+            FPKGI.Column.REGION.value: FPKGIUtils._normalize_region(
+                values.get(FPKGI.Column.REGION.value)
+            ),
+            FPKGI.Column.NAME.value: FPKGIUtils._string_or_none(
+                values.get(FPKGI.Column.NAME.value)
+            ),
+            FPKGI.Column.VERSION.value: FPKGIUtils._string_or_none(
+                values.get(FPKGI.Column.VERSION.value)
+            ),
+            FPKGI.Column.RELEASE.value: FPKGIUtils._string_or_none(
+                values.get(FPKGI.Column.RELEASE.value)
+            ),
+            FPKGI.Column.SIZE.value: FPKGIUtils._to_int(
+                values.get(FPKGI.Column.SIZE.value), 0
+            ),
+            FPKGI.Column.MIN_FW.value: FPKGIUtils._string_or_none(
+                values.get(FPKGI.Column.MIN_FW.value)
+            ),
+            FPKGI.Column.COVER_URL.value: FPKGIUtils._string_or_none(
+                values.get(FPKGI.Column.COVER_URL.value)
+            ),
+        }
+
+    @staticmethod
+    def _content_id_from_pkg_url(pkg_url: str | None) -> str | None:
+        raw = str(pkg_url or "").strip()
+        if not raw:
+            return None
+        parsed = urlparse(raw)
+        path = parsed.path or raw
+        filename = Path(path).name
+        if not filename.lower().endswith(".pkg"):
+            return None
+        content_id = filename[:-4].upper()
+        if not FPKGIUtils._CONTENT_ID_PATTERN.match(content_id):
+            return None
+        return content_id
+
+    @staticmethod
+    def _region_from_content_id(content_id: str | None) -> str | None:
+        content = str(content_id or "").strip().upper()
+        if len(content) < 2:
+            return None
+        return FPKGIUtils._REGION_BY_PREFIX.get(content[:2])
+
+    @staticmethod
+    def _rewrite_public_url(value: object) -> str | None:
+        raw = FPKGIUtils._string_or_none(value)
+        if not raw:
+            return None
+
+        parsed = urlparse(raw)
+        path = parsed.path if (parsed.scheme or parsed.netloc) else raw
+        path = path.replace("\\", "/").strip()
         if not path:
             return None
-        return URLUtils.to_public_url(path)
+
+        if path.startswith("/app/data/pkg/"):
+            public_path = path.replace("/app/data", "", 1)
+        else:
+            pkg_idx = path.find("/pkg/")
+            if pkg_idx < 0:
+                return raw
+            public_path = path[pkg_idx:]
+
+        if not public_path.startswith("/"):
+            public_path = f"/{public_path}"
+        return urljoin(Globals.ENVS.SERVER_URL, public_path)
 
     @staticmethod
     def _pkg_size(pkg: PKG) -> int:
@@ -111,47 +233,125 @@ class FPKGIUtils:
             return 0
 
     @staticmethod
-    def _read_json(path: Path) -> list[dict[str, object]] | None:
+    def _legacy_entries_to_data(
+        app_type: str, legacy_entries: list[dict[str, object]]
+    ) -> dict[str, dict[str, object]]:
+        data_entries: dict[str, dict[str, object]] = {}
+        for legacy_entry in legacy_entries:
+            if not isinstance(legacy_entry, dict):
+                continue
+
+            content_id = str(
+                legacy_entry.get(FPKGI.LegacyColumn.ID.value) or ""
+            ).strip().upper()
+            package_url = URLUtils.canonical_pkg_url(
+                content_id,
+                app_type,
+                legacy_entry.get(FPKGI.LegacyColumn.PACKAGE.value),
+            )
+            if not package_url:
+                continue
+
+            data_entries[package_url] = {
+                FPKGI.Column.TITLE_ID.value: None,
+                FPKGI.Column.REGION.value: FPKGIUtils._region_from_content_id(content_id),
+                FPKGI.Column.NAME.value: FPKGIUtils._string_or_none(
+                    legacy_entry.get(FPKGI.LegacyColumn.NAME.value)
+                ),
+                FPKGI.Column.VERSION.value: FPKGIUtils._string_or_none(
+                    legacy_entry.get(FPKGI.LegacyColumn.VERSION.value)
+                ),
+                FPKGI.Column.RELEASE.value: None,
+                FPKGI.Column.SIZE.value: FPKGIUtils._to_int(
+                    legacy_entry.get(FPKGI.LegacyColumn.SIZE.value), 0
+                ),
+                FPKGI.Column.MIN_FW.value: None,
+                FPKGI.Column.COVER_URL.value: URLUtils.canonical_media_url(
+                    content_id,
+                    "icon0",
+                    legacy_entry.get(FPKGI.LegacyColumn.ICON.value),
+                )
+                or FPKGIUtils._rewrite_public_url(
+                    legacy_entry.get(FPKGI.LegacyColumn.ICON.value)
+                ),
+            }
+        return data_entries
+
+    @staticmethod
+    def _read_json(
+        path: Path, app_type: str
+    ) -> tuple[dict[str, dict[str, object]] | None, bool]:
         if not path.exists():
-            return []
+            return {}, False
         try:
             data = json.loads(path.read_text("utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             log.log_error(f"Failed to read {path.name}: {exc}")
-            return None
-        if not isinstance(data, list):
-            log.log_error(f"Invalid {path.name}. Expected a JSON list")
-            return None
-        return data
+            return None, False
+
+        if isinstance(data, list):
+            return FPKGIUtils._legacy_entries_to_data(app_type, data), True
+
+        if isinstance(data, dict):
+            if FPKGI.Root.DATA.value in data:
+                raw_entries = data.get(FPKGI.Root.DATA.value)
+                if not isinstance(raw_entries, dict):
+                    log.log_error(f"Invalid {path.name}. Expected DATA as object")
+                    return None, False
+                normalized: dict[str, dict[str, object]] = {}
+                for pkg_url, metadata in raw_entries.items():
+                    pkg_url_text = str(pkg_url).strip()
+                    if not pkg_url_text or not isinstance(metadata, dict):
+                        continue
+                    normalized[pkg_url_text] = FPKGIUtils._normalize_metadata(metadata)
+                return normalized, False
+
+            if all(isinstance(value, dict) for value in data.values()):
+                normalized = {
+                    str(pkg_url).strip(): FPKGIUtils._normalize_metadata(metadata)
+                    for pkg_url, metadata in data.items()
+                    if str(pkg_url).strip()
+                }
+                return normalized, True
+
+        log.log_error(f"Invalid {path.name}. Expected FPKGi JSON object")
+        return None, False
 
     @staticmethod
-    def _write_json(path: Path, entries: list[dict[str, object]]) -> None:
+    def _write_json(path: Path, entries: dict[str, dict[str, object]]) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            FPKGI.Root.DATA.value: {
+                pkg_url: entries[pkg_url] for pkg_url in sorted(entries.keys())
+            }
+        }
         path.write_text(
-            json.dumps(entries, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+            json.dumps(payload, ensure_ascii=True, indent=2) + "\n",
             encoding="utf-8",
         )
 
     @staticmethod
-    def _entry_from_pkg(pkg: PKG) -> dict[str, object]:
-        return {
-            FPKGI.Column.ID.value: pkg.content_id,
-            FPKGI.Column.NAME.value: pkg.title,
-            FPKGI.Column.VERSION.value: pkg.version,
-            FPKGI.Column.PACKAGE.value: URLUtils.canonical_pkg_url(
-                pkg.content_id, str(pkg.app_type), pkg.pkg_path
-            ),
+    def _entry_from_pkg(pkg: PKG) -> tuple[str, dict[str, object]] | None:
+        app_type = str(pkg.app_type) if pkg.app_type else "unknown"
+        content_id = str(pkg.content_id or "").strip().upper()
+        package_url = URLUtils.canonical_pkg_url(content_id, app_type, pkg.pkg_path)
+        if not package_url:
+            return None
+
+        region = pkg.region.value if pkg.region and pkg.region.value != "UNKNOWN" else None
+        metadata = {
+            FPKGI.Column.TITLE_ID.value: FPKGIUtils._string_or_none(pkg.title_id),
+            FPKGI.Column.REGION.value: region,
+            FPKGI.Column.NAME.value: FPKGIUtils._string_or_none(pkg.title),
+            FPKGI.Column.VERSION.value: FPKGIUtils._string_or_none(pkg.version),
+            FPKGI.Column.RELEASE.value: FPKGIUtils._normalize_release(pkg.release_date),
             FPKGI.Column.SIZE.value: FPKGIUtils._pkg_size(pkg),
-            FPKGI.Column.DESC.value: None,
-            FPKGI.Column.ICON.value: URLUtils.canonical_media_url(
-                pkg.content_id, "icon0", pkg.icon0_png_path
-            ),
-            FPKGI.Column.BG_IMAGE.value: (
-                URLUtils.canonical_media_url(pkg.content_id, "pic1", pkg.pic1_png_path)
-                if pkg.pic1_png_path
-                else None
+            FPKGI.Column.MIN_FW.value: None,
+            FPKGI.Column.COVER_URL.value: URLUtils.canonical_media_url(
+                content_id, "icon0", pkg.icon0_png_path
             ),
         }
+        return package_url, metadata
 
     @staticmethod
     def _app_type_names() -> list[str]:
@@ -171,18 +371,16 @@ class FPKGIUtils:
         return pkgs_by_type
 
     @staticmethod
-    def _entry_indexes(
-        entries: list[dict[str, object]],
-    ) -> tuple[dict[str, int], dict[str, str]]:
-        index_by_id: dict[str, int] = {}
-        hash_by_id: dict[str, str] = {}
-        for idx, entry in enumerate(entries):
-            entry_id = entry.get(FPKGI.Column.ID.value)
-            if not entry_id:
+    def _urls_by_content_id(
+        entries: dict[str, dict[str, object]],
+    ) -> dict[str, set[str]]:
+        by_content_id: dict[str, set[str]] = {}
+        for pkg_url in entries.keys():
+            content_id = FPKGIUtils._content_id_from_pkg_url(pkg_url)
+            if not content_id:
                 continue
-            index_by_id[entry_id] = idx
-            hash_by_id[entry_id] = FPKGIUtils._entry_md5(entry)
-        return index_by_id, hash_by_id
+            by_content_id.setdefault(content_id, set()).add(pkg_url)
+        return by_content_id
 
     @staticmethod
     def upsert(pkgs: list[PKG]) -> Output:
@@ -204,22 +402,40 @@ class FPKGIUtils:
             if entries is None:
                 return Output(Status.ERROR, "Failed to read FPKGI JSON")
 
-            index_by_id, hash_by_id = FPKGIUtils._entry_indexes(entries)
+            hash_by_url = {
+                pkg_url: FPKGIUtils._entry_md5(metadata)
+                for pkg_url, metadata in entries.items()
+            }
+            urls_by_content_id = FPKGIUtils._urls_by_content_id(entries)
 
             updated_for_type = 0
             for pkg in pkgs_for_type:
-                entry = FPKGIUtils._entry_from_pkg(pkg)
-                entry_id = entry.get(FPKGI.Column.ID.value)
-                if not entry_id:
+                pkg_entry = FPKGIUtils._entry_from_pkg(pkg)
+                if not pkg_entry:
                     continue
-                entry_hash = FPKGIUtils._entry_md5(entry)
-                if hash_by_id.get(entry_id) == entry_hash:
+
+                package_url, metadata = pkg_entry
+                content_id = FPKGIUtils._content_id_from_pkg_url(package_url)
+                if content_id:
+                    stale_urls = {
+                        stale_url
+                        for stale_url in urls_by_content_id.get(content_id, set())
+                        if stale_url != package_url
+                    }
+                    for stale_url in stale_urls:
+                        entries.pop(stale_url, None)
+                        hash_by_url.pop(stale_url, None)
+                        urls_by_content_id[content_id].discard(stale_url)
+
+                entry_hash = FPKGIUtils._entry_md5(metadata)
+                if hash_by_url.get(package_url) == entry_hash:
                     skipped_total += 1
                     continue
-                if entry_id in index_by_id:
-                    entries[index_by_id[entry_id]] = entry
-                else:
-                    entries.append(entry)
+
+                entries[package_url] = metadata
+                hash_by_url[package_url] = entry_hash
+                if content_id:
+                    urls_by_content_id.setdefault(content_id, set()).add(package_url)
                 updated_for_type += 1
 
             if updated_for_type or migrated:
@@ -258,11 +474,11 @@ class FPKGIUtils:
                     FPKGIUtils._cleanup_legacy_json(json_path, legacy_path)
                 continue
 
-            remaining = [
-                entry
-                for entry in entries
-                if entry.get(FPKGI.Column.ID.value) not in target_ids
-            ]
+            remaining = {
+                pkg_url: metadata
+                for pkg_url, metadata in entries.items()
+                if FPKGIUtils._content_id_from_pkg_url(pkg_url) not in target_ids
+            }
             removed = len(entries) - len(remaining)
             if removed or migrated:
                 FPKGIUtils._write_json(json_path, remaining)
@@ -291,32 +507,31 @@ class FPKGIUtils:
                 continue
 
             changed = migrated
-            for entry in entries:
-                content_id = str(entry.get(FPKGI.Column.ID.value) or "")
-
-                package_old = entry.get(FPKGI.Column.PACKAGE.value)
-                package_new = URLUtils.canonical_pkg_url(
-                    content_id, app_type, package_old
-                )
+            refreshed: dict[str, dict[str, object]] = {}
+            for package_old, metadata_old in entries.items():
+                content_id = FPKGIUtils._content_id_from_pkg_url(package_old)
+                package_new = URLUtils.canonical_pkg_url(content_id, app_type, package_old)
+                if package_new is None:
+                    package_new = package_old
                 if package_new != package_old:
-                    entry[FPKGI.Column.PACKAGE.value] = package_new
                     changed = True
 
-                icon_old = entry.get(FPKGI.Column.ICON.value)
-                icon_new = URLUtils.to_public_url(icon_old)
-                if icon_new != icon_old:
-                    entry[FPKGI.Column.ICON.value] = icon_new
+                metadata_new = FPKGIUtils._normalize_metadata(metadata_old)
+                if metadata_new != metadata_old:
                     changed = True
 
-                bg_old = entry.get(FPKGI.Column.BG_IMAGE.value)
-                if bg_old is not None:
-                    bg_new = URLUtils.to_public_url(bg_old)
-                    if bg_new != bg_old:
-                        entry[FPKGI.Column.BG_IMAGE.value] = bg_new
-                        changed = True
+                cover_old = metadata_new.get(FPKGI.Column.COVER_URL.value)
+                cover_new = FPKGIUtils._rewrite_public_url(cover_old)
+                if cover_new != cover_old:
+                    metadata_new[FPKGI.Column.COVER_URL.value] = cover_new
+                    changed = True
+
+                if package_new in refreshed and refreshed[package_new] != metadata_new:
+                    changed = True
+                refreshed[package_new] = metadata_new
 
             if changed:
-                FPKGIUtils._write_json(json_path, entries)
+                FPKGIUtils._write_json(json_path, refreshed)
                 FPKGIUtils._cleanup_legacy_json(json_path, legacy_path)
                 updated_total += 1
 

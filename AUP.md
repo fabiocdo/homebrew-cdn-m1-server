@@ -2,6 +2,12 @@
 
 This policy applies to use, distribution, and operation of this project.
 
+## Scope
+
+- This AUP is a project policy for official channels/resources (repository, issue tracker, docs, and maintainers' support surfaces).
+- It does not replace, override, or add restrictions to rights granted by `LICENSE` (GNU GPLv3).
+- If there is any conflict, `LICENSE` governs software copyright permissions.
+
 ## Allowed
 
 - Personal, educational, research, and community use.

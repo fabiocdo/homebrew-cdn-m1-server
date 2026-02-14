@@ -168,7 +168,7 @@ docker compose down
 | `LOG_LEVEL` | string | `info` | `debug`, `info`, `warn`, `error`. |
 | `WATCHER_ENABLED` | bool | `true` | Enable/disable watcher loop. |
 | `WATCHER_PERIODIC_SCAN_SECONDS` | int | `30` | Scan loop interval. |
-| `FPGKI_FORMAT_ENABLED` | bool | `false` | Generate/update per-type JSON output (`game.json`, etc.). |
+| `FPGKI_FORMAT_ENABLED` | bool | `false` | Generate/update per-type FPKGi JSON output (`GAMES.json`, `DLC.json`, etc.). |
 | `PKGTOOL_TIMEOUT_SECONDS` | int | `300` | Generic timeout for lightweight `pkgtool` commands. |
 | `PKGTOOL_VALIDATE_TIMEOUT_SECONDS` | int | `300` | Base timeout for `pkg_validate`. |
 | `PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS` | int | `45` | Extra timeout budget per GiB for `pkg_validate`. |
@@ -229,11 +229,12 @@ Port mapping note:
 |   |-- unknown/
 |   `-- _media/
 |-- store.db
-|-- dlc.json
-|-- game.json
-|-- save.json
-|-- update.json
-`-- unknown.json
+|-- APPS.json
+|-- DLC.json
+|-- GAMES.json
+|-- SAVES.json
+|-- UPDATES.json
+`-- UNKNOWN.json
 ```
 
 Important notes:
@@ -242,6 +243,10 @@ Important notes:
 - Cache generation is lightweight and does not call `pkgtool`; for new/changed files it uses filename stem as key.
 - After successful processing/normalization, keys converge to canonical `content_id` values.
 - `data/_errors` receives PKGs that fail validation/conflict/processing rules.
+- FPKGi JSON files are written as:
+  - root object with `DATA`
+  - keys as package URLs
+  - values with `title_id`, `region`, `name`, `version`, `release`, `size`, `min_fw`, `cover_url`
 
 ## PKG Processing Flow
 
@@ -312,7 +317,7 @@ From the `PKG` model:
 Project/client references:
 
 - PS4-Store client base reference: https://github.com/LightningMods/PS4-Store
-- fPKGi ecosystem/reference format: https://github.com/hippie68/fPKGi
+- FPKGi ecosystem/reference format: https://github.com/ItsJokerZz/FPKGi
 
 Core tooling/runtime references:
 
@@ -403,6 +408,6 @@ The app reads version from `pyproject.toml` when available, with fallback to ins
 
 ## License
 
-This project is licensed under MIT. See `LICENSE`.
+This project is licensed under GNU GPLv3. See `LICENSE`.
 
 Gentle request (non-binding): if you publish a fork or derivative, please keep credits to the original project and upstream references.
