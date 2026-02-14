@@ -3,6 +3,7 @@
 [![Coverage](https://img.shields.io/badge/coverage-%E2%89%A590%25-brightgreen)](https://github.com/fabiocdo/hb-store-m1)
 [![Docker Hub](https://img.shields.io/docker/v/fabiocdo/hb-store-m1?label=dockerhub&sort=semver)](https://hub.docker.com/repository/docker/fabiocdo/hb-store-m1)
 [![Docker Pulls](https://img.shields.io/docker/pulls/fabiocdo/hb-store-m1)](https://hub.docker.com/repository/docker/fabiocdo/hb-store-m1)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/V7V11U8HWX)
 
 Local CDN for PS4 Homebrew PKGs, with automatic organization, media extraction, SQLite indexing (`store.db`), and optional fPKGi JSON output.
 
@@ -24,6 +25,23 @@ This project is open source, built as a community utility, and maintained as a h
 - Feedback is welcome via issues/PRs on GitLab or GitHub.
 - GitLab issues: https://gitlab.com/fabiocdo/hb-store-m1/-/issues
 - GitHub issues: https://github.com/fabiocdo/hb-store-m1/issues
+
+## Legal and Safety
+
+This project provides software tooling only. It does not include proprietary game content.
+
+- Operators and users are fully responsible for legal use of their deployments.
+- Unauthorized hosting/distribution of copyrighted content is prohibited.
+- Abuse/IP infringement reports should follow `TAKEDOWN.md`.
+- Usage restrictions and prohibited behavior are documented in `AUP.md`.
+- Liability and legal scope are documented in `LEGAL.md`.
+- Maintainers act only on project-controlled resources/channels, not third-party self-hosted instances.
+
+Quick links:
+
+- `LEGAL.md`
+- `AUP.md`
+- `TAKEDOWN.md`
 
 ## Overview
 
