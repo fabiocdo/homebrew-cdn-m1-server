@@ -1,0 +1,12 @@
+services:
+  hb-store-m1:
+    build: .
+    image: fabiocdo/hb-store-m1:latest
+    container_name: hb-store-m1
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./data:/app/data
+      - ./configs:/app/configs
+    restart: unless-stopped

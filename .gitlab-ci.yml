@@ -1,13 +1,21 @@
 stages:
   - test
+  - mirror
   - build
   - publish
 
 variables:
-  DOCKER_IMAGE: "fabiocdo/homebrew-store-cdn"
+  DOCKER_IMAGE: "fabiocdo/hb-store-m1"
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: ""
+  DOCKER_BUILDKIT: "1"
   PYTHONUNBUFFERED: "1"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  key: "pip-${CI_PROJECT_PATH_SLUG}-${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .cache/pip
 
 test:
   image: python:3.12-slim
@@ -16,8 +24,39 @@ test:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
     - if: '$CI_COMMIT_BRANCH == "main"'
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
+  artifacts:
+    when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
   script:
-    - python -m unittest discover -s tests -p "test_*.py"
+    - python -m pip install -U pip
+    - python -m pip install .
+    - python -m pytest --cov=hb_store_m1 --cov-report=term-missing --cov-report=xml --cov-fail-under=90
+
+mirror_to_github:
+  image: alpine/git:2.47.2
+  stage: mirror
+  variables:
+    GIT_STRATEGY: none
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main" && $GITHUB_MIRROR_REPO && $GITHUB_MIRROR_USER && $GITHUB_MIRROR_TOKEN'
+  script:
+    - git clone --mirror "$CI_REPOSITORY_URL" repo.git
+    - cd repo.git
+    - git remote add github "https://github.com/${GITHUB_MIRROR_REPO}.git"
+    - |
+      cat > /tmp/askpass.sh <<'EOF'
+      #!/bin/sh
+      case "$1" in
+        *Username*) echo "$GITHUB_MIRROR_USER" ;;
+        *Password*) echo "$GITHUB_MIRROR_TOKEN" ;;
+      esac
+      EOF
+    - chmod 700 /tmp/askpass.sh
+    - GIT_ASKPASS=/tmp/askpass.sh GIT_TERMINAL_PROMPT=0 git push --mirror github
 
 build:
   image: docker:24
@@ -29,7 +68,22 @@ build:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
     - if: '$CI_COMMIT_BRANCH == "main"'
   script:
-    - docker build -t "$DOCKER_IMAGE:$CI_COMMIT_SHA" .
+    - |
+      if [ -n "${CI_REGISTRY:-}" ] && [ -n "${CI_REGISTRY_USER:-}" ] && [ -n "${CI_REGISTRY_PASSWORD:-}" ]; then
+        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY" || true
+      fi
+    - docker buildx create --name ci-builder --use || docker buildx use ci-builder
+    - |
+      CACHE_ARGS=""
+      if [ -n "${CI_REGISTRY_IMAGE:-}" ]; then
+        BRANCH_CACHE_REF="${CI_REGISTRY_IMAGE}:buildcache-${CI_COMMIT_REF_SLUG}"
+        MAIN_CACHE_REF="${CI_REGISTRY_IMAGE}:buildcache-main"
+        CACHE_ARGS="--cache-from type=registry,ref=${BRANCH_CACHE_REF} --cache-to type=registry,ref=${BRANCH_CACHE_REF},mode=max"
+        if [ "${CI_COMMIT_REF_SLUG}" != "main" ]; then
+          CACHE_ARGS="--cache-from type=registry,ref=${MAIN_CACHE_REF} ${CACHE_ARGS}"
+        fi
+      fi
+      docker buildx build $CACHE_ARGS -t "$DOCKER_IMAGE:$CI_COMMIT_SHA" --load .
     - docker save "$DOCKER_IMAGE:$CI_COMMIT_SHA" -o image.tar
   artifacts:
     paths:
