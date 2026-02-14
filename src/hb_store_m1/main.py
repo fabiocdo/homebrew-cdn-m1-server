@@ -48,6 +48,7 @@ def welcome():
 def main():
     welcome()
     InitUtils.init_all()
+    InitUtils.sync_runtime_urls()
     ensure_http_api_started()
     if Globals.ENVS.WATCHER_ENABLED:
         Watcher().start()

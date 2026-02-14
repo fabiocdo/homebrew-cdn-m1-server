@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from hb_store_m1.models.globals import Globals
+from hb_store_m1.models.output import Output, Status
 from hb_store_m1.utils.init_utils import InitUtils
 
 
@@ -58,3 +59,20 @@ def test_given_init_all_when_called_then_runs_all_init_steps(monkeypatch):
     InitUtils.init_all()
 
     assert called == {"dirs": 1, "db": 1, "assets": 1}
+
+
+def test_given_sync_runtime_urls_when_called_then_refreshes_db_and_json(monkeypatch):
+    called = {"db": 0, "json": 0}
+
+    monkeypatch.setattr(
+        "hb_store_m1.utils.db_utils.DBUtils.refresh_urls",
+        lambda: called.__setitem__("db", called["db"] + 1) or Output(Status.OK, 1),
+    )
+    monkeypatch.setattr(
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.refresh_urls",
+        lambda: called.__setitem__("json", called["json"] + 1) or Output(Status.OK, 1),
+    )
+
+    InitUtils.sync_runtime_urls()
+
+    assert called == {"db": 1, "json": 1}

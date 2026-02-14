@@ -1,7 +1,6 @@
 import hashlib
 import json
 from pathlib import Path
-from urllib.parse import urljoin
 
 from hb_store_m1.models.fpkgi import FPKGI
 from hb_store_m1.models.globals import Globals
@@ -9,6 +8,7 @@ from hb_store_m1.models.log import LogModule
 from hb_store_m1.models.output import Output, Status
 from hb_store_m1.models.pkg.pkg import PKG, AppType
 from hb_store_m1.utils.log_utils import LogUtils
+from hb_store_m1.utils.url_utils import URLUtils
 
 log = LogUtils(LogModule.FPKGI_UTIL)
 
@@ -32,7 +32,7 @@ class FPKGIUtils:
     def _path_url(path: Path | None) -> str | None:
         if not path:
             return None
-        return urljoin(Globals.ENVS.SERVER_URL, str(path))
+        return URLUtils.to_public_url(path)
 
     @staticmethod
     def _pkg_size(pkg: PKG) -> int:
@@ -73,11 +73,19 @@ class FPKGIUtils:
             FPKGI.Column.ID.value: pkg.content_id,
             FPKGI.Column.NAME.value: pkg.title,
             FPKGI.Column.VERSION.value: pkg.version,
-            FPKGI.Column.PACKAGE.value: FPKGIUtils._path_url(pkg.pkg_path),
+            FPKGI.Column.PACKAGE.value: URLUtils.canonical_pkg_url(
+                pkg.content_id, str(pkg.app_type), pkg.pkg_path
+            ),
             FPKGI.Column.SIZE.value: FPKGIUtils._pkg_size(pkg),
             FPKGI.Column.DESC.value: None,
-            FPKGI.Column.ICON.value: FPKGIUtils._path_url(pkg.icon0_png_path),
-            FPKGI.Column.BG_IMAGE.value: FPKGIUtils._path_url(pkg.pic1_png_path),
+            FPKGI.Column.ICON.value: URLUtils.canonical_media_url(
+                pkg.content_id, "icon0", pkg.icon0_png_path
+            ),
+            FPKGI.Column.BG_IMAGE.value: (
+                URLUtils.canonical_media_url(pkg.content_id, "pic1", pkg.pic1_png_path)
+                if pkg.pic1_png_path
+                else None
+            ),
         }
 
     @staticmethod
@@ -179,6 +187,51 @@ class FPKGIUtils:
 
         log.log_info(f"{deleted_total} PKGs deleted successfully")
         return Output(Status.OK, deleted_total)
+
+    @staticmethod
+    def refresh_urls() -> Output:
+        updated_total = 0
+        app_types = FPKGIUtils._app_type_names()
+
+        for app_type in app_types:
+            json_path = FPKGIUtils._json_path(app_type)
+            entries = FPKGIUtils._read_json(json_path)
+            if entries is None:
+                return Output(Status.ERROR, "Failed to read FPKGI JSON")
+            if not entries:
+                continue
+
+            changed = False
+            for entry in entries:
+                content_id = str(entry.get(FPKGI.Column.ID.value) or "")
+
+                package_old = entry.get(FPKGI.Column.PACKAGE.value)
+                package_new = URLUtils.canonical_pkg_url(content_id, app_type, package_old)
+                if package_new != package_old:
+                    entry[FPKGI.Column.PACKAGE.value] = package_new
+                    changed = True
+
+                icon_old = entry.get(FPKGI.Column.ICON.value)
+                icon_new = URLUtils.to_public_url(icon_old)
+                if icon_new != icon_old:
+                    entry[FPKGI.Column.ICON.value] = icon_new
+                    changed = True
+
+                bg_old = entry.get(FPKGI.Column.BG_IMAGE.value)
+                if bg_old is not None:
+                    bg_new = URLUtils.to_public_url(bg_old)
+                    if bg_new != bg_old:
+                        entry[FPKGI.Column.BG_IMAGE.value] = bg_new
+                        changed = True
+
+            if changed:
+                FPKGIUtils._write_json(json_path, entries)
+                updated_total += 1
+
+        if updated_total:
+            log.log_info(f"Refreshed URLs in {updated_total} FPKGI JSON files")
+            return Output(Status.OK, updated_total)
+        return Output(Status.SKIP, "URLs already up to date")
 
 
 FPKGIUtils = FPKGIUtils()

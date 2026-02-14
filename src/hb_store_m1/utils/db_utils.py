@@ -1,7 +1,6 @@
 import hashlib
 import json
 import sqlite3
-from urllib.parse import urljoin
 
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogModule
@@ -10,6 +9,7 @@ from hb_store_m1.models.pkg.pkg import PKG
 from hb_store_m1.models.storedb import StoreDB
 from hb_store_m1.utils.init_utils import InitUtils
 from hb_store_m1.utils.log_utils import LogUtils
+from hb_store_m1.utils.url_utils import URLUtils
 
 log = LogUtils(LogModule.DB_UTIL)
 
@@ -30,8 +30,8 @@ def _generate_upsert_params(pkg: PKG) -> dict[str, object]:
         "id": pkg.title_id,
         "name": pkg.title,
         "desc": None,
-        "image": urljoin(Globals.ENVS.SERVER_URL, str(pkg.icon0_png_path)),
-        "package": urljoin(Globals.ENVS.SERVER_URL, str(pkg.pkg_path)),
+        "image": URLUtils.canonical_media_url(pkg.content_id, "icon0", pkg.icon0_png_path),
+        "package": URLUtils.canonical_pkg_url(pkg.content_id, str(pkg.app_type), pkg.pkg_path),
         "version": pkg.version,
         "picpath": None,
         "desc_1": None,
@@ -42,12 +42,12 @@ def _generate_upsert_params(pkg: PKG) -> dict[str, object]:
         "apptype": pkg.app_type,
         "pv": None,
         "main_icon_path": (
-            urljoin(Globals.ENVS.SERVER_URL, str(pkg.pic0_png_path))
+            URLUtils.canonical_media_url(pkg.content_id, "pic0", pkg.pic0_png_path)
             if pkg.pic0_png_path
             else None
         ),
         "main_menu_pic": (
-            urljoin(Globals.ENVS.SERVER_URL, str(pkg.pic1_png_path))
+            URLUtils.canonical_media_url(pkg.content_id, "pic1", pkg.pic1_png_path)
             if pkg.pic1_png_path
             else None
         ),
@@ -208,6 +208,95 @@ class DBUtils:
         finally:
             if own_conn:
                 conn.close()
+
+    @staticmethod
+    def refresh_urls() -> Output:
+        store_db_file_path = Globals.FILES.STORE_DB_FILE_PATH
+        if not store_db_file_path.exists():
+            return Output(Status.NOT_FOUND, "STORE.DB not found")
+
+        conn = DBUtils._connect()
+        conn.row_factory = sqlite3.Row
+        try:
+            rows = conn.execute("SELECT * FROM homebrews").fetchall()
+            if not rows:
+                return Output(Status.SKIP, "Nothing to refresh")
+
+            conn.execute("BEGIN")
+            refreshed = 0
+            for row in rows:
+                current = dict(row)
+                content_id = current.get(StoreDB.Column.CONTENT_ID.value)
+                app_type = current.get(StoreDB.Column.APP_TYPE.value)
+
+                updated = dict(current)
+                updated[StoreDB.Column.PACKAGE.value] = URLUtils.canonical_pkg_url(
+                    str(content_id or ""),
+                    str(app_type or ""),
+                    current.get(StoreDB.Column.PACKAGE.value),
+                )
+                updated[StoreDB.Column.IMAGE.value] = URLUtils.to_public_url(
+                    current.get(StoreDB.Column.IMAGE.value)
+                )
+                updated[StoreDB.Column.MAIN_ICON_PATH.value] = (
+                    URLUtils.to_public_url(current.get(StoreDB.Column.MAIN_ICON_PATH.value))
+                    if current.get(StoreDB.Column.MAIN_ICON_PATH.value)
+                    else None
+                )
+                updated[StoreDB.Column.MAIN_MENU_PIC.value] = (
+                    URLUtils.to_public_url(current.get(StoreDB.Column.MAIN_MENU_PIC.value))
+                    if current.get(StoreDB.Column.MAIN_MENU_PIC.value)
+                    else None
+                )
+                updated[StoreDB.Column.ROW_MD5.value] = _generate_row_md5(updated)
+
+                if (
+                    updated[StoreDB.Column.PACKAGE.value]
+                    == current.get(StoreDB.Column.PACKAGE.value)
+                    and updated[StoreDB.Column.IMAGE.value]
+                    == current.get(StoreDB.Column.IMAGE.value)
+                    and updated[StoreDB.Column.MAIN_ICON_PATH.value]
+                    == current.get(StoreDB.Column.MAIN_ICON_PATH.value)
+                    and updated[StoreDB.Column.MAIN_MENU_PIC.value]
+                    == current.get(StoreDB.Column.MAIN_MENU_PIC.value)
+                    and updated[StoreDB.Column.ROW_MD5.value]
+                    == current.get(StoreDB.Column.ROW_MD5.value)
+                ):
+                    continue
+
+                conn.execute(
+                    """
+                    UPDATE homebrews
+                    SET
+                        package = ?,
+                        image = ?,
+                        main_icon_path = ?,
+                        main_menu_pic = ?,
+                        row_md5 = ?
+                    WHERE pid = ?
+                    """,
+                    (
+                        updated[StoreDB.Column.PACKAGE.value],
+                        updated[StoreDB.Column.IMAGE.value],
+                        updated[StoreDB.Column.MAIN_ICON_PATH.value],
+                        updated[StoreDB.Column.MAIN_MENU_PIC.value],
+                        updated[StoreDB.Column.ROW_MD5.value],
+                        current.get("pid"),
+                    ),
+                )
+                refreshed += 1
+
+            conn.commit()
+            if refreshed:
+                log.log_info(f"Refreshed URLs for {refreshed} rows in STORE.DB")
+                return Output(Status.OK, refreshed)
+            return Output(Status.SKIP, "URLs already up to date")
+        except Exception as e:
+            conn.rollback()
+            log.log_error(f"Failed to refresh URLs in STORE.DB: {e}")
+            return Output(Status.ERROR, 0)
+        finally:
+            conn.close()
 
     @staticmethod
     def delete_by_content_ids(content_ids: list[str]) -> Output:

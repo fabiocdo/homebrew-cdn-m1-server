@@ -19,10 +19,13 @@ def test_given_welcome_when_called_then_prints_banner_and_table(monkeypatch):
 
 
 def test_given_watcher_enabled_when_main_then_starts_watcher(monkeypatch):
-    called = {"welcome": 0, "init": 0, "api": 0, "start": 0}
+    called = {"welcome": 0, "init": 0, "sync": 0, "api": 0, "start": 0}
     monkeypatch.setattr(main_module, "welcome", lambda: called.__setitem__("welcome", 1))
     monkeypatch.setattr(
         main_module.InitUtils, "init_all", lambda: called.__setitem__("init", 1)
+    )
+    monkeypatch.setattr(
+        main_module.InitUtils, "sync_runtime_urls", lambda: called.__setitem__("sync", 1)
     )
     monkeypatch.setattr(
         main_module, "ensure_http_api_started", lambda: called.__setitem__("api", 1)
@@ -39,14 +42,17 @@ def test_given_watcher_enabled_when_main_then_starts_watcher(monkeypatch):
 
     main_module.main()
 
-    assert called == {"welcome": 1, "init": 1, "api": 1, "start": 1}
+    assert called == {"welcome": 1, "init": 1, "sync": 1, "api": 1, "start": 1}
 
 
 def test_given_watcher_disabled_when_main_then_logs_info(monkeypatch):
-    called = {"welcome": 0, "init": 0, "api": 0, "log": 0}
+    called = {"welcome": 0, "init": 0, "sync": 0, "api": 0, "log": 0}
     monkeypatch.setattr(main_module, "welcome", lambda: called.__setitem__("welcome", 1))
     monkeypatch.setattr(
         main_module.InitUtils, "init_all", lambda: called.__setitem__("init", 1)
+    )
+    monkeypatch.setattr(
+        main_module.InitUtils, "sync_runtime_urls", lambda: called.__setitem__("sync", 1)
     )
     monkeypatch.setattr(
         main_module, "ensure_http_api_started", lambda: called.__setitem__("api", 1)
@@ -66,7 +72,7 @@ def test_given_watcher_disabled_when_main_then_logs_info(monkeypatch):
 
     main_module.main()
 
-    assert called == {"welcome": 1, "init": 1, "api": 1, "log": 1}
+    assert called == {"welcome": 1, "init": 1, "sync": 1, "api": 1, "log": 1}
 
 
 def test_given_module_execution_when_run_main_dunder_then_calls_main(monkeypatch):

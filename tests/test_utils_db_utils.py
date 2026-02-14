@@ -9,7 +9,7 @@ from hb_store_m1.utils.db_utils import DBUtils
 from hb_store_m1.utils.init_utils import InitUtils
 
 
-def test_given_path_outside_data_when_upsert_then_writes_original(init_paths, tmp_path):
+def test_given_path_outside_data_when_upsert_then_writes_canonical_pkg_url(init_paths, tmp_path):
     init_sql = (
         Path(__file__).resolve().parents[1] / "init" / "store_db.sql"
     ).read_text("utf-8")
@@ -44,7 +44,9 @@ def test_given_path_outside_data_when_upsert_then_writes_original(init_paths, tm
     finally:
         conn.close()
 
-    assert row[0] == urljoin(Globals.ENVS.SERVER_URL, str(other_path))
+    assert row[0] == urljoin(
+        Globals.ENVS.SERVER_URL, "/pkg/game/UP0000-TEST00000_00-TEST000000000000.pkg"
+    )
 
 
 def test_given_pkg_when_upsert_then_writes_cdn_urls_and_md5(init_paths, tmp_path):
@@ -87,16 +89,90 @@ def test_given_pkg_when_upsert_then_writes_cdn_urls_and_md5(init_paths, tmp_path
     finally:
         conn.close()
 
-    expected_pkg_url = urljoin(Globals.ENVS.SERVER_URL, str(pkg_path))
-    expected_icon_url = urljoin(Globals.ENVS.SERVER_URL, str(icon_path))
-    expected_pic0_url = urljoin(Globals.ENVS.SERVER_URL, str(pic0_path))
-    expected_pic1_url = urljoin(Globals.ENVS.SERVER_URL, str(pic1_path))
+    expected_pkg_url = urljoin(
+        Globals.ENVS.SERVER_URL, "/pkg/game/UP0000-TEST00000_00-TEST000000000000.pkg"
+    )
+    expected_icon_url = urljoin(
+        Globals.ENVS.SERVER_URL, "/pkg/_media/UP0000-TEST00000_00-TEST000000000000_icon0.png"
+    )
+    expected_pic0_url = urljoin(
+        Globals.ENVS.SERVER_URL, "/pkg/_media/UP0000-TEST00000_00-TEST000000000000_pic0.png"
+    )
+    expected_pic1_url = urljoin(
+        Globals.ENVS.SERVER_URL, "/pkg/_media/UP0000-TEST00000_00-TEST000000000000_pic1.png"
+    )
 
     assert row[0] == expected_pkg_url
     assert row[1] == expected_icon_url
     assert row[2] == expected_pic0_url
     assert row[3] == expected_pic1_url
     assert row[4]
+
+
+def test_given_old_urls_when_refresh_urls_then_rewrites_base_and_pkg_path(init_paths):
+    init_sql = (
+        Path(__file__).resolve().parents[1] / "init" / "store_db.sql"
+    ).read_text("utf-8")
+    (init_paths.INIT_DIR_PATH / "store_db.sql").write_text(init_sql, encoding="utf-8")
+    InitUtils.init_db()
+
+    old_server = "http://10.0.0.10:8080"
+    content_id = "UP0000-TEST00000_00-TEST000000000000"
+
+    conn = sqlite3.connect(str(Globals.FILES.STORE_DB_FILE_PATH))
+    conn.execute(
+        """
+        INSERT INTO homebrews (
+            content_id, id, name, desc, image, package, version, picpath, desc_1, desc_2,
+            ReviewStars, Size, Author, apptype, pv, main_icon_path, main_menu_pic, releaseddate,
+            number_of_downloads, github, video, twitter, md5, row_md5
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            content_id,
+            "CUSA00001",
+            "Test",
+            None,
+            f"{old_server}/app/data/pkg/_media/{content_id}_icon0.png",
+            f"{old_server}/app/data/pkg/game/{content_id}.pkg",
+            "01.00",
+            None,
+            None,
+            None,
+            None,
+            1,
+            None,
+            "game",
+            None,
+            f"{old_server}/app/data/pkg/_media/{content_id}_pic0.png",
+            f"{old_server}/app/data/pkg/_media/{content_id}_pic1.png",
+            "2024-01-01",
+            0,
+            None,
+            None,
+            None,
+            None,
+            "old-md5",
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+    result = DBUtils.refresh_urls()
+
+    conn = sqlite3.connect(str(Globals.FILES.STORE_DB_FILE_PATH))
+    row = conn.execute(
+        "SELECT package, image, main_icon_path, main_menu_pic, row_md5 FROM homebrews WHERE content_id = ?",
+        (content_id,),
+    ).fetchone()
+    conn.close()
+
+    assert result.status is Status.OK
+    assert row[0] == urljoin(Globals.ENVS.SERVER_URL, f"/pkg/game/{content_id}.pkg")
+    assert row[1] == urljoin(Globals.ENVS.SERVER_URL, f"/pkg/_media/{content_id}_icon0.png")
+    assert row[2] == urljoin(Globals.ENVS.SERVER_URL, f"/pkg/_media/{content_id}_pic0.png")
+    assert row[3] == urljoin(Globals.ENVS.SERVER_URL, f"/pkg/_media/{content_id}_pic1.png")
+    assert row[4] != "old-md5"
 
 
 def test_given_existing_rows_when_select_content_ids_then_returns_values(init_paths):

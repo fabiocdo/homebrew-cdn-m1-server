@@ -5,6 +5,7 @@ from github import GithubException
 from hb_store_m1.helpers.store_assets_client import StoreAssetClient
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogModule
+from hb_store_m1.models.output import Status
 from hb_store_m1.utils.log_utils import LogUtils
 
 log = LogUtils(LogModule.INIT_UTIL)
@@ -100,6 +101,19 @@ class InitUtils:
             log.log_error(f"Failed to download store assets: {message}")
         except Exception as e:
             log.log_error(f"Failed to download store assets: {e}")
+
+    @staticmethod
+    def sync_runtime_urls():
+        from hb_store_m1.utils.db_utils import DBUtils
+        from hb_store_m1.utils.fpkgi_utils import FPKGIUtils
+
+        db_result = DBUtils.refresh_urls()
+        if db_result.status is Status.ERROR:
+            log.log_warn("Failed to refresh STORE.DB URLs at startup")
+
+        fpkgi_result = FPKGIUtils.refresh_urls()
+        if fpkgi_result.status is Status.ERROR:
+            log.log_warn("Failed to refresh FPKGI JSON URLs at startup")
 
 
 InitUtils = InitUtils()

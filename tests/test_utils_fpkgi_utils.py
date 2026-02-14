@@ -51,9 +51,15 @@ def test_given_pkg_when_upsert_then_writes_json_per_app_type(init_paths):
     dlc_data = json.loads((init_paths.DATA_DIR_PATH / "dlc.json").read_text("utf-8"))
 
     game_entry = game_data[0]
-    expected_pkg_url = urljoin(Globals.ENVS.SERVER_URL, str(pkg_path))
-    expected_icon_url = urljoin(Globals.ENVS.SERVER_URL, str(icon_path))
-    expected_pic1_url = urljoin(Globals.ENVS.SERVER_URL, str(pic1_path))
+    expected_pkg_url = urljoin(
+        Globals.ENVS.SERVER_URL, "/pkg/game/UP0000-TEST00000_00-TEST000000000000.pkg"
+    )
+    expected_icon_url = urljoin(
+        Globals.ENVS.SERVER_URL, "/pkg/_media/UP0000-TEST00000_00-TEST000000000000_icon0.png"
+    )
+    expected_pic1_url = urljoin(
+        Globals.ENVS.SERVER_URL, "/pkg/_media/UP0000-TEST00000_00-TEST000000000000_pic1.png"
+    )
 
     assert game_entry[FPKGI.Column.ID.value] == game_pkg.content_id
     assert game_entry[FPKGI.Column.PACKAGE.value] == expected_pkg_url
@@ -219,3 +225,41 @@ def test_given_pkg_without_content_id_when_upsert_then_ignores_entry(init_paths)
     result = FPKGIUtils.upsert([pkg])
 
     assert result.status in (Status.OK, Status.SKIP)
+
+
+def test_given_old_json_urls_when_refresh_then_rewrites_base_and_pkg_path(init_paths):
+    content_id = "UP0000-TEST00000_00-TEST000000000000"
+    old_server = "http://10.0.0.10:8080"
+    path = init_paths.DATA_DIR_PATH / "game.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    FPKGI.Column.ID.value: content_id,
+                    FPKGI.Column.NAME.value: "Old",
+                    FPKGI.Column.VERSION.value: "00.01",
+                    FPKGI.Column.PACKAGE.value: f"{old_server}/app/data/pkg/game/{content_id}.pkg",
+                    FPKGI.Column.SIZE.value: 1,
+                    FPKGI.Column.DESC.value: None,
+                    FPKGI.Column.ICON.value: f"{old_server}/app/data/pkg/_media/{content_id}_icon0.png",
+                    FPKGI.Column.BG_IMAGE.value: f"{old_server}/app/data/pkg/_media/{content_id}_pic1.png",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = FPKGIUtils.refresh_urls()
+    data = json.loads(path.read_text("utf-8"))
+    entry = data[0]
+
+    assert result.status is Status.OK
+    assert entry[FPKGI.Column.PACKAGE.value] == urljoin(
+        Globals.ENVS.SERVER_URL, f"/pkg/game/{content_id}.pkg"
+    )
+    assert entry[FPKGI.Column.ICON.value] == urljoin(
+        Globals.ENVS.SERVER_URL, f"/pkg/_media/{content_id}_icon0.png"
+    )
+    assert entry[FPKGI.Column.BG_IMAGE.value] == urljoin(
+        Globals.ENVS.SERVER_URL, f"/pkg/_media/{content_id}_pic1.png"
+    )
