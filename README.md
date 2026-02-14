@@ -1,31 +1,31 @@
 # hb-store-m1
 
-Local CDN para PKGs de PS4 Homebrew, com organizacao automatica, extracao de midia, indexacao em SQLite (`store.db`) e saida JSON opcional para fPKGi.
+Local CDN for PS4 Homebrew PKGs, with automatic organization, media extraction, SQLite indexing (`store.db`), and optional fPKGi JSON output.
 
 ![hb-store-m1](assets/512.png)
 
-## Visao geral
+## Overview
 
-O servico sobe em um unico container com dois processos:
+The service runs in a single container with two processes:
 
-- `nginx` servindo arquivos em `/app/data`
-- `python -u -m hb_store_m1` rodando o watcher em background
+- `nginx` serving files from `/app/data`
+- `python -u -m hb_store_m1` running the watcher in the background
 
-Pipeline principal:
+Main pipeline:
 
-1. Inicializa diretorios, banco e assets base.
-2. Detecta mudancas de arquivos PKG/PNG via cache (`store-cache.json`).
-3. Valida PKG, extrai `PARAM.SFO` e midias (`ICON0/PIC0/PIC1`).
-4. Move/renomeia para o destino final por `content_id`.
-5. Atualiza `store.db` e (opcional) arquivos `*.json` por tipo.
+1. Initialize directories, database, and base assets.
+2. Detect PKG/PNG changes via cache (`store-cache.json`).
+3. Validate PKG, extract `PARAM.SFO` and media (`ICON0/PIC0/PIC1`).
+4. Move/rename to canonical destination using `content_id`.
+5. Update `store.db` and optional `*.json` files by app type.
 
-## Arquitetura (execucao)
+## Runtime Architecture
 
 ```mermaid
 flowchart TD
     A[Container start] --> B[/entrypoint.sh/]
-    B --> C[Carrega configs/settings.env]
-    B --> D[Gera /etc/nginx/conf.d/servers.conf]
+    B --> C[Load configs/settings.env]
+    B --> D[Generate /etc/nginx/conf.d/servers.conf]
     B --> E[nginx -t]
     B --> F[python -u -m hb_store_m1]
     B --> G[nginx -g daemon off]
@@ -37,32 +37,32 @@ flowchart TD
 
     F --> I[Watcher loop]
     I --> J[CacheUtils.compare_pkg_cache]
-    J --> K{Ha mudancas?}
-    K -->|nao| I
-    K -->|sim| L[Processa PKGs alterados]
-    L --> M[AutoOrganizer + extracao de midia]
+    J --> K{Changes found?}
+    K -->|no| I
+    K -->|yes| L[Process changed PKGs]
+    L --> M[AutoOrganizer + media extraction]
     M --> N[DBUtils.upsert]
-    M --> O[FPKGIUtils.upsert opcional]
+    M --> O[FPKGIUtils.upsert optional]
     N --> P[write store-cache.json]
     O --> P
 ```
 
-## Funcionalidades atuais
+## Current Features
 
-- Servir PKGs com `Accept-Ranges` e cache longo.
-- Organizar PKGs por tipo em:
+- Serve PKGs with `Accept-Ranges` and long cache headers.
+- Organize PKGs by type into:
   - `game`, `dlc`, `update`, `save`, `unknown`
-- Renomear para `<CONTENT_ID>.pkg`.
-- Extrair:
-  - `ICON0_PNG` (obrigatorio)
-  - `PIC0_PNG` e `PIC1_PNG` (opcionais)
-- Atualizar `store.db` com `upsert` por `content_id`.
-- Gerar JSON por tipo quando `FPGKI_FORMAT_ENABLED=true`.
-- Manter cache incremental em `data/_cache/store-cache.json`.
-- Mover arquivos invalidos/conflitantes para `data/_errors`.
-- Persistir logs de `WARN/ERROR` em `data/_logs/app_errors.log`.
+- Rename PKGs to `<CONTENT_ID>.pkg`.
+- Extract:
+  - `ICON0_PNG` (required)
+  - `PIC0_PNG` and `PIC1_PNG` (optional)
+- Update `store.db` using `upsert` by `content_id`.
+- Generate app-type JSON files when `FPGKI_FORMAT_ENABLED=true`.
+- Keep incremental cache in `data/_cache/store-cache.json`.
+- Move invalid/conflicting files to `data/_errors`.
+- Persist `WARN/ERROR` logs to `data/_logs/app_errors.log`.
 
-## Estrutura do repositorio
+## Repository Structure
 
 ```text
 .
@@ -97,49 +97,49 @@ flowchart TD
 `-- tests/
 ```
 
-## Como rodar (Docker Compose)
+## Run with Docker Compose
 
-### 1) Subir
+### 1) Start
 
 ```bash
 docker compose up --build -d
 ```
 
-### 2) Ver logs
+### 2) Follow logs
 
 ```bash
 docker compose logs -f hb-store-m1
 ```
 
-### 3) Parar
+### 3) Stop
 
 ```bash
 docker compose down
 ```
 
-## Configuracao (`configs/settings.env`)
+## Configuration (`configs/settings.env`)
 
-O `entrypoint` cria esse arquivo automaticamente na primeira execucao.
+`entrypoint.sh` creates this file automatically on first run.
 
-| Variavel | Tipo | Default no entrypoint | Descricao |
+| Variable | Type | Default in entrypoint | Description |
 |---|---|---|---|
-| `SERVER_IP` | string | `127.0.0.1` | Host usado para compor URLs (`SERVER_URL`). |
-| `SERVER_PORT` | int | `80` | Porta do nginx no container. |
-| `ENABLE_TLS` | bool | `false` | `true` exige `configs/certs/tls.crt` e `tls.key`. |
+| `SERVER_IP` | string | `127.0.0.1` | Host used to build URLs (`SERVER_URL`). |
+| `SERVER_PORT` | int | `80` | Nginx port inside container. |
+| `ENABLE_TLS` | bool | `false` | `true` requires `configs/certs/tls.crt` and `tls.key`. |
 | `LOG_LEVEL` | string | `info` | `debug`, `info`, `warn`, `error`. |
-| `WATCHER_ENABLED` | bool | `true` | Liga/desliga watcher. |
-| `WATCHER_PERIODIC_SCAN_SECONDS` | int | `30` | Intervalo do loop de varredura. |
-| `FPGKI_FORMAT_ENABLED` | bool | `false` | Gera/atualiza JSON por tipo (`game.json`, etc.). |
+| `WATCHER_ENABLED` | bool | `true` | Enable/disable watcher loop. |
+| `WATCHER_PERIODIC_SCAN_SECONDS` | int | `30` | Scan loop interval. |
+| `FPGKI_FORMAT_ENABLED` | bool | `false` | Generate/update per-type JSON output (`game.json`, etc.). |
 
-Observacoes:
+Notes:
 
-- O nome da variavel e `FPGKI_FORMAT_ENABLED` (mantido como esta no codigo).
-- `python` roda com `-u` (`unbuffered`) no entrypoint.
-- Quando `ENABLE_TLS=true`, sem certificado o container aborta com erro fatal.
+- The environment variable name is `FPGKI_FORMAT_ENABLED` (kept as-is in code).
+- Python runs with `-u` (unbuffered) in the entrypoint.
+- If `ENABLE_TLS=true` and certs are missing, container startup fails.
 
 ## Volumes
 
-`docker-compose.yml` atual:
+Current `docker-compose.yml`:
 
 ```yaml
 services:
@@ -156,7 +156,7 @@ services:
     restart: unless-stopped
 ```
 
-## Layout de dados (`/app/data`)
+## Data Layout (`/app/data`)
 
 ```text
 /app/data
@@ -185,13 +185,13 @@ services:
 `-- unknown.json
 ```
 
-Observacoes importantes:
+Important notes:
 
-- `store-cache.json` guarda metadados (`size|mtime_ns|filename`), nao o arquivo PKG em si.
-- Chave do cache tende a ser `content_id`; quando falha leitura, usa fallback pelo nome do arquivo.
-- `data/_errors` recebe PKGs com falha de validacao/conflito/processamento.
+- `store-cache.json` stores metadata (`size|mtime_ns|filename`), not PKG content.
+- Cache key is usually `content_id`; if extraction fails, it temporarily falls back to filename stem.
+- `data/_errors` receives PKGs that fail validation/conflict/processing rules.
 
-## Fluxo de processamento de PKG
+## PKG Processing Flow
 
 ```mermaid
 sequenceDiagram
@@ -203,16 +203,16 @@ sequenceDiagram
     participant F as FPKGIUtils
 
     W->>C: compare_pkg_cache()
-    C-->>W: secoes alteradas + arquivos atuais
+    C-->>W: changed sections + current files
     W->>P: validate(pkg)
     alt Status ERROR
         W->>W: move_to_error(validation_failed)
     else Status OK/WARN
         W->>P: extract_pkg_data(pkg)
         W->>A: run(pkg)
-        alt falha no organizer
+        alt organizer failure
             W->>W: move_to_error(organizer_failed)
-        else sucesso
+        else success
             W->>P: extract_pkg_medias(pkg)
             W->>P: build_pkg(...)
             W->>D: upsert(pkgs)
@@ -224,72 +224,72 @@ sequenceDiagram
     end
 ```
 
-## Mapeamento de tipo/regiao
+## Type/Region Mapping
 
-Pelo modelo `PKG`:
+From the `PKG` model:
 
-- Categoria -> tipo:
+- Category -> app type:
   - `AC` -> `dlc`
   - `GC`/`GD` -> `game`
   - `GP` -> `update`
   - `SD` -> `save`
-  - outro -> `unknown`
-- Prefixo do `content_id` -> regiao:
-  - `UP` USA, `EP` EUR, `JP` JAP, `HP/AP/KP` ASIA, resto `UNKNOWN`
+  - others -> `unknown`
+- `content_id` prefix -> region:
+  - `UP` USA, `EP` EUR, `JP` JAP, `HP/AP/KP` ASIA, others `UNKNOWN`
 
-## Endpoints HTTP expostos (nginx)
+## Exposed HTTP Endpoints (nginx)
 
-| Endpoint | Origem | Comportamento |
+| Endpoint | Source | Behavior |
 |---|---|---|
-| `/` | redirect | `302` para `/store.db` |
-| `/store.db` | `/app/data/store.db` | `no-store`, range habilitado |
-| `/api.php` | `/app/data/_cache/store.db.json` | retorna JSON se o arquivo existir |
+| `/` | redirect | `302` to `/store.db` |
+| `/store.db` | `/app/data/store.db` | `no-store`, byte-range enabled |
+| `/api.php` | `/app/data/_cache/store.db.json` | serves JSON if file exists |
 | `/update/remote.md5` | `/_cache/remote.md5` | `no-store` |
 | `/update/homebrew.elf` | `/_cache/homebrew.elf` | `no-store` |
 | `/update/homebrew.elf.sig` | `/_cache/homebrew.elf.sig` | `no-store` |
 | `/update/store.prx` | `/_cache/store.prx` | `no-store` |
 | `/update/store.prx.sig` | `/_cache/store.prx.sig` | `no-store` |
-| `/pkg/**/*.pkg` | `/app/data/pkg` | cache longo (`max-age=31536000`, `immutable`), range |
-| `/pkg/**/*.(png|jpg|jpeg|webp)` | `/app/data/pkg` | cache de 30 dias |
+| `/pkg/**/*.pkg` | `/app/data/pkg` | long cache (`max-age=31536000`, `immutable`), range |
+| `/pkg/**/*.(png|jpg|jpeg|webp)` | `/app/data/pkg` | 30-day cache |
 | `/pkg/**/*.(json|db)` | `/app/data/pkg` | `no-store` |
 
 ## CI/CD (GitLab)
 
-Pipeline atual (`.gitlab-ci.yml`):
+Current pipeline (`.gitlab-ci.yml`):
 
 1. `test`
-   - roda `pytest` com cobertura
+   - runs `pytest` with coverage
    - gate: `--cov-fail-under=90`
-   - publica `coverage.xml` (cobertura no GitLab)
+   - publishes `coverage.xml`
 
 2. `mirror_to_github`
-   - roda em `push` para `main`
-   - executa `git push --mirror` para GitHub
-   - requer variaveis:
+   - runs on `push` to `main`
+   - executes `git push --mirror` to GitHub
+   - required variables:
      - `GITHUB_MIRROR_REPO` (`owner/repo`)
      - `GITHUB_MIRROR_USER`
      - `GITHUB_MIRROR_TOKEN`
 
 3. `build`
-   - build da imagem docker por commit (`$CI_COMMIT_SHA`)
-   - exporta artifact `image.tar`
+   - builds Docker image tagged with commit SHA
+   - exports `image.tar` artifact
 
 4. `publish:*` (manual)
    - `publish:release`, `publish:stable`, `publish:dev`
-   - tag baseada no `version` do `pyproject.toml`
-   - requer:
+   - tag derived from `version` in `pyproject.toml`
+   - required variables:
      - `DOCKER_HUB_USER`
      - `DOCKER_HUB_TOKEN`
 
-## Desenvolvimento local (sem Docker)
+## Local Development (without Docker)
 
-Requisitos:
+Requirements:
 
 - Python 3.12+
-- `bin/pkgtool` funcional
-- bibliotecas nativas compativeis com o `pkgtool`
+- working `bin/pkgtool`
+- native runtime libraries required by `pkgtool`
 
-Execucao:
+Run:
 
 ```bash
 python -m venv .venv
@@ -299,7 +299,7 @@ pip install -e .
 python -m hb_store_m1
 ```
 
-Testes:
+Tests:
 
 ```bash
 .venv/bin/pytest -q
@@ -308,37 +308,37 @@ Testes:
 
 ## Troubleshooting
 
-### `docker compose up` nao sobe servico
+### `docker compose up` does not start the service
 
-- Verifique:
+- Check:
   - `docker compose logs hb-store-m1`
-  - `nginx -t` (ja roda no entrypoint)
-- Causa comum: `ENABLE_TLS=true` sem `configs/certs/tls.crt` e `tls.key`.
+  - `nginx -t` output (already executed by entrypoint)
+- Common cause: `ENABLE_TLS=true` without `configs/certs/tls.crt` and `tls.key`.
 
-### PKG bom foi para `_errors`
+### Valid PKG moved to `_errors`
 
-- Veja `data/_logs/app_errors.log`.
-- Motivos comuns:
-  - validacao critica falhou
-  - erro ao extrair `PARAM.SFO`
-  - `ICON0_PNG` ausente
-  - conflito de destino (`content_id.pkg` ja existe)
+- Check `data/_logs/app_errors.log`.
+- Common reasons:
+  - critical validation failure
+  - `PARAM.SFO` extraction failure
+  - missing `ICON0_PNG`
+  - destination conflict (`content_id.pkg` already exists)
 
 ### `No usable version of libssl was found`
 
-- Isso indica dependencia nativa faltando para `pkgtool` em runtime.
-- O Dockerfile do projeto ja copia `libssl.so.1.1` e `libcrypto.so.1.1` da toolchain.
+- This means a native dependency required by `pkgtool` is missing.
+- Current Dockerfile already copies `libssl.so.1.1` and `libcrypto.so.1.1` from toolchain.
 
-### Versao do app nao atualizou no banner
+### App version in banner did not update
 
-- Rode com rebuild:
+Rebuild and restart:
 
 ```bash
 docker compose up --build -d
 ```
 
-- O banner le versao do `pyproject.toml` quando disponivel, com fallback para metadata do pacote instalado.
+The app reads version from `pyproject.toml` when available, with fallback to installed package metadata.
 
-## Licenca
+## License
 
-Defina aqui a licenca oficial do projeto (ex.: MIT, GPL-3.0).
+Add your project license here (for example: MIT, GPL-3.0).

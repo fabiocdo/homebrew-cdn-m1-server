@@ -31,20 +31,13 @@ def test_given_pkg_dir_missing_when_write_pkg_cache_then_returns_not_found(
     assert result.status is Status.NOT_FOUND
 
 
-def test_given_pkg_changes_when_compare_pkg_cache_then_reports_added(
-    init_paths, monkeypatch
-):
-    pkg_path = init_paths.GAME_DIR_PATH / "game.pkg"
+def test_given_pkg_changes_when_compare_pkg_cache_then_reports_added(init_paths):
+    pkg_path = init_paths.GAME_DIR_PATH / "UP0000-CUSA00001_00-TEST000000000001.pkg"
     pkg_path.write_text("data", encoding="utf-8")
-
-    monkeypatch.setattr(
-        "hb_store_m1.utils.pkg_utils.PkgUtils.read_content_id",
-        lambda path: path.stem.upper(),
-    )
 
     CacheUtils.write_pkg_cache()
 
-    extra_pkg = init_paths.DLC_DIR_PATH / "dlc.pkg"
+    extra_pkg = init_paths.DLC_DIR_PATH / "UP0000-CUSA00002_00-TEST000000000002.pkg"
     extra_pkg.write_text("data", encoding="utf-8")
 
     result = CacheUtils.compare_pkg_cache()
@@ -52,16 +45,12 @@ def test_given_pkg_changes_when_compare_pkg_cache_then_reports_added(
 
     assert result.status is Status.OK
     assert "dlc" in changes["changed"]
-    assert changes["added"]["dlc"] == ["DLC"]
+    assert changes["added"]["dlc"] == ["UP0000-CUSA00002_00-TEST000000000002"]
 
 
 def test_given_media_without_pkg_when_write_pkg_cache_then_excludes_media(
-    init_paths, monkeypatch
+    init_paths
 ):
-    monkeypatch.setattr(
-        "hb_store_m1.utils.pkg_utils.PkgUtils.read_content_id",
-        lambda path: path.stem.upper(),
-    )
     media_path = init_paths.MEDIA_DIR_PATH / "ORPHAN_icon0.png"
     media_path.parent.mkdir(parents=True, exist_ok=True)
     media_path.write_bytes(b"png")
@@ -76,15 +65,11 @@ def test_given_media_without_pkg_when_write_pkg_cache_then_excludes_media(
 
 
 def test_given_media_with_pkg_when_write_pkg_cache_then_includes_media(
-    init_paths, monkeypatch
+    init_paths
 ):
-    monkeypatch.setattr(
-        "hb_store_m1.utils.pkg_utils.PkgUtils.read_content_id",
-        lambda path: path.stem.upper(),
-    )
-    pkg_path = init_paths.GAME_DIR_PATH / "game.pkg"
+    pkg_path = init_paths.GAME_DIR_PATH / "UP0000-CUSA00001_00-TEST000000000001.pkg"
     pkg_path.write_text("data", encoding="utf-8")
-    media_path = init_paths.MEDIA_DIR_PATH / "GAME_icon0.png"
+    media_path = init_paths.MEDIA_DIR_PATH / "UP0000-CUSA00001_00-TEST000000000001_icon0.png"
     media_path.parent.mkdir(parents=True, exist_ok=True)
     media_path.write_bytes(b"png")
 
@@ -94,4 +79,4 @@ def test_given_media_with_pkg_when_write_pkg_cache_then_includes_media(
 
     assert result.status is Status.OK
     assert media_section is not None
-    assert "GAME_icon0" in media_section.content
+    assert "UP0000-CUSA00001_00-TEST000000000001_icon0" in media_section.content

@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from hb_store_m1.models.cache import CacheSection, CACHE_ADAPTER
@@ -7,7 +8,6 @@ from hb_store_m1.models.log import LogColor, LogModule
 from hb_store_m1.models.output import Output, Status
 from hb_store_m1.models.pkg.section import Section
 from hb_store_m1.utils.log_utils import LogUtils
-from hb_store_m1.utils.pkg_utils import PkgUtils
 
 log = LogUtils(LogModule.CACHE_UTIL)
 from pydantic import ValidationError
@@ -17,6 +17,9 @@ class CacheUtils:
     _SECTIONS = Section.ALL
     _MEDIA_SECTION = "_media"
     _MEDIA_SUFFIXES = ("_icon0", "_pic0", "_pic1")
+    _CONTENT_ID_PATTERN = re.compile(
+        r"^[A-Z]{2}[A-Z0-9]{4}-[A-Z0-9]{9}_[0-9]{2}-[A-Z0-9]{16}$"
+    )
 
     @staticmethod
     def _parse_cache_entry(content_id: str, value: str) -> tuple[str, str, str] | None:
@@ -66,6 +69,10 @@ class CacheUtils:
     @staticmethod
     def _cache_value(size: int, mtime_ns: int, filename: str) -> str:
         return f"{size}|{mtime_ns}|{filename}"
+
+    @staticmethod
+    def _is_content_id(value: str) -> bool:
+        return bool(CacheUtils._CONTENT_ID_PATTERN.match(value or ""))
 
     @staticmethod
     def _current_file_map(current_content: dict[str, str]) -> dict[str, str]:
@@ -181,18 +188,13 @@ class CacheUtils:
                         and cached_entry[2] == mtime_str
                     ):
                         cache_key = cached_entry[0] or pkg_path.stem
-                        if cached_entry[0]:
+                        if cached_entry[0] and CacheUtils._is_content_id(cached_entry[0]):
                             valid_content_ids.add(cached_entry[0])
                     else:
-                        content_id = PkgUtils.read_content_id(pkg_path)
-                        cache_key = content_id or pkg_path.stem
-                        if not content_id:
-                            log.log_warn(
-                                f"Failed to read content_id for {pkg_path.name}. "
-                                "Falling back to filename."
-                            )
-                        else:
-                            valid_content_ids.add(content_id)
+                        # Keep cache generation lightweight: avoid calling pkgtool here.
+                        cache_key = pkg_path.stem
+                        if CacheUtils._is_content_id(cache_key):
+                            valid_content_ids.add(cache_key)
                     cache_value = CacheUtils._cache_value(
                         int(size_str), int(mtime_str), pkg_path.name
                     )
