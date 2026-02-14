@@ -293,7 +293,7 @@ From the `PKG` model:
 
 | Endpoint | Source | Behavior |
 |---|---|---|
-| `/` | `/_cache/index.html` | status/info HTML page with endpoint links and live UP/DOWN checks |
+| `/` | `/_cache/index.html` | status page with live endpoint UP/DOWN checks |
 | `/health` | inline response | returns `{"status":"online"}` |
 | `/store.db` | `/app/data/store.db` | `no-store`, byte-range enabled |
 | `/api.php?db_check_hash=true` | internal API | returns `{"hash":"<md5_of_store.db>"}` |
