@@ -79,3 +79,11 @@ def test_given_internal_app_type_when_to_client_app_type_then_returns_ps4_store_
     assert URLUtils.to_client_app_type("game") == "Game"
     assert URLUtils.to_client_app_type("update") == "Patch"
     assert URLUtils.to_client_app_type("save") == "Other"
+
+
+def test_given_valid_content_id_when_ps4_store_icon_cache_path_then_returns_local_path():
+    value = URLUtils.ps4_store_icon_cache_path(
+        "UP0000-CUSA00001_00-ABCDEFGHIJKLMNOP"
+    )
+
+    assert value == "/user/app/NPXS39041/storedata/UP0000-CUSA00001_00-ABCDEFGHIJKLMNOP_icon0.png"

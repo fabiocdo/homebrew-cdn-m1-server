@@ -40,7 +40,7 @@ def _generate_upsert_params(pkg: PKG) -> dict[str, object]:
             pkg.content_id, app_type_raw, pkg.pkg_path
         ),
         "version": pkg.version,
-        "picpath": None,
+        "picpath": URLUtils.ps4_store_icon_cache_path(pkg.content_id),
         "desc_1": None,
         "desc_2": None,
         "ReviewStars": None,
@@ -240,18 +240,27 @@ class DBUtils:
                     current.get(StoreDB.Column.PACKAGE.value),
                 )
                 updated[StoreDB.Column.APP_TYPE.value] = app_type_label
-                updated[StoreDB.Column.IMAGE.value] = URLUtils.to_public_url(
-                    current.get(StoreDB.Column.IMAGE.value)
+                updated[StoreDB.Column.IMAGE.value] = URLUtils.canonical_media_url(
+                    str(content_id or ""),
+                    "icon0",
+                    current.get(StoreDB.Column.IMAGE.value),
                 )
                 updated[StoreDB.Column.MAIN_ICON_PATH.value] = (
-                    URLUtils.to_public_url(
+                    URLUtils.canonical_media_url(
+                        str(content_id or ""),
+                        "pic0",
                         current.get(StoreDB.Column.MAIN_ICON_PATH.value)
                     )
                     if current.get(StoreDB.Column.MAIN_ICON_PATH.value)
                     else None
                 )
+                updated[StoreDB.Column.PIC_PATH.value] = (
+                    URLUtils.ps4_store_icon_cache_path(str(content_id or ""))
+                )
                 updated[StoreDB.Column.MAIN_MENU_PIC.value] = (
-                    URLUtils.to_public_url(
+                    URLUtils.canonical_media_url(
+                        str(content_id or ""),
+                        "pic1",
                         current.get(StoreDB.Column.MAIN_MENU_PIC.value)
                     )
                     if current.get(StoreDB.Column.MAIN_MENU_PIC.value)
@@ -264,6 +273,8 @@ class DBUtils:
                     == current.get(StoreDB.Column.PACKAGE.value)
                     and updated[StoreDB.Column.IMAGE.value]
                     == current.get(StoreDB.Column.IMAGE.value)
+                    and updated[StoreDB.Column.PIC_PATH.value]
+                    == current.get(StoreDB.Column.PIC_PATH.value)
                     and updated[StoreDB.Column.MAIN_ICON_PATH.value]
                     == current.get(StoreDB.Column.MAIN_ICON_PATH.value)
                     and updated[StoreDB.Column.MAIN_MENU_PIC.value]
@@ -281,6 +292,7 @@ class DBUtils:
                     SET
                         package = ?,
                         image = ?,
+                        picpath = ?,
                         main_icon_path = ?,
                         main_menu_pic = ?,
                         apptype = ?,
@@ -290,6 +302,7 @@ class DBUtils:
                     (
                         updated[StoreDB.Column.PACKAGE.value],
                         updated[StoreDB.Column.IMAGE.value],
+                        updated[StoreDB.Column.PIC_PATH.value],
                         updated[StoreDB.Column.MAIN_ICON_PATH.value],
                         updated[StoreDB.Column.MAIN_MENU_PIC.value],
                         updated[StoreDB.Column.APP_TYPE.value],

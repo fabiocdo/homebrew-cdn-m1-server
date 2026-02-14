@@ -6,6 +6,7 @@ from hb_store_m1.models.globals import Globals
 
 
 class URLUtils:
+    _PS4_STOREDATA_ROOT = "/user/app/NPXS39041/storedata"
     _APP_TYPE_TO_SECTION = {
         "app": "app",
         "dlc": "dlc",
@@ -135,6 +136,13 @@ class URLUtils:
                 f"/pkg/_media/{content}_{suffix}.png",
             )
         return URLUtils.to_public_url(fallback)
+
+    @staticmethod
+    def ps4_store_icon_cache_path(content_id: str | None) -> str | None:
+        content = (content_id or "").strip().upper()
+        if not URLUtils._is_content_id(content):
+            return None
+        return f"{URLUtils._PS4_STOREDATA_ROOT}/{content}_icon0.png"
 
 
 URLUtils = URLUtils()

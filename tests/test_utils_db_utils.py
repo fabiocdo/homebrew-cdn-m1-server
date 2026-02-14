@@ -86,7 +86,7 @@ def test_given_pkg_when_upsert_then_writes_cdn_urls_and_md5(init_paths, tmp_path
     conn = sqlite3.connect(str(Globals.FILES.STORE_DB_FILE_PATH))
     try:
         row = conn.execute(
-            "SELECT package, image, main_icon_path, main_menu_pic, row_md5, apptype FROM homebrews"
+            "SELECT package, image, picpath, main_icon_path, main_menu_pic, row_md5, apptype FROM homebrews"
         ).fetchone()
     finally:
         conn.close()
@@ -109,10 +109,14 @@ def test_given_pkg_when_upsert_then_writes_cdn_urls_and_md5(init_paths, tmp_path
 
     assert row[0] == expected_pkg_url
     assert row[1] == expected_icon_url
-    assert row[2] == expected_pic0_url
-    assert row[3] == expected_pic1_url
-    assert row[4]
-    assert row[5] == "Game"
+    assert (
+        row[2]
+        == "/user/app/NPXS39041/storedata/UP0000-TEST00000_00-TEST000000000000_icon0.png"
+    )
+    assert row[3] == expected_pic0_url
+    assert row[4] == expected_pic1_url
+    assert row[5]
+    assert row[6] == "Game"
 
 
 def test_given_old_urls_when_refresh_urls_then_rewrites_base_and_pkg_path(init_paths):
@@ -142,7 +146,7 @@ def test_given_old_urls_when_refresh_urls_then_rewrites_base_and_pkg_path(init_p
             f"{old_server}/app/data/pkg/_media/{content_id}_icon0.png",
             f"{old_server}/app/data/pkg/game/{content_id}.pkg",
             "01.00",
-            None,
+            f"{old_server}/app/data/pkg/_media/{content_id}_pic0.png",
             None,
             None,
             None,
@@ -151,7 +155,7 @@ def test_given_old_urls_when_refresh_urls_then_rewrites_base_and_pkg_path(init_p
             "game",
             None,
             f"{old_server}/app/data/pkg/_media/{content_id}_pic0.png",
-            f"{old_server}/app/data/pkg/_media/{content_id}_pic1.png",
+            f"{old_server}/app/data/pkg/_media/{content_id}_pic0.png",
             "2024-01-01",
             0,
             None,
@@ -168,7 +172,7 @@ def test_given_old_urls_when_refresh_urls_then_rewrites_base_and_pkg_path(init_p
 
     conn = sqlite3.connect(str(Globals.FILES.STORE_DB_FILE_PATH))
     row = conn.execute(
-        "SELECT package, image, main_icon_path, main_menu_pic, row_md5, apptype FROM homebrews WHERE content_id = ?",
+        "SELECT package, image, picpath, main_icon_path, main_menu_pic, row_md5, apptype FROM homebrews WHERE content_id = ?",
         (content_id,),
     ).fetchone()
     conn.close()
@@ -178,14 +182,15 @@ def test_given_old_urls_when_refresh_urls_then_rewrites_base_and_pkg_path(init_p
     assert row[1] == urljoin(
         Globals.ENVS.SERVER_URL, f"/pkg/_media/{content_id}_icon0.png"
     )
-    assert row[2] == urljoin(
+    assert row[2] == f"/user/app/NPXS39041/storedata/{content_id}_icon0.png"
+    assert row[3] == urljoin(
         Globals.ENVS.SERVER_URL, f"/pkg/_media/{content_id}_pic0.png"
     )
-    assert row[3] == urljoin(
+    assert row[4] == urljoin(
         Globals.ENVS.SERVER_URL, f"/pkg/_media/{content_id}_pic1.png"
     )
-    assert row[4] != "old-md5"
-    assert row[5] == "Game"
+    assert row[5] != "old-md5"
+    assert row[6] == "Game"
 
 
 def test_given_pkg_categories_when_upsert_then_maps_apptype_to_ps4_store_labels(
