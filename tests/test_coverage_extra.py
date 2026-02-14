@@ -72,7 +72,8 @@ def test_given_media_section_when_accepts_then_allows_png(tmp_path):
 def test_given_invalid_content_id_when_dry_run_then_invalid(init_paths):
     pkg_path = init_paths.PKG_DIR_PATH / "raw.pkg"
     pkg_path.write_text("pkg", encoding="utf-8")
-    result = AutoOrganizer.dry_run(pkg_path, {"content_id": "bad/name"})
+    pkg = PKG(content_id="", category="GD", pkg_path=pkg_path)
+    result = AutoOrganizer.dry_run(pkg)
     assert result.status is Status.INVALID
 
 
@@ -82,10 +83,8 @@ def test_given_conflict_when_dry_run_then_returns_conflict(init_paths):
     target.write_text("pkg", encoding="utf-8")
     source = init_paths.PKG_DIR_PATH / "raw.pkg"
     source.write_text("pkg", encoding="utf-8")
-
-    result = AutoOrganizer.dry_run(
-        source, {"content_id": content_id, "app_type": "game"}
-    )
+    pkg = PKG(content_id=content_id, category="GD", pkg_path=source)
+    result = AutoOrganizer.dry_run(pkg)
 
     assert result.status is Status.CONFLICT
 
@@ -93,12 +92,14 @@ def test_given_conflict_when_dry_run_then_returns_conflict(init_paths):
 def test_given_move_failure_when_run_then_returns_none(init_paths, monkeypatch):
     pkg_path = init_paths.PKG_DIR_PATH / "raw.pkg"
     pkg_path.write_text("pkg", encoding="utf-8")
+    pkg = PKG(
+        content_id="UP0000-TEST00000_00-TEST000000000000",
+        category="GD",
+        pkg_path=pkg_path,
+    )
 
     monkeypatch.setattr(file_utils_module.FileUtils, "move", lambda *_: None)
-    result = AutoOrganizer.run(
-        pkg_path,
-        {"content_id": "UP0000-TEST00000_00-TEST000000000000", "app_type": "game"},
-    )
+    result = AutoOrganizer.run(pkg)
 
     assert result is None
 
@@ -110,17 +111,18 @@ def test_given_no_changes_when_run_cycle_then_skips_scan(
     monkeypatch.setattr(
         cache_utils_module.CacheUtils,
         "compare_pkg_cache",
-        lambda: Output(Status.OK, {"changed": []}),
+        lambda: Output(Status.SKIP, None),
     )
-    called = {"scan": False}
+    called = {"write": False}
     monkeypatch.setattr(
-        "hb_store_m1.utils.pkg_utils.PkgUtils.scan",
-        lambda _s: called.__setitem__("scan", True),
+        cache_utils_module.CacheUtils,
+        "write_pkg_cache",
+        lambda *args, **kwargs: called.__setitem__("write", True),
     )
 
     watcher._run_cycle()
 
-    assert called["scan"] is False
+    assert called["write"] is False
 
 
 def test_given_upsert_error_when_run_cycle_then_skips_cache_write(
@@ -133,10 +135,16 @@ def test_given_upsert_error_when_run_cycle_then_skips_cache_write(
     monkeypatch.setattr(
         cache_utils_module.CacheUtils,
         "compare_pkg_cache",
-        lambda: Output(Status.OK, {"changed": ["game"]}),
-    )
-    monkeypatch.setattr(
-        "hb_store_m1.utils.pkg_utils.PkgUtils.scan", lambda _s: [pkg_path]
+        lambda: Output(
+            Status.OK,
+            {
+                "changed": ["game"],
+                "added": {"game": ["X"]},
+                "updated": {},
+                "removed": {},
+                "current_files": {"game": {"X": "sample.pkg"}},
+            },
+        ),
     )
     monkeypatch.setattr(
         "hb_store_m1.utils.pkg_utils.PkgUtils.validate",
@@ -144,7 +152,13 @@ def test_given_upsert_error_when_run_cycle_then_skips_cache_write(
     )
     monkeypatch.setattr(
         "hb_store_m1.utils.pkg_utils.PkgUtils.extract_pkg_data",
-        lambda _p: Output(Status.OK, PKG(content_id="X", category="GD", pkg_path=_p)),
+        lambda _p: Output(Status.OK, ("param_sfo", "medias")),
+    )
+    monkeypatch.setattr(
+        "hb_store_m1.utils.pkg_utils.PkgUtils.build_pkg",
+        lambda _p, _sfo, _medias: Output(
+            Status.OK, PKG(content_id="X", category="GD", pkg_path=_p)
+        ),
     )
     monkeypatch.setattr(
         db_utils_module.DBUtils,
@@ -207,6 +221,16 @@ def test_given_upsert_exception_when_upsert_then_returns_error(
     init_utils_module.InitUtils.init_db()
 
     class _BadConn:
+        class _Cursor:
+            def execute(self, *_args, **_kwargs):
+                return None
+
+            def fetchall(self):
+                return []
+
+        def cursor(self):
+            return self._Cursor()
+
         def execute(self, *_args, **_kwargs):
             return None
 

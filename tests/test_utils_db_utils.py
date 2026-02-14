@@ -1,5 +1,6 @@
 import sqlite3
 from pathlib import Path
+from urllib.parse import urljoin
 
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.pkg.pkg import PKG
@@ -46,7 +47,7 @@ def test_given_path_outside_data_when_upsert_then_writes_original(
     finally:
         conn.close()
 
-    assert row[0] == str(other_path)
+    assert row[0] == urljoin(Globals.ENVS.SERVER_URL, str(other_path))
 
 
 def test_given_pkg_when_upsert_then_writes_cdn_urls_and_md5(init_paths, tmp_path):
@@ -91,11 +92,10 @@ def test_given_pkg_when_upsert_then_writes_cdn_urls_and_md5(init_paths, tmp_path
     finally:
         conn.close()
 
-    prefix = Globals.ENVS.SERVER_URL.rstrip("/")
-    expected_pkg_url = f"{prefix}/{pkg_path.relative_to(Globals.PATHS.DATA_DIR_PATH).as_posix()}"
-    expected_icon_url = f"{prefix}/{icon_path.relative_to(Globals.PATHS.DATA_DIR_PATH).as_posix()}"
-    expected_pic0_url = f"{prefix}/{pic0_path.relative_to(Globals.PATHS.DATA_DIR_PATH).as_posix()}"
-    expected_pic1_url = f"{prefix}/{pic1_path.relative_to(Globals.PATHS.DATA_DIR_PATH).as_posix()}"
+    expected_pkg_url = urljoin(Globals.ENVS.SERVER_URL, str(pkg_path))
+    expected_icon_url = urljoin(Globals.ENVS.SERVER_URL, str(icon_path))
+    expected_pic0_url = urljoin(Globals.ENVS.SERVER_URL, str(pic0_path))
+    expected_pic1_url = urljoin(Globals.ENVS.SERVER_URL, str(pic1_path))
 
     assert row[0] == expected_pkg_url
     assert row[1] == expected_icon_url

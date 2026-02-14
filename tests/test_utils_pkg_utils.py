@@ -122,5 +122,6 @@ def test_given_pkg_data_when_extract_then_returns_pkg_model(
     result = PkgUtils.extract_pkg_data(pkg_path)
 
     assert result.status is Status.OK
-    assert result.content.content_id.startswith("UP0000-TEST")
-    assert result.content.icon0_png_path is not None
+    param_sfo, medias = result.content
+    assert param_sfo.data[ParamSFOKey.CONTENT_ID].startswith("UP0000-TEST")
+    assert medias

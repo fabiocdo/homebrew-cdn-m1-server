@@ -150,10 +150,7 @@ class Watcher:
 
             pkg = build_output.content
 
-            if (
-                Globals.ENVS.AUTO_ORGANIZER_ENABLED
-                and pkg_path.parent.name in changed_section_set
-            ):
+            if pkg_path.parent.name in changed_section_set:
 
                 target_path = AutoOrganizer.run(pkg)
 

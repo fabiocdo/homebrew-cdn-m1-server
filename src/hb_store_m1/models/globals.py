@@ -33,11 +33,11 @@ def _env(name: str, default, type_):
         return v.upper()
 
     if type_ is list:
-        return (
-            default.upper()
-            if v == ""
-            else [p.strip().upper() for p in v.split(",") if p.strip()]
-        )
+        if v == "":
+            if isinstance(default, list):
+                return [str(p).strip().upper() for p in default if str(p).strip()]
+            return [p.strip().upper() for p in str(default).split(",") if p.strip()]
+        return [p.strip().upper() for p in v.split(",") if p.strip()]
 
     raise TypeError(f"Unsupported type {type_}")
 
@@ -127,14 +127,9 @@ class _GlobalEnvs:
         self.WATCHER_PERIODIC_SCAN_SECONDS: int = _env(
             "WATCHER_PERIODIC_SCAN_SECONDS", 30, int
         )
-        self.WATCHER_SCAN_BATCH_SIZE: int = _env("WATCHER_SCAN_BATCH_SIZE", 50, int)
-        self.WATCHER_EXECUTOR_WORKERS: int = _env("WATCHER_EXECUTOR_WORKERS", 4, int)
-        self.WATCHER_SCAN_WORKERS: int = _env("WATCHER_SCAN_WORKERS", 4, int)
-        self.WATCHER_ACCESS_LOG_TAIL: bool = _env("WATCHER_ACCESS_LOG_TAIL", True, bool)
-        self.WATCHER_ACCESS_LOG_INTERVAL: int = _env(
-            "WATCHER_ACCESS_LOG_INTERVAL", 5, int
+        self.AUTO_INDEXER_OUTPUT_FORMAT: list[str] = _env(
+            "AUTO_INDEXER_OUTPUT_FORMAT", ["DB", "JSON"], list
         )
-        self.AUTO_ORGANIZER_ENABLED: bool = _env("AUTO_ORGANIZER_ENABLED", True, bool)
 
     @property
     def APP_NAME(self) -> str:

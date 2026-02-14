@@ -66,32 +66,23 @@ services:
 | `ENABLE_TLS`                    | Serve Nginx via TLS/HTTPS when `true`; otherwise HTTP only. Controls the `SERVER_URL` scheme. | `false`     |
 | `WATCHER_ENABLED`               | Master switch for watcher-driven automation.                                                  | `true`      |
 | `WATCHER_PERIODIC_SCAN_SECONDS` | Periodic scan interval in seconds.                                                            | `30`        |
-| `WATCHER_SCAN_BATCH_SIZE`       | Batch size for PKG scanning (use a large value to effectively disable batching).              | `50`        |
-| `WATCHER_EXECUTOR_WORKERS`      | Number of parallel executor workers for planned batches.                                      | `4`         |
-| `WATCHER_SCAN_WORKERS`          | Number of parallel scan workers for PKG scanning.                                             | `4`         |
-| `WATCHER_ACCESS_LOG_TAIL`       | Enable tailing Nginx access log from watcher.                                                 | `true`      |
-| `WATCHER_ACCESS_LOG_INTERVAL`   | Tail interval in seconds.                                                                     | `5`         |
 | `AUTO_INDEXER_OUTPUT_FORMAT`    | Output targets: `DB`, `JSON` (comma-separated).                                               | `db,json`   |
 
 Notes:
 
 - The runtime sources `configs/settings.env` before starting the watcher, so updating that file is all you need to tweak
-  `SERVER_*`, the TLS toggle (`ENABLE_TLS`), `LOG_LEVEL`, or any optional watcher/index overrides; you can still layer
-  extra `-e` / `--env-file` overrides when you run the container.
+  `SERVER_*`, the TLS toggle (`ENABLE_TLS`), `LOG_LEVEL`, or watcher/index behavior; you can still layer extra `-e` /
+  `--env-file` overrides when you run the container.
 - `WATCHER_ENABLED=false` stops all automation.
 - `AUTO_INDEXER_OUTPUT_FORMAT` controls output: include `JSON` to write `index.json`, include `DB` to update `store.db`.
-- When `ENABLE_TLS=true`, drop TLS certificates under `configs/certs/` (or point `TLS_CRT`/`TLS_KEY` somewhere else) so
-  the entrypoint can configure HTTPS.
+- When `ENABLE_TLS=true`, drop TLS certificates under `configs/certs/` so the entrypoint can configure HTTPS.
 - `SERVER_IP` should be just the host (or host:port) without `http://` or `https://`.
 - Ensure `SERVER_IP` matches the host/port used by clients, and toggle `ENABLE_TLS` to select TLS vs HTTP.
 - Data paths are fixed to `/app/data` inside the container.
 - Conflicts are moved to `/app/data/_error/` with a reason appended to `/app/data/_logs/errors.log`.
-- Access log tailing writes lines as `WATCHER` debug logs (`/app/data/_logs/access.log`).
 - If `configs/settings.env` is absent, the entrypoint writes a minimal template before continuing; edit that file (or
   replace it with your own) whenever you want to customize the defaults.
-- TLS certificates must be placed as `configs/certs/tls.crt` and `configs/certs/tls.key` when `ENABLE_TLS=true`; those
-  are the defaults under `/app/configs/certs/`, and you only need to set `TLS_CRT`/`TLS_KEY` if you mount them
-  elsewhere.
+- TLS certificates must be placed as `configs/certs/tls.crt` and `configs/certs/tls.key` when `ENABLE_TLS=true`.
 
 ## Volumes
 
@@ -169,7 +160,6 @@ Example payload:
 - Periodically scans `pkg/` and orchestrates the pipeline.
 - Uses `WATCHER_PERIODIC_SCAN_SECONDS` for the scan interval.
 - Skips execution when the cache detects no changes.
-- When `WATCHER_ACCESS_LOG_TAIL=true`, tails `/app/data/_logs/access.log` in a background thread.
 - Downloads missing HB-Store update assets into `/app/data/_cache/`.
 
 ### Auto Formatter (`src/modules/auto_formatter.py`)

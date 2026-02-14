@@ -19,17 +19,13 @@ def welcome():
     print(app_banner)
     rows = []
     items = [
-        ("SERVER_URL", Globals.ENVS.SERVER_URL),
+        ("SERVER_IP", Globals.ENVS.SERVER_IP),
+        ("SERVER_PORT", Globals.ENVS.SERVER_PORT),
         ("ENABLE_TLS", Globals.ENVS.ENABLE_TLS),
         ("LOG_LEVEL", Globals.ENVS.LOG_LEVEL),
         ("WATCHER_ENABLED", Globals.ENVS.WATCHER_ENABLED),
         ("WATCHER_PERIODIC_SCAN_SECONDS", Globals.ENVS.WATCHER_PERIODIC_SCAN_SECONDS),
-        ("WATCHER_SCAN_BATCH_SIZE", Globals.ENVS.WATCHER_SCAN_BATCH_SIZE),
-        ("WATCHER_EXECUTOR_WORKERS", Globals.ENVS.WATCHER_EXECUTOR_WORKERS),
-        ("WATCHER_SCAN_WORKERS", Globals.ENVS.WATCHER_SCAN_WORKERS),
-        ("WATCHER_ACCESS_LOG_TAIL", Globals.ENVS.WATCHER_ACCESS_LOG_TAIL),
-        ("WATCHER_ACCESS_LOG_INTERVAL", Globals.ENVS.WATCHER_ACCESS_LOG_INTERVAL),
-        ("AUTO_ORGANIZER_ENABLED", Globals.ENVS.AUTO_ORGANIZER_ENABLED),
+        ("AUTO_INDEXER_OUTPUT_FORMAT", Globals.ENVS.AUTO_INDEXER_OUTPUT_FORMAT),
     ]
     for key, value in items:
         if isinstance(value, list):

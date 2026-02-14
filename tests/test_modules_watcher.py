@@ -17,7 +17,7 @@ def test_given_media_change_when_pkgs_from_media_changes_then_returns_pkg_path(
     content_id = "UP0000-TEST00000_00-TEST000000000000"
     pkg_path = init_paths.GAME_DIR_PATH / f"{content_id}.pkg"
     pkg_path.write_text("pkg", encoding="utf-8")
-    changes = {"added": {"_media": [f"{content_id}_icon0.png"]}}
+    changes = {"removed": {"_media": [f"{content_id}_icon0.png"]}}
 
     pkgs = watcher._pkgs_from_media_changes(changes)
 
@@ -36,10 +36,19 @@ def test_given_changes_when_run_cycle_then_updates_cache(
         "compare_pkg_cache",
         lambda: Output(
             Status.OK,
-            {"changed": ["game"], "added": {}, "updated": {}, "removed": {}},
+            {
+                "changed": ["game"],
+                "added": {"game": ["UP0000-TEST00000_00-TEST000000000000"]},
+                "updated": {},
+                "removed": {},
+                "current_files": {
+                    "game": {
+                        "UP0000-TEST00000_00-TEST000000000000": "sample.pkg"
+                    }
+                },
+            },
         ),
     )
-    monkeypatch.setattr(pkg_utils_module.PkgUtils, "scan", lambda _s: [pkg_path])
     monkeypatch.setattr(
         pkg_utils_module.PkgUtils,
         "validate",
@@ -49,6 +58,14 @@ def test_given_changes_when_run_cycle_then_updates_cache(
         pkg_utils_module.PkgUtils,
         "extract_pkg_data",
         lambda _p: Output(
+            Status.OK,
+            ("param_sfo", "medias"),
+        ),
+    )
+    monkeypatch.setattr(
+        pkg_utils_module.PkgUtils,
+        "build_pkg",
+        lambda _p, _sfo, _medias: Output(
             Status.OK,
             PKG(
                 title="t",
@@ -63,7 +80,7 @@ def test_given_changes_when_run_cycle_then_updates_cache(
     monkeypatch.setattr(
         auto_organizer_module.AutoOrganizer,
         "run",
-        lambda _p, _s: _p,
+        lambda _pkg: _pkg.pkg_path,
     )
     monkeypatch.setattr(
         db_utils_module.DBUtils,
@@ -95,10 +112,15 @@ def test_given_validation_error_when_run_cycle_then_moves_to_error(
         "compare_pkg_cache",
         lambda: Output(
             Status.OK,
-            {"changed": ["game"], "added": {}, "updated": {}, "removed": {}},
+            {
+                "changed": ["game"],
+                "added": {"game": ["bad"]},
+                "updated": {},
+                "removed": {},
+                "current_files": {"game": {"bad": "bad.pkg"}},
+            },
         ),
     )
-    monkeypatch.setattr(pkg_utils_module.PkgUtils, "scan", lambda _s: [pkg_path])
     monkeypatch.setattr(
         pkg_utils_module.PkgUtils,
         "validate",
