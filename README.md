@@ -1,8 +1,29 @@
 # hb-store-m1
 
+[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A590%25-brightgreen)](https://github.com/fabiocdo/hb-store-m1)
+[![Docker Hub](https://img.shields.io/docker/v/fabiocdo/hb-store-m1?label=dockerhub&sort=semver)](https://hub.docker.com/repository/docker/fabiocdo/hb-store-m1)
+[![Docker Pulls](https://img.shields.io/docker/pulls/fabiocdo/hb-store-m1)](https://hub.docker.com/repository/docker/fabiocdo/hb-store-m1)
+
 Local CDN for PS4 Homebrew PKGs, with automatic organization, media extraction, SQLite indexing (`store.db`), and optional fPKGi JSON output.
 
 ![hb-store-m1](assets/512.png)
+
+## Project Links
+
+- GitLab: https://gitlab.com/fabiocdo/hb-store-m1
+- GitHub: https://github.com/fabiocdo/hb-store-m1
+- Docker Hub: https://hub.docker.com/repository/docker/fabiocdo/hb-store-m1
+
+## Open Source and Community Intent
+
+This project is open source, built as a community utility, and maintained as a hobby/non-profit effort.
+
+- Anyone can use, modify, and distribute it.
+- Commercial intent is not the project's goal.
+- Credits are kindly requested when redistributing forks/derivatives.
+- Feedback is welcome via issues/PRs on GitLab or GitHub.
+- GitLab issues: https://gitlab.com/fabiocdo/hb-store-m1/-/issues
+- GitHub issues: https://github.com/fabiocdo/hb-store-m1/issues
 
 ## Overview
 
@@ -254,45 +275,42 @@ From the `PKG` model:
 
 | Endpoint | Source | Behavior |
 |---|---|---|
-| `/` | redirect | `302` to `/store.db` |
+| `/` | `/_cache/index.html` | status/info HTML page with endpoint links and live UP/DOWN checks |
+| `/health` | inline response | returns `{"status":"online"}` |
 | `/store.db` | `/app/data/store.db` | `no-store`, byte-range enabled |
+| `/api.php?db_check_hash=true` | internal API | returns `{"hash":"<md5_of_store.db>"}` |
 | `/api.php` | `/app/data/_cache/store.db.json` | serves JSON if file exists |
+| `/download.php?tid=<TITLE_ID>&check=true` | internal API + SQLite | returns `{"number_of_downloads":N}` |
+| `/download.php?tid=<TITLE_ID>` | internal API + SQLite | serves matching PKG file (supports range via nginx internal path) |
 | `/update/remote.md5` | `/_cache/remote.md5` | `no-store` |
 | `/update/homebrew.elf` | `/_cache/homebrew.elf` | `no-store` |
 | `/update/homebrew.elf.sig` | `/_cache/homebrew.elf.sig` | `no-store` |
-| `/update/store.prx` | `/_cache/store.prx` | `no-store` |
-| `/update/store.prx.sig` | `/_cache/store.prx.sig` | `no-store` |
 | `/pkg/**/*.pkg` | `/app/data/pkg` | long cache (`max-age=31536000`, `immutable`), range |
 | `/pkg/**/*.(png|jpg|jpeg|webp)` | `/app/data/pkg` | 30-day cache |
 | `/pkg/**/*.(json|db)` | `/app/data/pkg` | `no-store` |
 
-## CI/CD (GitLab)
+## Credits and References
 
-Current pipeline (`.gitlab-ci.yml`):
+Project/client references:
 
-1. `test`
-   - runs `pytest` with coverage
-   - gate: `--cov-fail-under=90`
-   - publishes `coverage.xml`
+- PS4-Store client base reference: https://github.com/LightningMods/PS4-Store
+- fPKGi ecosystem/reference format: https://github.com/hippie68/fPKGi
 
-2. `mirror_to_github`
-   - runs on `push` to `main`
-   - executes `git push --mirror` to GitHub
-   - required variables:
-     - `GITHUB_MIRROR_REPO` (`owner/repo`)
-     - `GITHUB_MIRROR_USER`
-     - `GITHUB_MIRROR_TOKEN`
+Core tooling/runtime references:
 
-3. `build`
-   - builds Docker image tagged with commit SHA
-   - exports `image.tar` artifact
+- OpenOrbis toolchain (used in Dockerfile for `pkgtool`): https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain
+- OpenOrbis toolchain Docker image: https://hub.docker.com/r/openorbisofficial/toolchain
+- Python official image (`python:3.12-slim`): https://hub.docker.com/_/python
+- Nginx: https://nginx.org
+- SQLite: https://www.sqlite.org
 
-4. `publish:*` (manual)
-   - `publish:release`, `publish:stable`, `publish:dev`
-   - tag derived from `version` in `pyproject.toml`
-   - required variables:
-     - `DOCKER_HUB_USER`
-     - `DOCKER_HUB_TOKEN`
+Python dependencies (`pyproject.toml`):
+
+- PyGithub: https://github.com/PyGithub/PyGithub
+- pydantic: https://github.com/pydantic/pydantic
+- tabulate: https://github.com/astanin/python-tabulate
+- pytest: https://github.com/pytest-dev/pytest
+- pytest-cov: https://github.com/pytest-dev/pytest-cov
 
 ## Local Development (without Docker)
 
@@ -367,4 +385,6 @@ The app reads version from `pyproject.toml` when available, with fallback to ins
 
 ## License
 
-Add your project license here (for example: MIT, GPL-3.0).
+This project is licensed under MIT. See `LICENSE`.
+
+Gentle request (non-binding): if you publish a fork or derivative, please keep credits to the original project and upstream references.

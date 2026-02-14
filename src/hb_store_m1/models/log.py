@@ -28,6 +28,7 @@ class LogModule(StrEnum):
     FILE_UTIL = LogColor.BRIGHT_PURPLE
     AUTO_ORGANIZER = LogColor.BRIGHT_YELLOW
     WATCHER = LogColor.BRIGHT_RED
+    HTTP_API = LogColor.WHITE
 
     def color(self):
         return self.value

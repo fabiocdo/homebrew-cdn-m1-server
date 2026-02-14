@@ -2,6 +2,7 @@ from tabulate import tabulate
 
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogModule
+from hb_store_m1.modules.http_api import ensure_http_api_started
 from hb_store_m1.modules.watcher import Watcher
 from hb_store_m1.utils.init_utils import InitUtils
 from hb_store_m1.utils.log_utils import LogUtils
@@ -47,6 +48,7 @@ def welcome():
 def main():
     welcome()
     InitUtils.init_all()
+    ensure_http_api_started()
     if Globals.ENVS.WATCHER_ENABLED:
         Watcher().start()
     else:

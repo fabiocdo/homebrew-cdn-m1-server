@@ -74,9 +74,297 @@ fi
 mkdir -p /tmp/nginx/client_body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi
 mkdir -p /var/log/nginx /etc/nginx/conf.d
 mkdir -p /app/data/_logs
+mkdir -p /app/data/_cache
 
 # Normalize the TLS toggle
 ENABLE_TLS_LC="$(printf "%s" "$ENABLE_TLS" | tr '[:upper:]' '[:lower:]')"
+if [ "$ENABLE_TLS_LC" = "true" ] || [ "$ENABLE_TLS_LC" = "1" ] || [ "$ENABLE_TLS_LC" = "yes" ]; then
+  URL_SCHEME="https"
+  DEFAULT_PORT="443"
+else
+  URL_SCHEME="http"
+  DEFAULT_PORT="80"
+fi
+if [ "$SERVER_PORT" = "$DEFAULT_PORT" ]; then
+  SERVER_URL="${URL_SCHEME}://${SERVER_IP}"
+else
+  SERVER_URL="${URL_SCHEME}://${SERVER_IP}:${SERVER_PORT}"
+fi
+
+GENERATED_AT="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+cat > /app/data/_cache/index.html <<EOF
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>HB-Store CDN Status</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Arial, sans-serif;
+      background: #f5f7fb;
+      color: #1f2937;
+      line-height: 1.5;
+    }
+    .wrap {
+      max-width: 900px;
+      margin: 32px auto;
+      padding: 0 16px;
+    }
+    .card {
+      background: #ffffff;
+      border: 1px solid #dbe3ef;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(31, 41, 55, 0.06);
+    }
+    h1 { margin: 0 0 8px; font-size: 26px; }
+    .ok {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #dcfce7;
+      color: #166534;
+      font-weight: 600;
+      margin-bottom: 14px;
+    }
+    .warn {
+      background: #fef3c7;
+      color: #92400e;
+    }
+    h2 { margin: 20px 0 8px; font-size: 18px; }
+    ul { margin: 8px 0 0; padding-left: 20px; }
+    code {
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+    .meta {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #4b5563;
+    }
+    a { color: #0f4db8; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .toolbar {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
+    button {
+      border: 1px solid #c7d2fe;
+      background: #eef2ff;
+      color: #1e3a8a;
+      border-radius: 8px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    button:hover { background: #e0e7ff; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+    th, td {
+      border-bottom: 1px solid #e5e7eb;
+      padding: 8px 6px;
+      text-align: left;
+      vertical-align: top;
+    }
+    .badge {
+      display: inline-block;
+      min-width: 48px;
+      text-align: center;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    .up {
+      background: #dcfce7;
+      color: #166534;
+    }
+    .down {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+    .unknown {
+      background: #f3f4f6;
+      color: #374151;
+    }
+    .small { font-size: 12px; color: #4b5563; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>HB-Store CDN</h1>
+      <div class="ok">Status: ONLINE</div>
+
+      <p>Base URL: <code>${SERVER_URL}</code></p>
+
+      <h2>Health</h2>
+      <ul>
+        <li><a href="/health"><code>/health</code></a> - JSON service status.</li>
+      </ul>
+
+      <h2>Endpoint Healthcheck</h2>
+      <div class="toolbar">
+        <button type="button" id="refresh-health">Refresh checks</button>
+        <span class="small" id="health-updated">Last update: pending...</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Path</th>
+            <th>Status</th>
+            <th>HTTP</th>
+            <th>Type</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="health-table">
+          <tr data-url="/health" data-required="true">
+            <td><code>/health</code></td>
+            <td><span class="badge unknown">...</span></td>
+            <td class="http">-</td>
+            <td>Required</td>
+            <td>Service heartbeat.</td>
+          </tr>
+          <tr data-url="/store.db" data-required="true">
+            <td><code>/store.db</code></td>
+            <td><span class="badge unknown">...</span></td>
+            <td class="http">-</td>
+            <td>Required</td>
+            <td>Main SQLite database.</td>
+          </tr>
+          <tr data-url="/api.php?db_check_hash=true" data-required="true">
+            <td><code>/api.php?db_check_hash=true</code></td>
+            <td><span class="badge unknown">...</span></td>
+            <td class="http">-</td>
+            <td>Required</td>
+            <td>Returns DB MD5 hash for cache validation.</td>
+          </tr>
+          <tr data-url="/game.json" data-required="false">
+            <td><code>/game.json</code></td>
+            <td><span class="badge unknown">...</span></td>
+            <td class="http">-</td>
+            <td>Optional</td>
+            <td>Generated only when FPKGI format is enabled and populated.</td>
+          </tr>
+          <tr data-url="/dlc.json" data-required="false">
+            <td><code>/dlc.json</code></td>
+            <td><span class="badge unknown">...</span></td>
+            <td class="http">-</td>
+            <td>Optional</td>
+            <td>Generated only when FPKGI format is enabled and populated.</td>
+          </tr>
+          <tr data-url="/update/remote.md5" data-required="false">
+            <td><code>/update/remote.md5</code></td>
+            <td><span class="badge unknown">...</span></td>
+            <td class="http">-</td>
+            <td>Optional</td>
+            <td>Store asset metadata file.</td>
+          </tr>
+          <tr data-url="/update/homebrew.elf" data-required="false">
+            <td><code>/update/homebrew.elf</code></td>
+            <td><span class="badge unknown">...</span></td>
+            <td class="http">-</td>
+            <td>Optional</td>
+            <td>Store asset binary.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2>Main Endpoints</h2>
+      <ul>
+        <li><a href="/store.db"><code>/store.db</code></a> - SQLite database.</li>
+        <li><a href="/api.php?db_check_hash=true"><code>/api.php?db_check_hash=true</code></a> - Returns <code>{"hash":"..."}</code>.</li>
+        <li><a href="/api.php"><code>/api.php</code></a> - Optional JSON view from <code>_cache/store.db.json</code>.</li>
+        <li><code>/download.php?tid=&lt;TITLE_ID&gt;&amp;check=true</code> - Returns <code>{"number_of_downloads":N}</code>.</li>
+        <li><code>/download.php?tid=&lt;TITLE_ID&gt;</code> - Serves matching PKG file.</li>
+        <li><a href="/update/remote.md5"><code>/update/remote.md5</code></a> - MD5 metadata.</li>
+        <li><a href="/update/homebrew.elf"><code>/update/homebrew.elf</code></a> - Homebrew ELF binary.</li>
+        <li><a href="/update/homebrew.elf.sig"><code>/update/homebrew.elf.sig</code></a> - Homebrew ELF signature.</li>
+      </ul>
+
+      <h2>PKG Content</h2>
+      <ul>
+        <li><code>/pkg/&lt;section&gt;/&lt;CONTENT_ID&gt;.pkg</code> - PKG files.</li>
+        <li><code>/pkg/_media/&lt;CONTENT_ID&gt;_icon0.png</code> - media assets.</li>
+        <li><code>/pkg/&lt;section&gt;.json</code> - optional fPKGi output when enabled.</li>
+      </ul>
+
+      <div class="meta">
+        Generated at ${GENERATED_AT} by container entrypoint.
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      function setRow(row, up, code) {
+        var badge = row.querySelector(".badge");
+        var http = row.querySelector(".http");
+        if (!badge || !http) {
+          return;
+        }
+        badge.classList.remove("up", "down", "unknown");
+        if (up) {
+          badge.textContent = "UP";
+          badge.classList.add("up");
+        } else {
+          badge.textContent = "DOWN";
+          badge.classList.add("down");
+        }
+        http.textContent = code;
+      }
+
+      async function checkRow(row) {
+        var url = row.getAttribute("data-url");
+        if (!url) {
+          return;
+        }
+        try {
+          var response = await fetch(url, { method: "HEAD", cache: "no-store" });
+          if (response.status === 405) {
+            response = await fetch(url, { method: "GET", cache: "no-store" });
+          }
+          setRow(row, response.ok, String(response.status));
+        } catch (_err) {
+          setRow(row, false, "ERR");
+        }
+      }
+
+      async function runChecks() {
+        var rows = Array.prototype.slice.call(document.querySelectorAll("#health-table tr"));
+        for (var i = 0; i < rows.length; i += 1) {
+          await checkRow(rows[i]);
+        }
+        var updated = document.getElementById("health-updated");
+        if (updated) {
+          updated.textContent = "Last update: " + new Date().toLocaleString();
+        }
+      }
+
+      var button = document.getElementById("refresh-health");
+      if (button) {
+        button.addEventListener("click", function () {
+          runChecks();
+        });
+      }
+      runChecks();
+    })();
+  </script>
+</body>
+</html>
+EOF
 
 # Build the appropriate server block
 if [ "$ENABLE_TLS_LC" = "true" ] || [ "$ENABLE_TLS_LC" = "1" ] || [ "$ENABLE_TLS_LC" = "yes" ]; then
