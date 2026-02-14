@@ -1,5 +1,6 @@
 import time
 import traceback
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -53,6 +54,9 @@ class WatchChanges:
 class Watcher:
     _MEDIA_SECTION_NAME = "_media"
     _MEDIA_SUFFIXES = ("_icon0", "_pic0", "_pic1")
+    _CONTENT_ID_PATTERN = re.compile(
+        r"^[A-Z]{2}[A-Z0-9]{4}-[A-Z0-9]{9}_[0-9]{2}-[A-Z0-9]{16}$"
+    )
 
     def __init__(
         self,
@@ -281,6 +285,53 @@ class Watcher:
         scanned_pkgs.extend(self._pkgs_from_media_changes(changes.removed))
         return list(dict.fromkeys(scanned_pkgs))
 
+    @classmethod
+    def _is_canonical_pkg_filename(cls, pkg_path: Path) -> bool:
+        return bool(cls._CONTENT_ID_PATTERN.match(pkg_path.stem))
+
+    def _collect_non_canonical_pkgs(self) -> list[Path]:
+        non_canonical_pkgs: list[Path] = []
+        for section in self._iter_pkg_sections():
+            if not section.path.exists():
+                continue
+            for pkg_path in section.path.iterdir():
+                if not section.accepts(pkg_path):
+                    continue
+                if not self._is_canonical_pkg_filename(pkg_path):
+                    non_canonical_pkgs.append(pkg_path)
+        return non_canonical_pkgs
+
+    def _has_pkg_for_content_id(self, content_id: str) -> bool:
+        for section in self._iter_pkg_sections():
+            if (section.path / f"{content_id}.pkg").exists():
+                return True
+        return False
+
+    def _normalize_media_files(self) -> None:
+        media_dir = self._paths.MEDIA_DIR_PATH
+        if not media_dir.exists():
+            return
+
+        for media_path in list(media_dir.iterdir()):
+            if not Section.MEDIA.accepts(media_path):
+                continue
+
+            content_id = self._content_id_from_media(media_path.name)
+            if not content_id:
+                self._file_utils.move_to_error(
+                    media_path,
+                    self._paths.ERRORS_DIR_PATH,
+                    "invalid_media_name",
+                )
+                continue
+
+            if not self._has_pkg_for_content_id(content_id):
+                self._file_utils.move_to_error(
+                    media_path,
+                    self._paths.ERRORS_DIR_PATH,
+                    "orphan_media",
+                )
+
     @staticmethod
     def _build_pkg_model(pkg_path: Path, param_sfo) -> PKG:
         return PKG(
@@ -305,29 +356,44 @@ class Watcher:
 
         extract_output = self._pkg_utils.extract_pkg_data(pkg_path)
         if extract_output.status is not Status.OK or not extract_output.content:
+            self._file_utils.move_to_error(
+                pkg_path,
+                self._paths.ERRORS_DIR_PATH,
+                "extract_data_failed",
+            )
             return None
 
         param_sfo = extract_output.content
         pkg = self._build_pkg_model(pkg_path, param_sfo)
 
-        if pkg_path.parent.name in changed_section_set:
-            target_path = self._auto_organizer.run(pkg)
-            if not target_path:
-                self._file_utils.move_to_error(
-                    pkg_path,
-                    self._paths.ERRORS_DIR_PATH,
-                    "organizer_failed",
-                )
-                return None
-            pkg.pkg_path = target_path
-            pkg_path = target_path
+        # Always normalize/move by content_id to guarantee canonical PKG naming.
+        target_path = self._auto_organizer.run(pkg)
+        if not target_path:
+            self._file_utils.move_to_error(
+                pkg_path,
+                self._paths.ERRORS_DIR_PATH,
+                "organizer_failed",
+            )
+            return None
+        pkg.pkg_path = target_path
+        pkg_path = target_path
 
         media_output = self._pkg_utils.extract_pkg_medias(pkg_path, pkg.content_id)
         if media_output.status is not Status.OK or not media_output.content:
+            self._file_utils.move_to_error(
+                pkg_path,
+                self._paths.ERRORS_DIR_PATH,
+                "extract_medias_failed",
+            )
             return None
 
         build_output = self._pkg_utils.build_pkg(pkg_path, param_sfo, media_output.content)
         if build_output.status is not Status.OK:
+            self._file_utils.move_to_error(
+                pkg_path,
+                self._paths.ERRORS_DIR_PATH,
+                "build_failed",
+            )
             return None
 
         return build_output.content
@@ -357,6 +423,15 @@ class Watcher:
     def _run_cycle(self) -> None:
         changes = self._load_changes()
         if not changes:
+            extracted_pkgs = []
+            scanned_pkgs = self._collect_non_canonical_pkgs()
+            for pkg_path in scanned_pkgs:
+                built_pkg = self._process_pkg(pkg_path, set())
+                if built_pkg is not None:
+                    extracted_pkgs.append(built_pkg)
+            if scanned_pkgs:
+                self._persist_results(extracted_pkgs, None)
+            self._normalize_media_files()
             return
 
         changed_section_set = set(changes.changed)
@@ -376,6 +451,7 @@ class Watcher:
                 extracted_pkgs.append(built_pkg)
 
         self._persist_results(extracted_pkgs, changes.current_cache)
+        self._normalize_media_files()
 
     def start(self) -> None:
         log.log_info(f"Watcher started (interval: {self._interval}s)")

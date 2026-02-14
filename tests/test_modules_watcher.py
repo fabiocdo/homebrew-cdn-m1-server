@@ -263,10 +263,31 @@ def test_given_scanned_changes_with_invalid_section_when_collect_scanned_pkgs_th
     assert scanned == []
 
 
+def test_given_canonical_pkg_name_when_check_then_returns_true(init_paths):
+    pkg_path = init_paths.GAME_DIR_PATH / "UP0000-CUSA00000_00-TEST000000000000.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+
+    assert Watcher._is_canonical_pkg_filename(pkg_path) is True
+
+
+def test_given_non_canonical_pkg_name_when_check_then_returns_false(init_paths):
+    pkg_path = init_paths.GAME_DIR_PATH / "sample.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+
+    assert Watcher._is_canonical_pkg_filename(pkg_path) is False
+
+
 def test_given_process_pkg_failures_when_process_pkg_then_returns_none(init_paths, monkeypatch):
     watcher = Watcher()
     pkg_path = init_paths.GAME_DIR_PATH / "sample.pkg"
     pkg_path.write_text("pkg", encoding="utf-8")
+    moved_reasons = []
+
+    monkeypatch.setattr(
+        watcher._file_utils,
+        "move_to_error",
+        lambda _path, _errors_dir, reason: moved_reasons.append(reason) or _path,
+    )
 
     monkeypatch.setattr(
         watcher._pkg_utils, "validate", lambda _p: Output(Status.OK, _p)
@@ -275,6 +296,7 @@ def test_given_process_pkg_failures_when_process_pkg_then_returns_none(init_path
         watcher._pkg_utils, "extract_pkg_data", lambda _p: Output(Status.ERROR, None)
     )
     assert watcher._process_pkg(pkg_path, {"game"}) is None
+    assert moved_reasons[-1] == "extract_data_failed"
 
     sfo = ParamSFO(
         {
@@ -291,12 +313,14 @@ def test_given_process_pkg_failures_when_process_pkg_then_returns_none(init_path
     )
     monkeypatch.setattr(watcher._auto_organizer, "run", lambda _pkg: None)
     assert watcher._process_pkg(pkg_path, {"game"}) is None
+    assert moved_reasons[-1] == "organizer_failed"
 
     monkeypatch.setattr(watcher._auto_organizer, "run", lambda _pkg: pkg_path)
     monkeypatch.setattr(
         watcher._pkg_utils, "extract_pkg_medias", lambda _p, _cid: Output(Status.ERROR, None)
     )
     assert watcher._process_pkg(pkg_path, {"game"}) is None
+    assert moved_reasons[-1] == "extract_medias_failed"
 
     monkeypatch.setattr(
         watcher._pkg_utils, "extract_pkg_medias", lambda _p, _cid: Output(Status.OK, {"icon": _p})
@@ -305,6 +329,7 @@ def test_given_process_pkg_failures_when_process_pkg_then_returns_none(init_path
         watcher._pkg_utils, "build_pkg", lambda _p, _sfo, _m: Output(Status.ERROR, None)
     )
     assert watcher._process_pkg(pkg_path, {"game"}) is None
+    assert moved_reasons[-1] == "build_failed"
 
 
 def test_given_process_pkg_with_validation_warn_when_process_pkg_then_continues(
@@ -348,3 +373,150 @@ def test_given_process_pkg_with_validation_warn_when_process_pkg_then_continues(
 
     assert result == built_pkg
     assert moved["called"] is False
+
+
+def test_given_process_pkg_when_section_not_changed_then_still_runs_organizer(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    pkg_path = init_paths.GAME_DIR_PATH / "sample.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+    called = {"run": 0}
+
+    sfo = ParamSFO(
+        {
+            ParamSFOKey.TITLE: "t",
+            ParamSFOKey.TITLE_ID: "CUSA00001",
+            ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000",
+            ParamSFOKey.CATEGORY: "GD",
+            ParamSFOKey.VERSION: "01.00",
+            ParamSFOKey.PUBTOOLINFO: "",
+        }
+    )
+    built_pkg = PKG(content_id="UP0000-TEST00000_00-TEST000000000000", category="GD")
+
+    monkeypatch.setattr(watcher._pkg_utils, "validate", lambda _p: Output(Status.OK, _p))
+    monkeypatch.setattr(
+        watcher._pkg_utils, "extract_pkg_data", lambda _p: Output(Status.OK, sfo)
+    )
+    monkeypatch.setattr(
+        watcher._auto_organizer,
+        "run",
+        lambda _pkg: called.__setitem__("run", called["run"] + 1) or pkg_path,
+    )
+    monkeypatch.setattr(
+        watcher._pkg_utils, "extract_pkg_medias", lambda _p, _cid: Output(Status.OK, {"icon": _p})
+    )
+    monkeypatch.setattr(
+        watcher._pkg_utils, "build_pkg", lambda _p, _sfo, _m: Output(Status.OK, built_pkg)
+    )
+
+    result = watcher._process_pkg(pkg_path, set())
+
+    assert result == built_pkg
+    assert called["run"] == 1
+
+
+def test_given_invalid_media_name_when_run_cycle_then_moves_media_to_error(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    media_path = init_paths.MEDIA_DIR_PATH / "badname.png"
+    media_path.write_text("png", encoding="utf-8")
+    moved = {"reasons": []}
+
+    monkeypatch.setattr(
+        cache_utils_module.CacheUtils,
+        "compare_pkg_cache",
+        lambda: Output(Status.SKIP, None),
+    )
+    monkeypatch.setattr(
+        watcher._file_utils,
+        "move_to_error",
+        lambda _path, _errors_dir, reason: moved["reasons"].append(reason) or _path,
+    )
+
+    watcher._run_cycle()
+
+    assert "invalid_media_name" in moved["reasons"]
+
+
+def test_given_orphan_media_when_run_cycle_then_moves_media_to_error(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    content_id = "UP0000-TEST00000_00-TEST000000000000"
+    media_path = init_paths.MEDIA_DIR_PATH / f"{content_id}_icon0.png"
+    media_path.write_text("png", encoding="utf-8")
+    moved = {"reasons": []}
+
+    monkeypatch.setattr(
+        cache_utils_module.CacheUtils,
+        "compare_pkg_cache",
+        lambda: Output(Status.SKIP, None),
+    )
+    monkeypatch.setattr(
+        watcher._file_utils,
+        "move_to_error",
+        lambda _path, _errors_dir, reason: moved["reasons"].append(reason) or _path,
+    )
+
+    watcher._run_cycle()
+
+    assert "orphan_media" in moved["reasons"]
+
+
+def test_given_valid_media_with_matching_pkg_when_run_cycle_then_keeps_media(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    content_id = "UP0000-TEST00000_00-TEST000000000000"
+    (init_paths.GAME_DIR_PATH / f"{content_id}.pkg").write_text("pkg", encoding="utf-8")
+    media_path = init_paths.MEDIA_DIR_PATH / f"{content_id}_icon0.png"
+    media_path.write_text("png", encoding="utf-8")
+    moved = {"called": False}
+
+    monkeypatch.setattr(
+        cache_utils_module.CacheUtils,
+        "compare_pkg_cache",
+        lambda: Output(Status.SKIP, None),
+    )
+    monkeypatch.setattr(
+        watcher._file_utils,
+        "move_to_error",
+        lambda *_args, **_kwargs: moved.__setitem__("called", True),
+    )
+
+    watcher._run_cycle()
+
+    assert moved["called"] is False
+
+
+def test_given_no_changes_and_non_canonical_pkg_when_run_cycle_then_forces_processing(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    pkg_path = init_paths.GAME_DIR_PATH / "sample.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+    processed = {"paths": [], "persisted": False}
+
+    monkeypatch.setattr(
+        cache_utils_module.CacheUtils,
+        "compare_pkg_cache",
+        lambda: Output(Status.SKIP, None),
+    )
+    monkeypatch.setattr(
+        watcher,
+        "_process_pkg",
+        lambda _pkg_path, _changed: processed["paths"].append(_pkg_path) or None,
+    )
+    monkeypatch.setattr(
+        watcher,
+        "_persist_results",
+        lambda _pkgs, _cache: processed.__setitem__("persisted", True),
+    )
+
+    watcher._run_cycle()
+
+    assert pkg_path in processed["paths"]
+    assert processed["persisted"] is True

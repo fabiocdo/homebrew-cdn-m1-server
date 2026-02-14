@@ -1,5 +1,6 @@
 stages:
   - test
+  - mirror
   - build
   - publish
 
@@ -27,6 +28,28 @@ test:
     - python -m pip install --no-cache-dir -U pip
     - python -m pip install --no-cache-dir .
     - python -m pytest --cov=hb_store_m1 --cov-report=term-missing --cov-report=xml --cov-fail-under=90
+
+mirror_to_github:
+  image: alpine/git:2.47.2
+  stage: mirror
+  variables:
+    GIT_STRATEGY: none
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH == "main" && $GITHUB_MIRROR_REPO && $GITHUB_MIRROR_USER && $GITHUB_MIRROR_TOKEN'
+  script:
+    - git clone --mirror "$CI_REPOSITORY_URL" repo.git
+    - cd repo.git
+    - git remote add github "https://github.com/${GITHUB_MIRROR_REPO}.git"
+    - |
+      cat > /tmp/askpass.sh <<'EOF'
+      #!/bin/sh
+      case "$1" in
+        *Username*) echo "$GITHUB_MIRROR_USER" ;;
+        *Password*) echo "$GITHUB_MIRROR_TOKEN" ;;
+      esac
+      EOF
+    - chmod 700 /tmp/askpass.sh
+    - GIT_ASKPASS=/tmp/askpass.sh GIT_TERMINAL_PROMPT=0 git push --mirror github
 
 build:
   image: docker:24

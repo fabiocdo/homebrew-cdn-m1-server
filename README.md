@@ -1,47 +1,147 @@
 # hb-store-m1
 
-### Local CDN for PS4 homebrew PKG files using Docker Compose + Nginx with automatic formatting, sorting, icon extraction, and index/database generation.
+Local CDN para PKGs de PS4 Homebrew, com organizacao automatica, extracao de midia, indexacao em SQLite (`store.db`) e saida JSON opcional para fPKGi.
 
-![512.png](assets/512.png)
+![hb-store-m1](assets/512.png)
 
-## Overview
+## Visao geral
 
-- Serves `.pkg` files over HTTP with range requests.
-- Extracts `ICON0_PNG` to `pkg/_media` for cover images.
-- Formats PKG filenames and sorts them into app-type folders.
-- Generates `index.json` (Homebrew Store) and `store.db` (fPKGi) when enabled.
-- Uses a cache (`_cache/index-cache.json`) to skip reprocessing unchanged files.
+O servico sobe em um unico container com dois processos:
 
-## Quick start
+- `nginx` servindo arquivos em `/app/data`
+- `python -u -m hb_store_m1` rodando o watcher em background
 
-The image bundles the watcher/indexer and nginx inside a single container. Run `docker compose up --build` from the repo
-root: Docker Compose creates `./configs`/`./data` for you, mounts `./configs` read-write into `/app/configs`, and the
-entrypoint generates `configs/settings.env` plus `configs/certs/` (if they don’t already exist). After the first run you
-only need to edit `configs/settings.env` to customize `SERVER_IP`, `SERVER_PORT`, the TLS toggle (`ENABLE_TLS`), or any
-optional `WATCHER_*` / `AUTO_INDEXER_*` overrides. When HTTPS is enabled, drop `tls.crt`/`tls.key` into
-`./configs/certs/` and restart; those files already live under `/app/configs/certs/` inside the container, which is
-where the entrypoint looks for them when scaffolding `servers.conf`. `SERVER_IP`, `SERVER_PORT`, and the TLS toggle (
-`ENABLE_TLS`) also control the `SERVER_URL` the indexer embeds in each entry, so make sure they match how clients reach
-the service.
+Pipeline principal:
 
-Mount your PKG directory and caches at `./data` so the watcher and nginx can share `/app/data`.
+1. Inicializa diretorios, banco e assets base.
+2. Detecta mudancas de arquivos PKG/PNG via cache (`store-cache.json`).
+3. Valida PKG, extrai `PARAM.SFO` e midias (`ICON0/PIC0/PIC1`).
+4. Move/renomeia para o destino final por `content_id`.
+5. Atualiza `store.db` e (opcional) arquivos `*.json` por tipo.
 
-### Docker run
+## Arquitetura (execucao)
 
-```bash
-docker run -d \
-  --name hb-store-m1 \
-  -p 80:80 \
-  -p 443:443 \
-  -v ./data:/app/data \
-  -v ./configs:/app/configs \
-  fabiocdo/hb-store-m1:latest
+```mermaid
+flowchart TD
+    A[Container start] --> B[/entrypoint.sh/]
+    B --> C[Carrega configs/settings.env]
+    B --> D[Gera /etc/nginx/conf.d/servers.conf]
+    B --> E[nginx -t]
+    B --> F[python -u -m hb_store_m1]
+    B --> G[nginx -g daemon off]
+
+    F --> H[InitUtils.init_all]
+    H --> H1[init_directories]
+    H --> H2[init_db]
+    H --> H3[init_assets]
+
+    F --> I[Watcher loop]
+    I --> J[CacheUtils.compare_pkg_cache]
+    J --> K{Ha mudancas?}
+    K -->|nao| I
+    K -->|sim| L[Processa PKGs alterados]
+    L --> M[AutoOrganizer + extracao de midia]
+    M --> N[DBUtils.upsert]
+    M --> O[FPKGIUtils.upsert opcional]
+    N --> P[write store-cache.json]
+    O --> P
 ```
 
-### Docker Compose
+## Funcionalidades atuais
+
+- Servir PKGs com `Accept-Ranges` e cache longo.
+- Organizar PKGs por tipo em:
+  - `game`, `dlc`, `update`, `save`, `unknown`
+- Renomear para `<CONTENT_ID>.pkg`.
+- Extrair:
+  - `ICON0_PNG` (obrigatorio)
+  - `PIC0_PNG` e `PIC1_PNG` (opcionais)
+- Atualizar `store.db` com `upsert` por `content_id`.
+- Gerar JSON por tipo quando `FPGKI_FORMAT_ENABLED=true`.
+- Manter cache incremental em `data/_cache/store-cache.json`.
+- Mover arquivos invalidos/conflitantes para `data/_errors`.
+- Persistir logs de `WARN/ERROR` em `data/_logs/app_errors.log`.
+
+## Estrutura do repositorio
+
+```text
+.
+|-- Dockerfile
+|-- docker-compose.yml
+|-- docker/
+|   |-- entrypoint.sh
+|   |-- nginx/
+|   |   |-- nginx.template.conf
+|   |   `-- common.locations.conf
+|-- src/hb_store_m1/
+|   |-- main.py
+|   |-- modules/
+|   |   |-- watcher.py
+|   |   `-- auto_organizer.py
+|   |-- utils/
+|   |   |-- init_utils.py
+|   |   |-- cache_utils.py
+|   |   |-- pkg_utils.py
+|   |   |-- db_utils.py
+|   |   |-- fpkgi_utils.py
+|   |   |-- file_utils.py
+|   |   `-- log_utils.py
+|   |-- helpers/
+|   |   |-- pkgtool.py
+|   |   `-- store_assets_client.py
+|   `-- models/
+|       |-- globals.py
+|       `-- ...
+|-- init/
+|   `-- store_db.sql
+`-- tests/
+```
+
+## Como rodar (Docker Compose)
+
+### 1) Subir
+
+```bash
+docker compose up --build -d
+```
+
+### 2) Ver logs
+
+```bash
+docker compose logs -f hb-store-m1
+```
+
+### 3) Parar
+
+```bash
+docker compose down
+```
+
+## Configuracao (`configs/settings.env`)
+
+O `entrypoint` cria esse arquivo automaticamente na primeira execucao.
+
+| Variavel | Tipo | Default no entrypoint | Descricao |
+|---|---|---|---|
+| `SERVER_IP` | string | `127.0.0.1` | Host usado para compor URLs (`SERVER_URL`). |
+| `SERVER_PORT` | int | `80` | Porta do nginx no container. |
+| `ENABLE_TLS` | bool | `false` | `true` exige `configs/certs/tls.crt` e `tls.key`. |
+| `LOG_LEVEL` | string | `info` | `debug`, `info`, `warn`, `error`. |
+| `WATCHER_ENABLED` | bool | `true` | Liga/desliga watcher. |
+| `WATCHER_PERIODIC_SCAN_SECONDS` | int | `30` | Intervalo do loop de varredura. |
+| `FPGKI_FORMAT_ENABLED` | bool | `false` | Gera/atualiza JSON por tipo (`game.json`, etc.). |
+
+Observacoes:
+
+- O nome da variavel e `FPGKI_FORMAT_ENABLED` (mantido como esta no codigo).
+- `python` roda com `-u` (`unbuffered`) no entrypoint.
+- Quando `ENABLE_TLS=true`, sem certificado o container aborta com erro fatal.
+
+## Volumes
+
+`docker-compose.yml` atual:
 
 ```yaml
-version: "3.9"
 services:
   hb-store-m1:
     build: .
@@ -56,216 +156,189 @@ services:
     restart: unless-stopped
 ```
 
-## Environment variables
+## Layout de dados (`/app/data`)
 
-| Variable                        | Description                                                                                   | Default     |
-|---------------------------------|-----------------------------------------------------------------------------------------------|-------------|
-| `SERVER_IP`                     | Host used to build URLs in the index. Scheme is derived from the TLS toggle (`ENABLE_TLS`).   | `127.0.0.1` |
-| `SERVER_PORT`                   | Port used to build URLs in the index. Scheme is derived from the TLS toggle (`ENABLE_TLS`).   | `80`        |
-| `LOG_LEVEL`                     | Log verbosity: `debug`, `info`, `warn`, `error`.                                              | `info`      |
-| `ENABLE_TLS`                    | Serve Nginx via TLS/HTTPS when `true`; otherwise HTTP only. Controls the `SERVER_URL` scheme. | `false`     |
-| `WATCHER_ENABLED`               | Master switch for watcher-driven automation.                                                  | `true`      |
-| `WATCHER_PERIODIC_SCAN_SECONDS` | Periodic scan interval in seconds.                                                            | `30`        |
-| `FPGKI_FORMAT_ENABLED`          | Enable FPKGI format output.                                                                   | `false`     |
-
-Notes:
-
-- The runtime sources `configs/settings.env` before starting the watcher, so updating that file is all you need to tweak
-  `SERVER_*`, the TLS toggle (`ENABLE_TLS`), `LOG_LEVEL`, or watcher/index behavior; you can still layer extra `-e` /
-  `--env-file` overrides when you run the container.
-- `WATCHER_ENABLED=false` stops all automation.
-- Store DB is always updated.
-- When `ENABLE_TLS=true`, drop TLS certificates under `configs/certs/` so the entrypoint can configure HTTPS.
-- `SERVER_IP` should be just the host (or host:port) without `http://` or `https://`.
-- Ensure `SERVER_IP` matches the host/port used by clients, and toggle `ENABLE_TLS` to select TLS vs HTTP.
-- Data paths are fixed to `/app/data` inside the container.
-- Conflicts are moved to `/app/data/_error/` with a reason appended to `/app/data/_logs/errors.log`.
-- If `configs/settings.env` is absent, the entrypoint writes a minimal template before continuing; edit that file (or
-  replace it with your own) whenever you want to customize the defaults.
-- TLS certificates must be placed as `configs/certs/tls.crt` and `configs/certs/tls.key` when `ENABLE_TLS=true`.
-
-## Volumes
-
-| Volume                   | Description                                                                                                              | Default     |
-|--------------------------|--------------------------------------------------------------------------------------------------------------------------|-------------|
-| `./data:/app/data`       | PKG tree, caches, logs, and generated indexes served by both the watcher and nginx.                                      | `./data`    |
-| `./configs:/app/configs` | Configuration directory containing `settings.env` (auto-generated on first run) and TLS material under `configs/certs/`. | `./configs` |
-
-## Data layout
-
-The `/app/data` volume follows this layout:
-
-```
+```text
 /app/data
-|-- pkg/
-|   |-- game/
-|   |-- update/
-|   |-- dlc/
-|   |-- save/
-|   |-- unknown/
-|   |-- _media/          # extracted icons
-|   |-- _PUT_YOUR_PKGS_HERE
-|   |-- *.pkg
 |-- _cache/
-|   |-- index-cache.json
-|   |-- remote.md5
-|   |-- store.db.md5
-|   |-- store.db.json
+|   |-- store-cache.json
 |   |-- homebrew.elf
 |   |-- homebrew.elf.sig
-|   |-- store.prx
-|   |-- store.prx.sig
-|-- _error/
+|   `-- remote.md5
+|-- _errors/
+|   `-- *.pkg
 |-- _logs/
-|   |-- errors.log
-|-- index.json
+|   `-- app_errors.log
+|-- pkg/
+|   |-- app/
+|   |-- dlc/
+|   |-- game/
+|   |-- save/
+|   |-- update/
+|   |-- unknown/
+|   `-- _media/
 |-- store.db
+|-- dlc.json
+|-- game.json
+|-- save.json
+|-- update.json
+`-- unknown.json
 ```
 
-Notes:
+Observacoes importantes:
 
-- PKGs placed in `pkg/` are formatted and sorted, but only indexed once under a category folder.
-- Files under `_error/` are not indexed.
-- `index.json` is written when enabled by a future toggle (not implemented yet).
-- Update assets are downloaded from the official PS4-Store releases if missing:
-    - Required: `homebrew.elf`, `homebrew.elf.sig`, `remote.md5`
-    - Optional (if present in the release): `store.prx`, `store.prx.sig`
-- `store.db.md5` (plain hash) and `store.db.json` (JSON with `hash`) are generated from `store.db`
-  and used by `/api.php?db_check_hash=true`.
+- `store-cache.json` guarda metadados (`size|mtime_ns|filename`), nao o arquivo PKG em si.
+- Chave do cache tende a ser `content_id`; quando falha leitura, usa fallback pelo nome do arquivo.
+- `data/_errors` recebe PKGs com falha de validacao/conflito/processamento.
 
-## index.json format
+## Fluxo de processamento de PKG
 
-Example payload:
+```mermaid
+sequenceDiagram
+    participant W as Watcher
+    participant C as CacheUtils
+    participant P as PkgUtils
+    participant A as AutoOrganizer
+    participant D as DBUtils
+    participant F as FPKGIUtils
 
-```json
-{
-  "DATA": {
-    "http://localhost:8080/pkg/game/Example%20Game%20%5BCUSA12345%5D.pkg": {
-      "region": "USA",
-      "name": "Example Game",
-      "version": "01.00",
-      "release": "01-13-2023",
-      "size": 123456789,
-      "min_fw": null,
-      "cover_url": "http://localhost:8080/pkg/_media/UP0000-CUSA12345_00-EXAMPLE.png"
-    }
-  }
-}
+    W->>C: compare_pkg_cache()
+    C-->>W: secoes alteradas + arquivos atuais
+    W->>P: validate(pkg)
+    alt Status ERROR
+        W->>W: move_to_error(validation_failed)
+    else Status OK/WARN
+        W->>P: extract_pkg_data(pkg)
+        W->>A: run(pkg)
+        alt falha no organizer
+            W->>W: move_to_error(organizer_failed)
+        else sucesso
+            W->>P: extract_pkg_medias(pkg)
+            W->>P: build_pkg(...)
+            W->>D: upsert(pkgs)
+            opt FPGKI_FORMAT_ENABLED=true
+                W->>F: upsert(pkgs)
+            end
+            W->>C: write_pkg_cache()
+        end
+    end
 ```
 
-## Modules
+## Mapeamento de tipo/regiao
 
-### Watcher (`src/modules/watcher.py`)
+Pelo modelo `PKG`:
 
-- Periodically scans `pkg/` and orchestrates the pipeline.
-- Uses `WATCHER_PERIODIC_SCAN_SECONDS` for the scan interval.
-- Skips execution when the cache detects no changes.
-- Downloads missing HB-Store update assets into `/app/data/_cache/`.
+- Categoria -> tipo:
+  - `AC` -> `dlc`
+  - `GC`/`GD` -> `game`
+  - `GP` -> `update`
+  - `SD` -> `save`
+  - outro -> `unknown`
+- Prefixo do `content_id` -> regiao:
+  - `UP` USA, `EP` EUR, `JP` JAP, `HP/AP/KP` ASIA, resto `UNKNOWN`
 
-### Auto Formatter (`src/modules/auto_formatter.py`)
+## Endpoints HTTP expostos (nginx)
 
-- Renames PKGs to `{CONTENT_ID}.pkg`.
-- Moves conflicts to `_error/` and logs a reason.
+| Endpoint | Origem | Comportamento |
+|---|---|---|
+| `/` | redirect | `302` para `/store.db` |
+| `/store.db` | `/app/data/store.db` | `no-store`, range habilitado |
+| `/api.php` | `/app/data/_cache/store.db.json` | retorna JSON se o arquivo existir |
+| `/update/remote.md5` | `/_cache/remote.md5` | `no-store` |
+| `/update/homebrew.elf` | `/_cache/homebrew.elf` | `no-store` |
+| `/update/homebrew.elf.sig` | `/_cache/homebrew.elf.sig` | `no-store` |
+| `/update/store.prx` | `/_cache/store.prx` | `no-store` |
+| `/update/store.prx.sig` | `/_cache/store.prx.sig` | `no-store` |
+| `/pkg/**/*.pkg` | `/app/data/pkg` | cache longo (`max-age=31536000`, `immutable`), range |
+| `/pkg/**/*.(png|jpg|jpeg|webp)` | `/app/data/pkg` | cache de 30 dias |
+| `/pkg/**/*.(json|db)` | `/app/data/pkg` | `no-store` |
 
-### Auto Sorter (`src/modules/auto_sorter.py`)
+## CI/CD (GitLab)
 
-- Moves PKGs into `game/`, `dlc/`, `update/`, `save/`, or `unknown/` based on `app_type`.
-- Moves conflicts to `_error/`.
+Pipeline atual (`.gitlab-ci.yml`):
 
-### Auto Indexer (`src/modules/auto_indexer.py`)
+1. `test`
+   - roda `pytest` com cobertura
+   - gate: `--cov-fail-under=90`
+   - publica `coverage.xml` (cobertura no GitLab)
 
-- Writes `index.json` and updates `store.db` based on the current plan.
-- Builds URLs using `SERVER_IP` and the TLS toggle (`ENABLE_TLS`) and percent-encodes path segments.
+2. `mirror_to_github`
+   - roda em `push` para `main`
+   - executa `git push --mirror` para GitHub
+   - requer variaveis:
+     - `GITHUB_MIRROR_REPO` (`owner/repo`)
+     - `GITHUB_MIRROR_USER`
+     - `GITHUB_MIRROR_TOKEN`
 
-## Helpers
+3. `build`
+   - build da imagem docker por commit (`$CI_COMMIT_SHA`)
+   - exporta artifact `image.tar`
 
-### WatcherPlanner (`src/modules/helpers/watcher_planner.py`)
+4. `publish:*` (manual)
+   - `publish:release`, `publish:stable`, `publish:dev`
+   - tag baseada no `version` do `pyproject.toml`
+   - requer:
+     - `DOCKER_HUB_USER`
+     - `DOCKER_HUB_TOKEN`
 
-- Scans PKGs via `pkg_scanner` and determines planned actions.
-- Marks each PKG/icon as `allow`, `reject`, or `skip`.
-- Prevents duplicating planned paths and duplicate icon extraction.
+## Desenvolvimento local (sem Docker)
 
-### WatcherExecutor (`src/modules/helpers/watcher_executor.py`)
+Requisitos:
 
-- Executes the plan in order: move errors, extract icons, rename/sort PKGs.
-- Appends reasons to `/app/data/_logs/errors.log` when rejecting.
-- Returns execution stats (moves, renames, extractions, errors, skipped).
+- Python 3.12+
+- `bin/pkgtool` funcional
+- bibliotecas nativas compativeis com o `pkgtool`
 
-## Utils
+Execucao:
 
-### PkgUtils (`src/utils/pkg_utils.py`)
-
-- Reads `PARAM.SFO` using `pkgtool`.
-- Normalizes fields and derives `release_date`, `region`, and `app_type`.
-- Extracts `ICON0_PNG` to `pkg/_media` (dry-run supported).
-
-### PkgScanner (`src/utils/pkg_scanner.py`)
-
-- Scans the PKG tree and detects changes using size/mtime/hash.
-- Reuses cached SFO data when files are unchanged.
-- Marks changes when `SERVER_IP` or the TLS toggle (`ENABLE_TLS`) changes (index URLs must update).
-
-### IndexCache (`src/utils/index_cache.py`)
-
-- Loads/saves `index-cache.json` in `_cache/`.
-- Stores file metadata, SFO payloads, and last generated index entries.
-
-### Log Utils (`src/utils/log_utils.py`)
-
-- Centralized logging with module tags and level filtering.
-- Module color tags: `WATCHER`, `WATCHER_PLANNER`, `WATCHER_EXECUTOR`, `AUTO_FORMATTER`, `AUTO_SORTER`, `AUTO_INDEXER`.
-
-### Utils Models (`src/utils/models/*.py`)
-
-- Defines shared enums and mappings (`REGION_MAP`, `APP_TYPE_MAP`, etc.).
-
-## Flow diagram
-
-```
-Watcher.start()
-  |
-  |-- WatcherPlanner.plan()
-  |     |-- pkg_scanner.scan_pkgs()
-  |           |-- index_cache.load_cache()
-  |           |-- pkg_utils.extract_pkg_data()
-  |
-  |-- WatcherExecutor.run()
-  |     |-- AutoFormatter.run()
-  |     |-- AutoSorter.run()
-  |     |-- pkg_utils.extract_pkg_icon()
-  |
-  |-- AutoIndexer.run()
-        |-- index_cache.load_cache()/save_cache()
-        |-- write index.json / update store.db
+```bash
+python -m venv .venv
+. .venv/bin/activate
+pip install -U pip
+pip install -e .
+python -m hb_store_m1
 ```
 
-## Edge cases and behavior
+Testes:
 
-- Missing or unreadable `PARAM.SFO` -> PKG moved to `_error/`.
-- Duplicate planned names or existing target paths → PKG moved to `_error/`.
-- Missing or invalid `ICON0_PNG` -> PKG moved to `_error/`.
-- If a PKG is already in the correct folder and name, it is marked `skip`.
-- If `SERVER_IP` or the TLS toggle (`ENABLE_TLS`) changes, the index is regenerated even when PKGs are unchanged.
-- Encrypted PKGs may cause `pkgtool` to fail; these are moved to `_error/`.
-- Icons are only extracted when needed (non-existent and not duplicated by another plan item).
-- Extracted icons are optimized with `optipng` when available (lossless).
-
-## Nginx behavior
-
-- Serves `/app/data` directly and supports HTTP range requests for `.pkg`.
-- `index.json` and `store.db` are served with `no-store` to avoid stale caches.
-- Images and PKGs use long-lived cache headers.
-- Access logs are written to `/app/data/_logs/access.log` (tail with `tail -f`).
-- Update endpoints are served from `/app/data/_cache/`:
-    - `/update/remote.md5`
-    - `/update/homebrew.elf`
-    - `/update/homebrew.elf.sig`
-    - `/update/store.prx`
-    - `/update/store.prx.sig`
-- `/api.php?db_check_hash=true` returns `/app/data/_cache/store.db.json`.
+```bash
+.venv/bin/pytest -q
+.venv/bin/pytest --cov=hb_store_m1 --cov-report=term-missing --cov-fail-under=90
+```
 
 ## Troubleshooting
 
-- If the index is not updating, delete `/app/data/_cache/index-cache.json` to force a rebuild.
-- If files are stuck in `_error/`, check `/app/data/_logs/errors.log` for the reason.
-- Ensure `SERVER_IP` matches the host and port used by clients.
+### `docker compose up` nao sobe servico
+
+- Verifique:
+  - `docker compose logs hb-store-m1`
+  - `nginx -t` (ja roda no entrypoint)
+- Causa comum: `ENABLE_TLS=true` sem `configs/certs/tls.crt` e `tls.key`.
+
+### PKG bom foi para `_errors`
+
+- Veja `data/_logs/app_errors.log`.
+- Motivos comuns:
+  - validacao critica falhou
+  - erro ao extrair `PARAM.SFO`
+  - `ICON0_PNG` ausente
+  - conflito de destino (`content_id.pkg` ja existe)
+
+### `No usable version of libssl was found`
+
+- Isso indica dependencia nativa faltando para `pkgtool` em runtime.
+- O Dockerfile do projeto ja copia `libssl.so.1.1` e `libcrypto.so.1.1` da toolchain.
+
+### Versao do app nao atualizou no banner
+
+- Rode com rebuild:
+
+```bash
+docker compose up --build -d
+```
+
+- O banner le versao do `pyproject.toml` quando disponivel, com fallback para metadata do pacote instalado.
+
+## Licenca
+
+Defina aqui a licenca oficial do projeto (ex.: MIT, GPL-3.0).
