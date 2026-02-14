@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 # Stage 1: Orbis Toolchain
 FROM openorbisofficial/toolchain:latest AS toolchain
 
@@ -5,7 +7,8 @@ FROM openorbisofficial/toolchain:latest AS toolchain
 FROM python:3.12-slim AS builder
 WORKDIR /build
 
-RUN python -m pip install --no-cache-dir -U pip build
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install -U pip build
 COPY pyproject.toml /build/
 COPY src/ /build/src/
 RUN python -m build --wheel
@@ -22,8 +25,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 
 COPY --from=builder /build/dist/*.whl /tmp/
-RUN python -m pip install --no-cache-dir -U pip \
- && python -m pip install --no-cache-dir /tmp/*.whl \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install -U pip \
+ && python -m pip install /tmp/*.whl \
  && rm -f /tmp/*.whl
 
 

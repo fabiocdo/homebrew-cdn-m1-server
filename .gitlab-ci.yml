@@ -8,7 +8,14 @@ variables:
   DOCKER_IMAGE: "fabiocdo/hb-store-m1"
   DOCKER_DRIVER: overlay2
   DOCKER_TLS_CERTDIR: ""
+  DOCKER_BUILDKIT: "1"
   PYTHONUNBUFFERED: "1"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+cache:
+  key: "pip-${CI_PROJECT_PATH_SLUG}-${CI_COMMIT_REF_SLUG}"
+  paths:
+    - .cache/pip
 
 test:
   image: python:3.12-slim
@@ -25,8 +32,8 @@ test:
         coverage_format: cobertura
         path: coverage.xml
   script:
-    - python -m pip install --no-cache-dir -U pip
-    - python -m pip install --no-cache-dir .
+    - python -m pip install -U pip
+    - python -m pip install .
     - python -m pytest --cov=hb_store_m1 --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
 mirror_to_github:
@@ -61,7 +68,22 @@ build:
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
     - if: '$CI_COMMIT_BRANCH == "main"'
   script:
-    - docker build -t "$DOCKER_IMAGE:$CI_COMMIT_SHA" .
+    - |
+      if [ -n "${CI_REGISTRY:-}" ] && [ -n "${CI_REGISTRY_USER:-}" ] && [ -n "${CI_REGISTRY_PASSWORD:-}" ]; then
+        echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY" || true
+      fi
+    - docker buildx create --name ci-builder --use || docker buildx use ci-builder
+    - |
+      CACHE_ARGS=""
+      if [ -n "${CI_REGISTRY_IMAGE:-}" ]; then
+        BRANCH_CACHE_REF="${CI_REGISTRY_IMAGE}:buildcache-${CI_COMMIT_REF_SLUG}"
+        MAIN_CACHE_REF="${CI_REGISTRY_IMAGE}:buildcache-main"
+        CACHE_ARGS="--cache-from type=registry,ref=${BRANCH_CACHE_REF} --cache-to type=registry,ref=${BRANCH_CACHE_REF},mode=max"
+        if [ "${CI_COMMIT_REF_SLUG}" != "main" ]; then
+          CACHE_ARGS="--cache-from type=registry,ref=${MAIN_CACHE_REF} ${CACHE_ARGS}"
+        fi
+      fi
+      docker buildx build $CACHE_ARGS -t "$DOCKER_IMAGE:$CI_COMMIT_SHA" --load .
     - docker save "$DOCKER_IMAGE:$CI_COMMIT_SHA" -o image.tar
   artifacts:
     paths:
