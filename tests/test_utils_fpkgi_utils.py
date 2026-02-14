@@ -1,0 +1,135 @@
+import json
+from pathlib import Path
+from urllib.parse import urljoin
+
+from hb_store_m1.models.fpkgi import FPKGI
+from hb_store_m1.models.globals import Globals
+from hb_store_m1.models.output import Status
+from hb_store_m1.models.pkg.pkg import PKG
+from hb_store_m1.utils.fpkgi_utils import FPKGIUtils
+
+
+def _write_template(init_dir: Path) -> None:
+    template = [
+        {
+            "id": "EP0000-CUSA00000_00-GAME000000000000",
+            "name": "Game Title Name",
+            "version": "01.00",
+            "package": "https://url-to-your-pkg-file.pkg",
+            "size": 1024000000,
+            "desc": "Game Description",
+            "icon": "https://url-to-icon.png",
+            "bg_image": "https://url-to-background.png",
+        }
+    ]
+    template_path = init_dir / "json_template.json"
+    template_path.write_text(json.dumps(template), encoding="utf-8")
+
+
+def test_given_pkg_when_upsert_then_writes_json_per_app_type(init_paths):
+    _write_template(init_paths.INIT_DIR_PATH)
+
+    pkg_path = init_paths.GAME_DIR_PATH / "game.pkg"
+    pkg_path.write_text("data", encoding="utf-8")
+    icon_path = init_paths.MEDIA_DIR_PATH / "game_icon0.png"
+    icon_path.write_text("png", encoding="utf-8")
+    pic1_path = init_paths.MEDIA_DIR_PATH / "game_pic1.png"
+    pic1_path.write_text("png", encoding="utf-8")
+
+    dlc_path = init_paths.DLC_DIR_PATH / "dlc.pkg"
+    dlc_path.write_text("data", encoding="utf-8")
+    dlc_icon = init_paths.MEDIA_DIR_PATH / "dlc_icon0.png"
+    dlc_icon.write_text("png", encoding="utf-8")
+
+    game_pkg = PKG(
+        title="Game Title",
+        title_id="CUSA00001",
+        content_id="UP0000-TEST00000_00-TEST000000000000",
+        category="GD",
+        version="01.00",
+        icon0_png_path=icon_path,
+        pic1_png_path=pic1_path,
+        pkg_path=pkg_path,
+    )
+    dlc_pkg = PKG(
+        title="DLC Title",
+        title_id="CUSA00002",
+        content_id="UP0000-TEST00000_00-DLC000000000000",
+        category="AC",
+        version="01.00",
+        icon0_png_path=dlc_icon,
+        pkg_path=dlc_path,
+    )
+
+    result = FPKGIUtils.upsert([game_pkg, dlc_pkg])
+
+    assert result.status is Status.OK
+    assert (init_paths.DATA_DIR_PATH / "game.json").exists()
+    assert (init_paths.DATA_DIR_PATH / "dlc.json").exists()
+
+    game_data = json.loads((init_paths.DATA_DIR_PATH / "game.json").read_text("utf-8"))
+    dlc_data = json.loads((init_paths.DATA_DIR_PATH / "dlc.json").read_text("utf-8"))
+
+    game_entry = game_data[0]
+    expected_pkg_url = urljoin(Globals.ENVS.SERVER_URL, str(pkg_path))
+    expected_icon_url = urljoin(Globals.ENVS.SERVER_URL, str(icon_path))
+    expected_pic1_url = urljoin(Globals.ENVS.SERVER_URL, str(pic1_path))
+
+    assert game_entry[FPKGI.Column.ID.value] == game_pkg.content_id
+    assert game_entry[FPKGI.Column.PACKAGE.value] == expected_pkg_url
+    assert game_entry[FPKGI.Column.ICON.value] == expected_icon_url
+    assert game_entry[FPKGI.Column.BG_IMAGE.value] == expected_pic1_url
+    assert game_entry[FPKGI.Column.SIZE.value] == pkg_path.stat().st_size
+
+    dlc_entry = dlc_data[0]
+    assert dlc_entry[FPKGI.Column.ID.value] == dlc_pkg.content_id
+
+
+def test_given_unchanged_pkg_when_upsert_then_skips(init_paths):
+    _write_template(init_paths.INIT_DIR_PATH)
+
+    pkg_path = init_paths.GAME_DIR_PATH / "game.pkg"
+    pkg_path.write_text("data", encoding="utf-8")
+    icon_path = init_paths.MEDIA_DIR_PATH / "game_icon0.png"
+    icon_path.write_text("png", encoding="utf-8")
+
+    pkg = PKG(
+        title="Game Title",
+        title_id="CUSA00001",
+        content_id="UP0000-TEST00000_00-TEST000000000000",
+        category="GD",
+        version="01.00",
+        icon0_png_path=icon_path,
+        pkg_path=pkg_path,
+    )
+
+    first = FPKGIUtils.upsert([pkg])
+    second = FPKGIUtils.upsert([pkg])
+
+    assert first.status is Status.OK
+    assert second.status is Status.OK
+    assert second.content == 0
+
+
+def test_given_content_ids_when_delete_then_removes_entries(init_paths):
+    _write_template(init_paths.INIT_DIR_PATH)
+
+    pkg_path = init_paths.GAME_DIR_PATH / "game.pkg"
+    pkg_path.write_text("data", encoding="utf-8")
+
+    pkg = PKG(
+        title="Game Title",
+        title_id="CUSA00001",
+        content_id="UP0000-TEST00000_00-TEST000000000000",
+        category="GD",
+        version="01.00",
+        pkg_path=pkg_path,
+    )
+
+    FPKGIUtils.upsert([pkg])
+    delete_result = FPKGIUtils.delete_by_content_ids([pkg.content_id])
+
+    game_data = json.loads((init_paths.DATA_DIR_PATH / "game.json").read_text("utf-8"))
+
+    assert delete_result.status is Status.OK
+    assert not game_data

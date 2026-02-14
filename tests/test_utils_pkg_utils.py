@@ -122,6 +122,40 @@ def test_given_pkg_data_when_extract_then_returns_pkg_model(
     result = PkgUtils.extract_pkg_data(pkg_path)
 
     assert result.status is Status.OK
-    param_sfo, medias = result.content
+    param_sfo = result.content
     assert param_sfo.data[ParamSFOKey.CONTENT_ID].startswith("UP0000-TEST")
-    assert medias
+
+
+def test_given_pkg_when_extract_medias_then_returns_paths(
+    init_paths, param_sfo_lines, monkeypatch
+):
+    pkg_path = init_paths.GAME_DIR_PATH / "sample.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+
+    def fake_list_entries(_pkg):
+        stdout = "\n".join(
+            [
+                "header",
+                "0 0 0 1 PARAM_SFO",
+                "0 0 0 2 ICON0_PNG",
+                "0 0 0 3 PIC0_PNG",
+                "0 0 0 4 PIC1_PNG",
+            ]
+        )
+        return subprocess.CompletedProcess([], 0, stdout=stdout, stderr="")
+
+    def fake_extract(_pkg, _index, output_file):
+        output_path = Path(output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+        return subprocess.CompletedProcess([], 0, stdout="", stderr="")
+
+    monkeypatch.setattr(pkgtool_module.PKGTool, "list_pkg_entries", fake_list_entries)
+    monkeypatch.setattr(pkgtool_module.PKGTool, "extract_pkg_entry", fake_extract)
+
+    result = PkgUtils.extract_pkg_medias(
+        pkg_path, "UP0000-TEST00000_00-TEST000000000000"
+    )
+
+    assert result.status is Status.OK
+    assert result.content

@@ -50,11 +50,11 @@ class PkgUtils:
         if validation.status is not Status.OK:
             return None
 
-        extract_output = PkgUtils.extract_pkg_data(pkg, extract_media=False)
+        extract_output = PkgUtils.extract_pkg_data(pkg)
         if extract_output.status is not Status.OK or not extract_output.content:
             return None
 
-        param_sfo, _medias = extract_output.content
+        param_sfo = extract_output.content
         content_id = (param_sfo.data.get(ParamSFOKey.CONTENT_ID) or "").strip()
         return content_id or None
 
@@ -114,8 +114,8 @@ class PkgUtils:
 
     @staticmethod
     def extract_pkg_data(
-        pkg: Path, extract_media: bool = True
-    ) -> Output[dict[ParamSFO, list[Path]] | Path]:
+        pkg: Path,
+    ) -> Output[ParamSFO | Path]:
 
         if not pkg.is_file():
             log.log_error(f"PKG not found: {pkg}")
@@ -153,66 +153,94 @@ class PkgUtils:
                 param_sfo = PkgUtils.parse_param_sfo_entries(entries_list)
                 log.log_debug(f"PARAM.SFO extracted successfully")
 
-            # Step 3: Extract ICON0.PNG, PIC0.PNG, PIC1.PNG (optional)
-            extracted_medias: dict[PKGEntryKey, Path | None] = {}
-            if extract_media:
-                log.log_debug(f"Extracting MEDIAS from PKG {pkg.name}...")
-
-                content_id = param_sfo.data[ParamSFOKey.CONTENT_ID]
-                media_dir = Path(Globals.PATHS.MEDIA_DIR_PATH)
-
-                targets: list[tuple[PKGEntryKey, bool, Path]] = [
-                    (
-                        PKGEntryKey.ICON0_PNG,
-                        True,
-                        media_dir / f"{content_id}_icon0.png",
-                    ),
-                    (
-                        PKGEntryKey.PIC0_PNG,
-                        False,
-                        media_dir / f"{content_id}_pic0.png",
-                    ),
-                    (
-                        PKGEntryKey.PIC1_PNG,
-                        False,
-                        media_dir / f"{content_id}_pic1.png",
-                    ),
-                ]
-
-                for entry_key, is_critical, file_path in targets:
-                    entry_index = pkg_entries.get(entry_key)
-                    if entry_index is None:
-                        if is_critical:
-                            log.log_error(
-                                f"Cannot extract media from {pkg.name}. {entry_key} was not found"
-                            )
-                            return Output(Status.ERROR, pkg)
-
-                        else:
-                            log.log_debug(
-                                f"Skipping {entry_key} extraction. {entry_key} was not found in {pkg.name}"
-                            )
-                            extracted_medias[entry_key] = None
-                        continue
-
-                    if file_path.exists():
-                        log.log_debug(
-                            f"Skipping {entry_key} extraction. {file_path.name} already exists"
-                        )
-                        extracted_medias[entry_key] = file_path
-                        continue
-
-                    PKGTool.extract_pkg_entry(pkg, entry_index, str(file_path))
-                    log.log_debug(
-                        f"Extracted {entry_key} from {pkg.name} successfully."
-                    )
-                    extracted_medias[entry_key] = file_path
-
             log.log_debug(f"Extracted data successfully from PKG {pkg.name}")
-            return Output(Status.OK, [param_sfo, extracted_medias])
+            return Output(Status.OK, param_sfo)
 
         except Exception as exc:
             log.log_error(f"Failed to extract data from PKG {pkg.name}: {exc}")
+            return Output(Status.ERROR, pkg)
+
+    @staticmethod
+    def extract_pkg_medias(
+        pkg: Path, content_id: str
+    ) -> Output[dict[PKGEntryKey, Path | None] | Path]:
+        if not pkg.is_file():
+            log.log_error(f"PKG not found: {pkg}")
+            return Output(Status.NOT_FOUND, pkg)
+
+        if not (content_id or "").strip():
+            log.log_error(f"Cannot extract medias from {pkg.name}. Missing content_id")
+            return Output(Status.ERROR, pkg)
+
+        try:
+            pkg_entries = {}
+            entries_result = PKGTool.list_pkg_entries(pkg).stdout.splitlines()
+
+            for line in entries_result[1:]:
+                parts = line.split()
+                name = str(parts[4])
+                index = str(parts[3])
+
+                entry_key = PKGEntryKey.__members__.get(name)
+                if entry_key is None:
+                    continue
+
+                pkg_entries[entry_key] = index
+
+            extracted_medias: dict[PKGEntryKey, Path | None] = {}
+            log.log_debug(f"Extracting MEDIAS from PKG {pkg.name}...")
+
+            media_dir = Path(Globals.PATHS.MEDIA_DIR_PATH)
+
+            targets: list[tuple[PKGEntryKey, bool, Path]] = [
+                (
+                    PKGEntryKey.ICON0_PNG,
+                    True,
+                    media_dir / f"{content_id}_icon0.png",
+                ),
+                (
+                    PKGEntryKey.PIC0_PNG,
+                    False,
+                    media_dir / f"{content_id}_pic0.png",
+                ),
+                (
+                    PKGEntryKey.PIC1_PNG,
+                    False,
+                    media_dir / f"{content_id}_pic1.png",
+                ),
+            ]
+
+            for entry_key, is_critical, file_path in targets:
+                entry_index = pkg_entries.get(entry_key)
+                if entry_index is None:
+                    if is_critical:
+                        log.log_error(
+                            f"Cannot extract media from {pkg.name}. {entry_key} was not found"
+                        )
+                        return Output(Status.ERROR, pkg)
+
+                    log.log_debug(
+                        f"Skipping {entry_key} extraction. {entry_key} was not found in {pkg.name}"
+                    )
+                    extracted_medias[entry_key] = None
+                    continue
+
+                if file_path.exists():
+                    log.log_debug(
+                        f"Skipping {entry_key} extraction. {file_path.name} already exists"
+                    )
+                    extracted_medias[entry_key] = file_path
+                    continue
+
+                PKGTool.extract_pkg_entry(pkg, entry_index, str(file_path))
+                log.log_debug(f"Extracted {entry_key} from {pkg.name} successfully.")
+                extracted_medias[entry_key] = file_path
+
+            log.log_debug(f"Extracted medias successfully from PKG {pkg.name}")
+            return Output(Status.OK, extracted_medias)
+
+        except Exception as exc:
+            log.log_error(f"Failed to extract medias from PKG {pkg.name}: {exc}")
             return Output(Status.ERROR, pkg)
 
     @staticmethod

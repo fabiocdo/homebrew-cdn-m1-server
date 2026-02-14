@@ -7,6 +7,7 @@ from github import GithubException
 from hb_store_m1.models import globals as globals_module
 from hb_store_m1.models.globals import _env, _pyproject_value
 from hb_store_m1.models.pkg.metadata.pkg_entry import PKGEntry, PKGEntryKey
+from hb_store_m1.models.pkg.metadata.param_sfo import ParamSFO, ParamSFOKey
 from hb_store_m1.models.pkg.pkg import PKG
 from hb_store_m1.models.pkg.section import SectionEntry
 from hb_store_m1.models.output import Status, Output
@@ -150,9 +151,19 @@ def test_given_upsert_error_when_run_cycle_then_skips_cache_write(
         "hb_store_m1.utils.pkg_utils.PkgUtils.validate",
         lambda _p: Output(Status.OK, _p),
     )
+    sfo = ParamSFO(
+        {
+            ParamSFOKey.TITLE: "t",
+            ParamSFOKey.TITLE_ID: "CUSA00001",
+            ParamSFOKey.CONTENT_ID: "X",
+            ParamSFOKey.CATEGORY: "GD",
+            ParamSFOKey.VERSION: "01.00",
+            ParamSFOKey.PUBTOOLINFO: "",
+        }
+    )
     monkeypatch.setattr(
         "hb_store_m1.utils.pkg_utils.PkgUtils.extract_pkg_data",
-        lambda _p: Output(Status.OK, ("param_sfo", "medias")),
+        lambda _p, **_kwargs: Output(Status.OK, sfo),
     )
     monkeypatch.setattr(
         "hb_store_m1.utils.pkg_utils.PkgUtils.build_pkg",
@@ -161,9 +172,17 @@ def test_given_upsert_error_when_run_cycle_then_skips_cache_write(
         ),
     )
     monkeypatch.setattr(
+        "hb_store_m1.utils.pkg_utils.PkgUtils.extract_pkg_medias",
+        lambda _p, _content_id: Output(Status.OK, {"icon": _p}),
+    )
+    monkeypatch.setattr(
         db_utils_module.DBUtils,
         "upsert",
         lambda _pkgs: Output(Status.ERROR, 1),
+    )
+    monkeypatch.setattr(
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.upsert",
+        lambda _pkgs: Output(Status.OK, 1),
     )
     called = {"write": False}
     monkeypatch.setattr(

@@ -3,11 +3,14 @@ from pathlib import Path
 
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogModule
-from hb_store_m1.models.output import Status
+from hb_store_m1.models.output import Output, Status
 from hb_store_m1.models.pkg.section import Section
+from hb_store_m1.models.pkg.pkg import PKG
+from hb_store_m1.models.pkg.metadata.param_sfo import ParamSFOKey
 from hb_store_m1.modules.auto_organizer import AutoOrganizer
 from hb_store_m1.utils.cache_utils import CacheUtils
 from hb_store_m1.utils.db_utils import DBUtils
+from hb_store_m1.utils.fpkgi_utils import FPKGIUtils
 from hb_store_m1.utils.file_utils import FileUtils
 from hb_store_m1.utils.log_utils import LogUtils
 from hb_store_m1.utils.pkg_utils import PkgUtils
@@ -55,10 +58,50 @@ class Watcher:
         cache_output = CacheUtils.compare_pkg_cache()
 
         if cache_output.status == Status.SKIP:
-            log.log_info("No changes detected.")
-            return
+            if not Globals.ENVS.FPGKI_FORMAT_ENABLED:
+                log.log_info("No changes detected.")
+                return
+            cached = CacheUtils.read_pkg_cache().content or {}
+            current_files = {}
+            rebuild_sections = []
+            for section in Section.ALL:
+                if section.name == "_media":
+                    continue
+                section_cache = cached.get(section.name)
+                if not section_cache or not section_cache.content:
+                    continue
+                json_path = Globals.PATHS.DATA_DIR_PATH / f"{section.name}.json"
+                if json_path.exists():
+                    continue
+                rebuild_sections.append(section.name)
+                file_map = {}
+                for key, value in section_cache.content.items():
+                    parts = value.split("|", 2)
+                    if len(parts) >= 3 and parts[2]:
+                        filename = parts[2]
+                    else:
+                        filename = f"{key}.pkg"
+                    file_map[key] = filename
+                current_files[section.name] = file_map
 
-        changes = cache_output.content or {}
+            if not rebuild_sections:
+                log.log_info("No changes detected.")
+                return
+
+            changes = {
+                "changed": rebuild_sections,
+                "added": {
+                    name: list((current_files.get(name) or {}).keys())
+                    for name in rebuild_sections
+                },
+                "updated": {},
+                "removed": {},
+                "current_files": current_files,
+                "current_cache": cached,
+            }
+        else:
+            changes = cache_output.content or {}
+
         changed_sections = changes.get("changed") or []
         changed_section_set = set(changed_sections)
 
@@ -87,6 +130,11 @@ class Watcher:
             delete_result = DBUtils.delete_by_content_ids(unique_ids)
             if delete_result.status is Status.ERROR:
                 log.log_error("Failed to delete removed PKGs from STORE.DB")
+
+            if Globals.ENVS.FPGKI_FORMAT_ENABLED:
+                fpkgi_delete = FPKGIUtils.delete_by_content_ids(unique_ids)
+                if fpkgi_delete.status is Status.ERROR:
+                    log.log_error("Failed to delete removed PKGs from FPKGI JSON")
 
             media_dir = Globals.PATHS.MEDIA_DIR_PATH
             for content_id in unique_ids:
@@ -142,13 +190,16 @@ class Watcher:
             if extract_output.status is not Status.OK or not extract_output.content:
                 continue
 
-            param_sfo, medias = extract_output.content
-            build_output = PkgUtils.build_pkg(pkg_path, param_sfo, medias)
-
-            if build_output.status is not Status.OK:
-                continue
-
-            pkg = build_output.content
+            param_sfo = extract_output.content
+            pkg = PKG(
+                title=param_sfo.data[ParamSFOKey.TITLE],
+                title_id=param_sfo.data[ParamSFOKey.TITLE_ID],
+                content_id=param_sfo.data[ParamSFOKey.CONTENT_ID],
+                category=param_sfo.data[ParamSFOKey.CATEGORY],
+                version=param_sfo.data[ParamSFOKey.VERSION],
+                pubtoolinfo=param_sfo.data[ParamSFOKey.PUBTOOLINFO],
+                pkg_path=pkg_path,
+            )
 
             if pkg_path.parent.name in changed_section_set:
 
@@ -162,11 +213,30 @@ class Watcher:
                     )
                     continue
                 pkg.pkg_path = target_path
+                pkg_path = target_path
 
-            extracted_pkgs.append(pkg)
+            media_output = PkgUtils.extract_pkg_medias(pkg_path, pkg.content_id)
+
+            if media_output.status is not Status.OK or not media_output.content:
+                continue
+
+            build_output = PkgUtils.build_pkg(pkg_path, param_sfo, media_output.content)
+
+            if build_output.status is not Status.OK:
+                continue
+
+            extracted_pkgs.append(build_output.content)
 
         upsert_result = DBUtils.upsert(extracted_pkgs)
-        if upsert_result.status in (Status.OK, Status.SKIP):
+        if Globals.ENVS.FPGKI_FORMAT_ENABLED:
+            fpkgi_result = FPKGIUtils.upsert(extracted_pkgs)
+        else:
+            fpkgi_result = Output(Status.SKIP, "FPKGI disabled")
+
+        if (
+            upsert_result.status in (Status.OK, Status.SKIP)
+            and fpkgi_result.status in (Status.OK, Status.SKIP)
+        ):
             current_cache = changes.get("current_cache") or None
             if current_cache is not None:
                 CacheUtils.write_pkg_cache(cached=current_cache)
@@ -174,7 +244,10 @@ class Watcher:
                 CacheUtils.write_pkg_cache()
             return
 
-        log.log_error("Store DB update failed. Cache not updated.")
+        if upsert_result.status is Status.ERROR:
+            log.log_error("Store DB update failed. Cache not updated.")
+        if fpkgi_result.status is Status.ERROR:
+            log.log_error("FPKGI JSON update failed. Cache not updated.")
 
     def start(self) -> None:
         log.log_info(f"Watcher started (interval: {self._interval}s)")

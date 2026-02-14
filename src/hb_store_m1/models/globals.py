@@ -89,10 +89,6 @@ class _GlobalFiles:
         return self.paths.DATA_DIR_PATH / "store.db"
 
     @property
-    def INDEX_CACHE_JSON_FILE_PATH(self) -> _Path:
-        return self.paths.CACHE_DIR_PATH / "index-cache.json"
-
-    @property
     def STORE_CACHE_JSON_FILE_PATH(self) -> _Path:
         return self.paths.CACHE_DIR_PATH / "store-cache.json"
 

@@ -21,6 +21,7 @@ class LogColor(StrEnum):
 
 class LogModule(StrEnum):
     DB_UTIL = LogColor.BRIGHT_BLUE
+    FPKGI_UTIL = LogColor.BRIGHT_GRAY
     PKG_UTIL = LogColor.BRIGHT_GREEN
     INIT_UTIL = LogColor.BRIGHT_CYAN
     CACHE_UTIL = LogColor.BRIGHT_MAGENTA

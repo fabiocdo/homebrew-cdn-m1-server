@@ -3,9 +3,11 @@ import pytest
 from hb_store_m1.models.output import Output, Status
 from hb_store_m1.modules.watcher import Watcher
 from hb_store_m1.models.pkg.pkg import PKG
+from hb_store_m1.models.pkg.metadata.param_sfo import ParamSFO, ParamSFOKey
 from hb_store_m1.utils import cache_utils as cache_utils_module
 from hb_store_m1.utils import pkg_utils as pkg_utils_module
 from hb_store_m1.utils import db_utils as db_utils_module
+from hb_store_m1.utils import fpkgi_utils as fpkgi_utils_module
 from hb_store_m1.utils import file_utils as file_utils_module
 from hb_store_m1.modules import auto_organizer as auto_organizer_module
 
@@ -54,13 +56,25 @@ def test_given_changes_when_run_cycle_then_updates_cache(
         "validate",
         lambda _p: Output(Status.OK, _p),
     )
+    sfo = ParamSFO(
+        {
+            ParamSFOKey.TITLE: "t",
+            ParamSFOKey.TITLE_ID: "CUSA00001",
+            ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000",
+            ParamSFOKey.CATEGORY: "GD",
+            ParamSFOKey.VERSION: "01.00",
+            ParamSFOKey.PUBTOOLINFO: "",
+        }
+    )
     monkeypatch.setattr(
         pkg_utils_module.PkgUtils,
         "extract_pkg_data",
-        lambda _p: Output(
-            Status.OK,
-            ("param_sfo", "medias"),
-        ),
+        lambda _p, **_kwargs: Output(Status.OK, sfo),
+    )
+    monkeypatch.setattr(
+        pkg_utils_module.PkgUtils,
+        "extract_pkg_medias",
+        lambda _p, _content_id: Output(Status.OK, {"icon": _p}),
     )
     monkeypatch.setattr(
         pkg_utils_module.PkgUtils,
@@ -84,6 +98,11 @@ def test_given_changes_when_run_cycle_then_updates_cache(
     )
     monkeypatch.setattr(
         db_utils_module.DBUtils,
+        "upsert",
+        lambda _pkgs: Output(Status.OK, 1),
+    )
+    monkeypatch.setattr(
+        fpkgi_utils_module.FPKGIUtils,
         "upsert",
         lambda _pkgs: Output(Status.OK, 1),
     )
