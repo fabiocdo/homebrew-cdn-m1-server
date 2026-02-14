@@ -305,3 +305,46 @@ def test_given_process_pkg_failures_when_process_pkg_then_returns_none(init_path
         watcher._pkg_utils, "build_pkg", lambda _p, _sfo, _m: Output(Status.ERROR, None)
     )
     assert watcher._process_pkg(pkg_path, {"game"}) is None
+
+
+def test_given_process_pkg_with_validation_warn_when_process_pkg_then_continues(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    pkg_path = init_paths.GAME_DIR_PATH / "sample.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+    moved = {"called": False}
+
+    sfo = ParamSFO(
+        {
+            ParamSFOKey.TITLE: "t",
+            ParamSFOKey.TITLE_ID: "CUSA00001",
+            ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000",
+            ParamSFOKey.CATEGORY: "GD",
+            ParamSFOKey.VERSION: "01.00",
+            ParamSFOKey.PUBTOOLINFO: "",
+        }
+    )
+    built_pkg = PKG(content_id="UP0000-TEST00000_00-TEST000000000000", category="GD")
+
+    monkeypatch.setattr(watcher._pkg_utils, "validate", lambda _p: Output(Status.WARN, _p))
+    monkeypatch.setattr(
+        watcher._pkg_utils, "extract_pkg_data", lambda _p: Output(Status.OK, sfo)
+    )
+    monkeypatch.setattr(watcher._auto_organizer, "run", lambda _pkg: pkg_path)
+    monkeypatch.setattr(
+        watcher._pkg_utils, "extract_pkg_medias", lambda _p, _cid: Output(Status.OK, {"icon": _p})
+    )
+    monkeypatch.setattr(
+        watcher._pkg_utils, "build_pkg", lambda _p, _sfo, _m: Output(Status.OK, built_pkg)
+    )
+    monkeypatch.setattr(
+        watcher._file_utils,
+        "move_to_error",
+        lambda *_args, **_kwargs: moved.__setitem__("called", True),
+    )
+
+    result = watcher._process_pkg(pkg_path, {"game"})
+
+    assert result == built_pkg
+    assert moved["called"] is False

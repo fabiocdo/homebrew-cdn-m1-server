@@ -16,8 +16,17 @@ test:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_PIPELINE_SOURCE == "push" && $CI_OPEN_MERGE_REQUESTS'
     - if: '$CI_COMMIT_BRANCH == "main"'
+  coverage: '/TOTAL\s+\d+\s+\d+\s+(\d+%)/'
+  artifacts:
+    when: always
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.xml
   script:
-    - python -m unittest discover -s tests -p "test_*.py"
+    - python -m pip install --no-cache-dir -U pip
+    - python -m pip install --no-cache-dir .
+    - python -m pytest --cov=hb_store_m1 --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
 build:
   image: docker:24

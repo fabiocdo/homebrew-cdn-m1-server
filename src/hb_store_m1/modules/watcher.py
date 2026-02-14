@@ -295,7 +295,7 @@ class Watcher:
 
     def _process_pkg(self, pkg_path: Path, changed_section_set: set[str]):
         validation = self._pkg_utils.validate(pkg_path)
-        if validation.status is not Status.OK:
+        if validation.status not in (Status.OK, Status.WARN):
             self._file_utils.move_to_error(
                 pkg_path,
                 self._paths.ERRORS_DIR_PATH,

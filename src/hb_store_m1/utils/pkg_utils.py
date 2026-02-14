@@ -85,7 +85,7 @@ class PkgUtils:
     @staticmethod
     def read_content_id(pkg: Path) -> str | None:
         validation = PkgUtils.validate(pkg)
-        if validation.status is not Status.OK:
+        if validation.status not in (Status.OK, Status.WARN):
             return None
 
         extract_output = PkgUtils.extract_pkg_data(pkg)
@@ -122,20 +122,25 @@ class PkgUtils:
 
     @staticmethod
     def validate(pkg: Path) -> Output:
+        validation_result: list[str] = []
+        command_failed = False
+        command_error_message = ""
         try:
             validation_result = PKGTool.validate_pkg(pkg).stdout.splitlines()
-        except (
-            subprocess.CalledProcessError,
-            subprocess.TimeoutExpired,
-            OSError,
-        ):
-            log.log_error(f"PKG {pkg.name} validation failed")
+        except subprocess.CalledProcessError as exc:
+            command_failed = True
+            validation_result = (exc.stdout or "").splitlines()
+            command_error_message = (exc.stderr or "").strip()
+        except (subprocess.TimeoutExpired, OSError) as exc:
+            log.log_error(f"PKG {pkg.name} validation failed: {exc}")
             return Output(Status.ERROR, pkg)
 
+        found_error_line = False
         for line in validation_result:
             if "[ERROR]" not in line:
                 continue
 
+            found_error_line = True
             for field in ValidationFields:
                 name, level = field.value
                 if name in line:
@@ -146,6 +151,17 @@ class PkgUtils:
                         return Output(Status.ERROR, pkg)
                     log.log_warn(f"PKG {pkg.name} validation warning on [{name}] field")
                     return Output(Status.WARN, pkg)
+
+            log.log_error(f"PKG {pkg.name} validation failed: {line.strip()}")
+            return Output(Status.ERROR, pkg)
+
+        if command_failed:
+            details = f": {command_error_message}" if command_error_message else ""
+            if found_error_line:
+                log.log_error(f"PKG {pkg.name} validation failed{details}")
+            else:
+                log.log_error(f"PKG {pkg.name} validation failed{details}")
+            return Output(Status.ERROR, pkg)
 
         log.log_debug(f"PKG {pkg.name} validation successful")
         return Output(Status.OK, pkg)

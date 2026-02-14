@@ -1,14 +1,71 @@
 import os
 import tomllib
 from dataclasses import dataclass
+from importlib import metadata as _metadata
 from pathlib import Path as _Path
 
 
+def _resolve_pyproject_path(path: _Path) -> _Path | None:
+    if path.exists():
+        return path
+
+    if path.name != "pyproject.toml":
+        return None
+
+    seen = set()
+    search_roots = [path.parent, _Path.cwd(), _Path(__file__).resolve().parent]
+    for root in search_roots:
+        for parent in (root, *root.parents):
+            candidate = parent / "pyproject.toml"
+            key = str(candidate)
+            if key in seen:
+                continue
+            seen.add(key)
+            if candidate.exists():
+                return candidate
+    return None
+
+
 def _pyproject_value(path: _Path, key: str, default: str = "") -> str:
-    if not path.exists():
+    resolved_path = _resolve_pyproject_path(path)
+    if resolved_path is None:
         return default
-    data = tomllib.loads(path.read_text("utf-8"))
-    return data.get("project", {}).get(key, default)
+
+    try:
+        data = tomllib.loads(resolved_path.read_text("utf-8"))
+    except (OSError, tomllib.TOMLDecodeError):
+        return default
+
+    value = data.get("project", {}).get(key, default)
+    return value if isinstance(value, str) else default
+
+
+def _installed_dist_value(meta_key: str, default: str = "") -> str:
+    for dist_name in ("hb-store-m1", "hb_store_m1"):
+        try:
+            meta = _metadata.metadata(dist_name)
+        except _metadata.PackageNotFoundError:
+            continue
+        except Exception:
+            continue
+
+        value = (meta.get(meta_key) or "").strip()
+        if value:
+            return value
+    return default
+
+
+def _installed_dist_version(default: str = "") -> str:
+    for dist_name in ("hb-store-m1", "hb_store_m1"):
+        try:
+            value = (_metadata.version(dist_name) or "").strip()
+        except _metadata.PackageNotFoundError:
+            continue
+        except Exception:
+            continue
+        if value:
+            return value
+    return default
 
 
 def _env(name: str, default, type_):
@@ -119,11 +176,17 @@ class _GlobalEnvs:
 
     @property
     def APP_NAME(self) -> str:
-        return _pyproject_value(self.files.PYPROJECT_FILE_PATH, "name", "hb-store-m1")
+        pyproject_name = _pyproject_value(self.files.PYPROJECT_FILE_PATH, "name", "")
+        if pyproject_name:
+            return pyproject_name
+        return _installed_dist_value("Name", "hb-store-m1")
 
     @property
     def APP_VERSION(self) -> str:
-        return _pyproject_value(self.files.PYPROJECT_FILE_PATH, "version", "0.0.1")
+        pyproject_version = _pyproject_value(self.files.PYPROJECT_FILE_PATH, "version", "")
+        if pyproject_version:
+            return pyproject_version
+        return _installed_dist_version("0.0.1")
 
     @property
     def SERVER_URL(self) -> str:

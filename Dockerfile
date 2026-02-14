@@ -28,7 +28,10 @@ RUN python -m pip install --no-cache-dir -U pip \
 
 
 ENV DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
+ENV PYTHONUNBUFFERED=1
 COPY --from=toolchain /lib/OpenOrbisSDK/bin/linux/PkgTool.Core /usr/local/bin/pkgtool
+COPY --from=toolchain /usr/lib/x86_64-linux-gnu/libssl.so.1.1 /usr/lib/x86_64-linux-gnu/libssl.so.1.1
+COPY --from=toolchain /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1 /usr/lib/x86_64-linux-gnu/libcrypto.so.1.1
 RUN chmod +x /usr/local/bin/pkgtool
 RUN mkdir -p /app/bin && ln -sf /usr/local/bin/pkgtool /app/bin/pkgtool
 

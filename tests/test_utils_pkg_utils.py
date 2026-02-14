@@ -119,6 +119,24 @@ def test_given_pkgtool_failure_when_validate_then_returns_error(
     assert result.status is Status.ERROR
 
 
+def test_given_pkgtool_non_zero_with_non_critical_output_when_validate_then_returns_warn(
+    temp_globals, monkeypatch
+):
+    def fake_validate(_pkg):
+        raise subprocess.CalledProcessError(
+            1,
+            ["pkgtool"],
+            output="[ERROR] PIC0_PNG digest mismatch",
+            stderr="",
+        )
+
+    monkeypatch.setattr(pkgtool_module.PKGTool, "validate_pkg", fake_validate)
+
+    result = PkgUtils.validate(Path("game.pkg"))
+
+    assert result.status is Status.WARN
+
+
 def test_given_pkg_data_when_extract_then_returns_pkg_model(
     init_paths, param_sfo_lines, monkeypatch
 ):
@@ -208,6 +226,16 @@ def test_given_read_content_id_when_extract_fails_then_returns_none(monkeypatch)
     monkeypatch.setattr(PkgUtils, "extract_pkg_data", lambda _pkg: Output(Status.ERROR, None))
 
     assert PkgUtils.read_content_id(Path("x.pkg")) is None
+
+
+def test_given_read_content_id_when_validate_warn_then_extracts(monkeypatch):
+    sfo = ParamSFO({ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000"})
+    monkeypatch.setattr(PkgUtils, "validate", lambda _pkg: Output(Status.WARN, None))
+    monkeypatch.setattr(PkgUtils, "extract_pkg_data", lambda _pkg: Output(Status.OK, sfo))
+
+    content_id = PkgUtils.read_content_id(Path("x.pkg"))
+
+    assert content_id == "UP0000-TEST00000_00-TEST000000000000"
 
 
 def test_given_missing_section_root_when_scan_then_skips(init_paths):

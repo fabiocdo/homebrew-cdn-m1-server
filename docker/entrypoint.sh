@@ -38,7 +38,7 @@ else
   echo "[warn] settings.env not found at $SETTINGS_FILE; using defaults"
 fi
 
-: "${SERVER_IP:=0.0.0.0}"
+: "${SERVER_IP:=127.0.0.1}"
 : "${SERVER_PORT:=80}"
 : "${ENABLE_TLS:=false}"
 : "${LOG_LEVEL:=info}"
@@ -102,5 +102,5 @@ fi
 nginx -t
 
 # Start the watcher (background) and run nginx in the foreground
-python -m hb_store_m1 &
+python -u -m hb_store_m1 &
 exec nginx -g 'daemon off;'

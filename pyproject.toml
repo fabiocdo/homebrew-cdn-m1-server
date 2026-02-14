@@ -7,7 +7,7 @@ dependencies = [
     "pydantic",
     "pytest",
     "pytest-cov",
-    "tabulate",
+    "tabulate"
 ]
 
 [build-system]
