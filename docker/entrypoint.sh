@@ -25,6 +25,14 @@ WATCHER_ENABLED=true
 WATCHER_PERIODIC_SCAN_SECONDS=30
 # Enable FPKGI format output. Value type: boolean.
 FPGKI_FORMAT_ENABLED=false
+# Generic timeout (seconds) for lightweight pkgtool commands.
+PKGTOOL_TIMEOUT_SECONDS=300
+# Base timeout (seconds) for pkg_validate.
+PKGTOOL_VALIDATE_TIMEOUT_SECONDS=300
+# Extra timeout budget by file size (seconds per GiB) for pkg_validate.
+PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS=45
+# Hard cap timeout (seconds) for pkg_validate. Set 0 to disable cap.
+PKGTOOL_VALIDATE_TIMEOUT_MAX_SECONDS=3600
 EOF
   echo "[info] Generated default settings.env at $SETTINGS_FILE"
 fi
@@ -45,6 +53,10 @@ fi
 : "${WATCHER_ENABLED:=true}"
 : "${WATCHER_PERIODIC_SCAN_SECONDS:=30}"
 : "${FPGKI_FORMAT_ENABLED:=false}"
+: "${PKGTOOL_TIMEOUT_SECONDS:=300}"
+: "${PKGTOOL_VALIDATE_TIMEOUT_SECONDS:=300}"
+: "${PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS:=45}"
+: "${PKGTOOL_VALIDATE_TIMEOUT_MAX_SECONDS:=3600}"
 
 TLS_DIR="$CONFIG_DIR/certs"
 TLS_CRT="${TLS_DIR}/tls.crt"
@@ -61,6 +73,7 @@ fi
 # Prepare nginx runtime directories
 mkdir -p /tmp/nginx/client_body /tmp/nginx/proxy /tmp/nginx/fastcgi /tmp/nginx/uwsgi /tmp/nginx/scgi
 mkdir -p /var/log/nginx /etc/nginx/conf.d
+mkdir -p /app/data/_logs
 
 # Normalize the TLS toggle
 ENABLE_TLS_LC="$(printf "%s" "$ENABLE_TLS" | tr '[:upper:]' '[:lower:]')"

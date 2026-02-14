@@ -173,6 +173,16 @@ class _GlobalEnvs:
             "WATCHER_PERIODIC_SCAN_SECONDS", 30, int
         )
         self.FPGKI_FORMAT_ENABLED: bool = _env("FPGKI_FORMAT_ENABLED", False, bool)
+        self.PKGTOOL_TIMEOUT_SECONDS: int = _env("PKGTOOL_TIMEOUT_SECONDS", 300, int)
+        self.PKGTOOL_VALIDATE_TIMEOUT_SECONDS: int = _env(
+            "PKGTOOL_VALIDATE_TIMEOUT_SECONDS", 300, int
+        )
+        self.PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS: int = _env(
+            "PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS", 45, int
+        )
+        self.PKGTOOL_VALIDATE_TIMEOUT_MAX_SECONDS: int = _env(
+            "PKGTOOL_VALIDATE_TIMEOUT_MAX_SECONDS", 3600, int
+        )
 
     @property
     def APP_NAME(self) -> str:

@@ -130,12 +130,19 @@ docker compose down
 | `WATCHER_ENABLED` | bool | `true` | Enable/disable watcher loop. |
 | `WATCHER_PERIODIC_SCAN_SECONDS` | int | `30` | Scan loop interval. |
 | `FPGKI_FORMAT_ENABLED` | bool | `false` | Generate/update per-type JSON output (`game.json`, etc.). |
+| `PKGTOOL_TIMEOUT_SECONDS` | int | `300` | Generic timeout for lightweight `pkgtool` commands. |
+| `PKGTOOL_VALIDATE_TIMEOUT_SECONDS` | int | `300` | Base timeout for `pkg_validate`. |
+| `PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS` | int | `45` | Extra timeout budget per GiB for `pkg_validate`. |
+| `PKGTOOL_VALIDATE_TIMEOUT_MAX_SECONDS` | int | `3600` | Upper cap for `pkg_validate` timeout (`0` disables cap). |
 
 Notes:
 
 - The environment variable name is `FPGKI_FORMAT_ENABLED` (kept as-is in code).
 - Python runs with `-u` (unbuffered) in the entrypoint.
 - If `ENABLE_TLS=true` and certs are missing, container startup fails.
+- Validation timeout is adaptive for large files:
+  - `max(PKGTOOL_VALIDATE_TIMEOUT_SECONDS, ceil(size_gib) * PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS)`,
+  - capped by `PKGTOOL_VALIDATE_TIMEOUT_MAX_SECONDS` when this value is greater than `0`.
 
 ## Volumes
 
@@ -188,7 +195,8 @@ services:
 Important notes:
 
 - `store-cache.json` stores metadata (`size|mtime_ns|filename`), not PKG content.
-- Cache key is usually `content_id`; if extraction fails, it temporarily falls back to filename stem.
+- Cache generation is lightweight and does not call `pkgtool`; for new/changed files it uses filename stem as key.
+- After successful processing/normalization, keys converge to canonical `content_id` values.
 - `data/_errors` receives PKGs that fail validation/conflict/processing rules.
 
 ## PKG Processing Flow
@@ -328,6 +336,19 @@ Tests:
 
 - This means a native dependency required by `pkgtool` is missing.
 - Current Dockerfile already copies `libssl.so.1.1` and `libcrypto.so.1.1` from toolchain.
+
+### Large PKGs (`>20GB`) timing out in `pkg_validate`
+
+- Increase timeout knobs in `configs/settings.env`, for example:
+
+```env
+PKGTOOL_VALIDATE_TIMEOUT_SECONDS=300
+PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS=90
+PKGTOOL_VALIDATE_TIMEOUT_MAX_SECONDS=7200
+```
+
+- For very large files, increase `PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS` first.
+- If `settings.env` already existed, add these variables manually (the entrypoint does not overwrite existing files).
 
 ### App version in banner did not update
 

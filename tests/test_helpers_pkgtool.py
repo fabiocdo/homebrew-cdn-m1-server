@@ -26,7 +26,7 @@ def test_given_pkg_path_when_validate_pkg_then_calls_pkgtool_with_expected_args(
     assert captured["kwargs"]["check"] is True
     assert captured["kwargs"]["capture_output"] is True
     assert captured["kwargs"]["text"] is True
-    assert captured["kwargs"]["timeout"] == 120
+    assert captured["kwargs"]["timeout"] == Globals.ENVS.PKGTOOL_VALIDATE_TIMEOUT_SECONDS
     assert captured["kwargs"]["env"] == {"DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1"}
 
 
@@ -64,3 +64,73 @@ def test_given_sfo_path_when_list_sfo_entries_then_calls_pkgtool_with_sfo_comman
 
     assert captured["args"][1] == "sfo_listentries"
     assert captured["args"][2] == str(sfo_path)
+
+
+def test_given_large_pkg_when_validate_timeout_then_scales_by_size(
+    temp_globals, monkeypatch, tmp_path
+):
+    pkg_path = tmp_path / "large.pkg"
+    pkg_path.write_bytes(b"x")
+
+    monkeypatch.setattr(
+        Globals.ENVS,
+        "PKGTOOL_VALIDATE_TIMEOUT_SECONDS",
+        300,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        Globals.ENVS,
+        "PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS",
+        45,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        Globals.ENVS,
+        "PKGTOOL_VALIDATE_TIMEOUT_MAX_SECONDS",
+        3600,
+        raising=False,
+    )
+
+    class _Stat:
+        st_size = 25 * 1024**3
+
+    monkeypatch.setattr(Path, "stat", lambda _self: _Stat())
+
+    timeout = PKGTool._validate_timeout_seconds(pkg_path)
+
+    assert timeout == 1125
+
+
+def test_given_huge_pkg_when_validate_timeout_then_respects_max(
+    temp_globals, monkeypatch, tmp_path
+):
+    pkg_path = tmp_path / "huge.pkg"
+    pkg_path.write_bytes(b"x")
+
+    monkeypatch.setattr(
+        Globals.ENVS,
+        "PKGTOOL_VALIDATE_TIMEOUT_SECONDS",
+        300,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        Globals.ENVS,
+        "PKGTOOL_VALIDATE_TIMEOUT_PER_GB_SECONDS",
+        90,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        Globals.ENVS,
+        "PKGTOOL_VALIDATE_TIMEOUT_MAX_SECONDS",
+        600,
+        raising=False,
+    )
+
+    class _Stat:
+        st_size = 20 * 1024**3
+
+    monkeypatch.setattr(Path, "stat", lambda _self: _Stat())
+
+    timeout = PKGTool._validate_timeout_seconds(pkg_path)
+
+    assert timeout == 600
