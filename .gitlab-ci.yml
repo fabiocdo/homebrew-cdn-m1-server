@@ -37,8 +37,11 @@ test:
     - python -m pytest --cov=hb_store_m1 --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
 mirror_to_github:
-  image: alpine/git:2.47.2
+  image:
+    name: alpine/git:2.47.2
+    entrypoint: [""]
   stage: mirror
+  allow_failure: true
   variables:
     GIT_STRATEGY: none
   rules:
