@@ -101,7 +101,9 @@ class FPKGIUtils:
         return pkgs_by_type
 
     @staticmethod
-    def _entry_indexes(entries: list[dict[str, object]]) -> tuple[dict[str, int], dict[str, str]]:
+    def _entry_indexes(
+        entries: list[dict[str, object]],
+    ) -> tuple[dict[str, int], dict[str, str]]:
         index_by_id: dict[str, int] = {}
         hash_by_id: dict[str, str] = {}
         for idx, entry in enumerate(entries):
@@ -206,7 +208,9 @@ class FPKGIUtils:
                 content_id = str(entry.get(FPKGI.Column.ID.value) or "")
 
                 package_old = entry.get(FPKGI.Column.PACKAGE.value)
-                package_new = URLUtils.canonical_pkg_url(content_id, app_type, package_old)
+                package_new = URLUtils.canonical_pkg_url(
+                    content_id, app_type, package_old
+                )
                 if package_new != package_old:
                     entry[FPKGI.Column.PACKAGE.value] = package_new
                     changed = True

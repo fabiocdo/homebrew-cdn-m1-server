@@ -80,6 +80,32 @@ mkdir -p /app/data/_cache
 ENABLE_TLS_LC="$(printf "%s" "$ENABLE_TLS" | tr '[:upper:]' '[:lower:]')"
 
 GENERATED_AT="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+# Build optional JSON endpoint rows dynamically (defaults + discovered files).
+JSON_ENDPOINTS="$(
+  {
+    printf "%s\n" "app.json" "dlc.json" "game.json" "save.json" "unknown.json" "update.json"
+    for json_file in /app/data/*.json; do
+      [ -e "$json_file" ] || continue
+      basename "$json_file"
+    done
+  } | awk 'NF' | sort -u
+)"
+
+JSON_HEALTH_ROWS="$(
+  for json_name in $JSON_ENDPOINTS; do
+    cat <<ROW
+          <tr data-url="/${json_name}" data-required="false">
+            <td><code>/${json_name}</code></td>
+            <td><span class="badge unknown">...</span></td>
+            <td class="http">-</td>
+            <td>Optional</td>
+            <td>Generated only when FPKGI format is enabled and populated.</td>
+          </tr>
+ROW
+  done
+)"
+
 cat > /app/data/_cache/index.html <<EOF
 <!doctype html>
 <html lang="en">
@@ -238,20 +264,7 @@ cat > /app/data/_cache/index.html <<EOF
             <td>Required</td>
             <td>Returns DB MD5 hash for cache validation.</td>
           </tr>
-          <tr data-url="/game.json" data-required="false">
-            <td><code>/game.json</code></td>
-            <td><span class="badge unknown">...</span></td>
-            <td class="http">-</td>
-            <td>Optional</td>
-            <td>Generated only when FPKGI format is enabled and populated.</td>
-          </tr>
-          <tr data-url="/dlc.json" data-required="false">
-            <td><code>/dlc.json</code></td>
-            <td><span class="badge unknown">...</span></td>
-            <td class="http">-</td>
-            <td>Optional</td>
-            <td>Generated only when FPKGI format is enabled and populated.</td>
-          </tr>
+${JSON_HEALTH_ROWS}
           <tr data-url="/update/remote.md5" data-required="false">
             <td><code>/update/remote.md5</code></td>
             <td><span class="badge unknown">...</span></td>
@@ -270,7 +283,7 @@ cat > /app/data/_cache/index.html <<EOF
       </table>
 
       <div class="meta">
-        Generated at ${GENERATED_AT} by container entrypoint.
+        Generated at ${GENERATED_AT}
       </div>
     </div>
   </div>

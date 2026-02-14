@@ -55,14 +55,20 @@ def test_given_missing_pyproject_path_when_parent_has_file_then_reads_value(
     root = tmp_path / "root"
     nested = root / "a" / "b"
     nested.mkdir(parents=True)
-    (root / "pyproject.toml").write_text("[project]\nversion='1.2.3'\n", encoding="utf-8")
+    (root / "pyproject.toml").write_text(
+        "[project]\nversion='1.2.3'\n", encoding="utf-8"
+    )
     monkeypatch.chdir(nested)
 
     assert _pyproject_value(nested / "pyproject.toml", "version", "default") == "1.2.3"
 
 
-def test_given_pyproject_missing_when_app_version_then_uses_installed_metadata(monkeypatch):
-    monkeypatch.setattr(globals_module, "_pyproject_value", lambda *_args, **_kwargs: "")
+def test_given_pyproject_missing_when_app_version_then_uses_installed_metadata(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        globals_module, "_pyproject_value", lambda *_args, **_kwargs: ""
+    )
     monkeypatch.setattr(globals_module._metadata, "version", lambda _name: "9.9.9")
 
     envs = globals_module._GlobalEnvs(globals_module.Globals.FILES)
@@ -70,8 +76,12 @@ def test_given_pyproject_missing_when_app_version_then_uses_installed_metadata(m
     assert envs.APP_VERSION == "9.9.9"
 
 
-def test_given_pyproject_missing_when_app_name_then_uses_installed_metadata(monkeypatch):
-    monkeypatch.setattr(globals_module, "_pyproject_value", lambda *_args, **_kwargs: "")
+def test_given_pyproject_missing_when_app_name_then_uses_installed_metadata(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        globals_module, "_pyproject_value", lambda *_args, **_kwargs: ""
+    )
     monkeypatch.setattr(
         globals_module._metadata,
         "metadata",
@@ -86,7 +96,9 @@ def test_given_pyproject_missing_when_app_name_then_uses_installed_metadata(monk
 def test_given_no_pyproject_and_no_metadata_when_app_version_then_falls_back_default(
     monkeypatch,
 ):
-    monkeypatch.setattr(globals_module, "_pyproject_value", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(
+        globals_module, "_pyproject_value", lambda *_args, **_kwargs: ""
+    )
 
     def _raise_not_found(_name):
         raise globals_module._metadata.PackageNotFoundError

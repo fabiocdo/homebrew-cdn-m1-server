@@ -1,6 +1,6 @@
+import re
 import time
 import traceback
-import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -36,12 +36,17 @@ class WatchChanges:
         raw = data or {}
         return cls(
             changed=list(raw.get("changed") or []),
-            added={key: list(value or []) for key, value in (raw.get("added") or {}).items()},
+            added={
+                key: list(value or [])
+                for key, value in (raw.get("added") or {}).items()
+            },
             updated={
-                key: list(value or []) for key, value in (raw.get("updated") or {}).items()
+                key: list(value or [])
+                for key, value in (raw.get("updated") or {}).items()
             },
             removed={
-                key: list(value or []) for key, value in (raw.get("removed") or {}).items()
+                key: list(value or [])
+                for key, value in (raw.get("removed") or {}).items()
             },
             current_files={
                 key: dict(value or {})
@@ -96,7 +101,9 @@ class Watcher:
                 return base[: -len(suffix)]
         return None
 
-    def _pkgs_from_media_changes(self, changes: dict[str, list[str]] | dict) -> list[Path]:
+    def _pkgs_from_media_changes(
+        self, changes: dict[str, list[str]] | dict
+    ) -> list[Path]:
         removed_by_section = changes.get("removed", changes)
         media_changes = removed_by_section.get(self._MEDIA_SECTION_NAME, []) or []
 
@@ -214,7 +221,9 @@ class Watcher:
         return changes
 
     @staticmethod
-    def _collect_current_content_ids(current_files: dict[str, dict[str, str]]) -> set[str]:
+    def _collect_current_content_ids(
+        current_files: dict[str, dict[str, str]],
+    ) -> set[str]:
         current_content_ids = set()
         for file_map in current_files.values():
             current_content_ids.update((file_map or {}).keys())
@@ -231,12 +240,18 @@ class Watcher:
                     removed_content_ids.append(content_id)
         return removed_content_ids
 
-    def _collect_removed_ids_from_db_snapshot(self, current_content_ids: set[str]) -> list[str]:
+    def _collect_removed_ids_from_db_snapshot(
+        self, current_content_ids: set[str]
+    ) -> list[str]:
         db_content_ids_output = self._db_utils.select_content_ids()
         if db_content_ids_output.status not in (Status.OK, Status.SKIP):
             return []
         db_content_ids = db_content_ids_output.content or []
-        return [content_id for content_id in db_content_ids if content_id not in current_content_ids]
+        return [
+            content_id
+            for content_id in db_content_ids
+            if content_id not in current_content_ids
+        ]
 
     def _handle_removed_content_ids(self, removed_content_ids: list[str]) -> None:
         if not removed_content_ids:
@@ -260,7 +275,9 @@ class Watcher:
                     if media_path.exists():
                         media_path.unlink()
                 except OSError as exc:
-                    log.log_warn(f"Failed to remove media file {media_path.name}: {exc}")
+                    log.log_warn(
+                        f"Failed to remove media file {media_path.name}: {exc}"
+                    )
 
     def _collect_scanned_pkgs(self, changes: WatchChanges) -> list[Path]:
         scanned_pkgs: list[Path] = []
@@ -344,7 +361,7 @@ class Watcher:
             pkg_path=pkg_path,
         )
 
-    def _process_pkg(self, pkg_path: Path, changed_section_set: set[str]):
+    def _process_pkg(self, pkg_path: Path):
         validation = self._pkg_utils.validate(pkg_path)
         if validation.status not in (Status.OK, Status.WARN):
             self._file_utils.move_to_error(
@@ -387,7 +404,9 @@ class Watcher:
             )
             return None
 
-        build_output = self._pkg_utils.build_pkg(pkg_path, param_sfo, media_output.content)
+        build_output = self._pkg_utils.build_pkg(
+            pkg_path, param_sfo, media_output.content
+        )
         if build_output.status is not Status.OK:
             self._file_utils.move_to_error(
                 pkg_path,
@@ -398,7 +417,9 @@ class Watcher:
 
         return build_output.content
 
-    def _persist_results(self, extracted_pkgs: list, current_cache: dict | None) -> None:
+    def _persist_results(
+        self, extracted_pkgs: list, current_cache: dict | None
+    ) -> None:
         upsert_result = self._db_utils.upsert(extracted_pkgs)
         if self._envs.FPGKI_FORMAT_ENABLED:
             fpkgi_result = self._fpkgi_utils.upsert(extracted_pkgs)
@@ -426,7 +447,7 @@ class Watcher:
             extracted_pkgs = []
             scanned_pkgs = self._collect_non_canonical_pkgs()
             for pkg_path in scanned_pkgs:
-                built_pkg = self._process_pkg(pkg_path, set())
+                built_pkg = self._process_pkg(pkg_path)
                 if built_pkg is not None:
                     extracted_pkgs.append(built_pkg)
             if scanned_pkgs:
@@ -434,10 +455,11 @@ class Watcher:
             self._normalize_media_files()
             return
 
-        changed_section_set = set(changes.changed)
         removed_content_ids = self._collect_removed_content_ids(changes)
         if changes.cache_missing:
-            current_content_ids = self._collect_current_content_ids(changes.current_files)
+            current_content_ids = self._collect_current_content_ids(
+                changes.current_files
+            )
             removed_content_ids.extend(
                 self._collect_removed_ids_from_db_snapshot(current_content_ids)
             )
@@ -446,7 +468,7 @@ class Watcher:
         scanned_pkgs = self._collect_scanned_pkgs(changes)
         extracted_pkgs = []
         for pkg_path in scanned_pkgs:
-            built_pkg = self._process_pkg(pkg_path, changed_section_set)
+            built_pkg = self._process_pkg(pkg_path)
             if built_pkg is not None:
                 extracted_pkgs.append(built_pkg)
 

@@ -88,7 +88,7 @@ class InitUtils:
         assets = InitUtils._assets_to_download()
 
         try:
-            downloaded, missing = StoreAssetClient.download_store_assets(assets)
+            _, missing = StoreAssetClient.download_store_assets(assets)
             if missing:
                 for asset in missing:
                     log.log_warn(

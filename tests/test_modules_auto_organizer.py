@@ -79,7 +79,11 @@ def test_given_pkg_when_run_then_moves_and_renames(
 def test_given_invalid_filename_when_dry_run_then_returns_invalid(init_paths):
     pkg_path = init_paths.GAME_DIR_PATH / "bad*name.pkg"
     pkg_path.write_text("pkg", encoding="utf-8")
-    pkg = PKG(content_id="UP0000-TEST00000_00-TEST000000000000", category="GD", pkg_path=pkg_path)
+    pkg = PKG(
+        content_id="UP0000-TEST00000_00-TEST000000000000",
+        category="GD",
+        pkg_path=pkg_path,
+    )
 
     result = AutoOrganizer.dry_run(pkg)
 

@@ -8,8 +8,12 @@ from hb_store_m1 import main as main_module
 def test_given_welcome_when_called_then_prints_banner_and_table(monkeypatch):
     printed = []
     monkeypatch.setattr("builtins.print", lambda msg: printed.append(str(msg)))
-    monkeypatch.setattr(main_module, "tabulate", lambda rows, tablefmt: f"{tablefmt}:{len(rows)}")
-    monkeypatch.setattr(main_module.Globals.ENVS, "LOG_LEVEL", ["debug", "info"], raising=False)
+    monkeypatch.setattr(
+        main_module, "tabulate", lambda rows, tablefmt: f"{tablefmt}:{len(rows)}"
+    )
+    monkeypatch.setattr(
+        main_module.Globals.ENVS, "LOG_LEVEL", ["debug", "info"], raising=False
+    )
 
     main_module.welcome()
 
@@ -20,12 +24,16 @@ def test_given_welcome_when_called_then_prints_banner_and_table(monkeypatch):
 
 def test_given_watcher_enabled_when_main_then_starts_watcher(monkeypatch):
     called = {"welcome": 0, "init": 0, "sync": 0, "api": 0, "start": 0}
-    monkeypatch.setattr(main_module, "welcome", lambda: called.__setitem__("welcome", 1))
+    monkeypatch.setattr(
+        main_module, "welcome", lambda: called.__setitem__("welcome", 1)
+    )
     monkeypatch.setattr(
         main_module.InitUtils, "init_all", lambda: called.__setitem__("init", 1)
     )
     monkeypatch.setattr(
-        main_module.InitUtils, "sync_runtime_urls", lambda: called.__setitem__("sync", 1)
+        main_module.InitUtils,
+        "sync_runtime_urls",
+        lambda: called.__setitem__("sync", 1),
     )
     monkeypatch.setattr(
         main_module, "ensure_http_api_started", lambda: called.__setitem__("api", 1)
@@ -47,12 +55,16 @@ def test_given_watcher_enabled_when_main_then_starts_watcher(monkeypatch):
 
 def test_given_watcher_disabled_when_main_then_logs_info(monkeypatch):
     called = {"welcome": 0, "init": 0, "sync": 0, "api": 0, "log": 0}
-    monkeypatch.setattr(main_module, "welcome", lambda: called.__setitem__("welcome", 1))
+    monkeypatch.setattr(
+        main_module, "welcome", lambda: called.__setitem__("welcome", 1)
+    )
     monkeypatch.setattr(
         main_module.InitUtils, "init_all", lambda: called.__setitem__("init", 1)
     )
     monkeypatch.setattr(
-        main_module.InitUtils, "sync_runtime_urls", lambda: called.__setitem__("sync", 1)
+        main_module.InitUtils,
+        "sync_runtime_urls",
+        lambda: called.__setitem__("sync", 1),
     )
     monkeypatch.setattr(
         main_module, "ensure_http_api_started", lambda: called.__setitem__("api", 1)

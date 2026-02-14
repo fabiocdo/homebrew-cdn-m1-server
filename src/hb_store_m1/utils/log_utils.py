@@ -12,7 +12,9 @@ class LogUtils:
 
     @staticmethod
     def _timestamp() -> str:
-        return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        return datetime.datetime.now(datetime.timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S UTC"
+        )
 
     def _module_tag(self) -> str:
         if not self._module:

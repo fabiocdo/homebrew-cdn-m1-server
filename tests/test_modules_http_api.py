@@ -13,8 +13,7 @@ from hb_store_m1.modules.http_api import (
 
 def _create_homebrews_db(path: Path) -> None:
     conn = sqlite3.connect(path)
-    conn.executescript(
-        """
+    conn.executescript("""
         CREATE TABLE homebrews (
             pid INTEGER PRIMARY KEY AUTOINCREMENT,
             id TEXT,
@@ -23,8 +22,7 @@ def _create_homebrews_db(path: Path) -> None:
             package TEXT,
             number_of_downloads INTEGER
         );
-        """
-    )
+        """)
     conn.commit()
     conn.close()
 
@@ -96,7 +94,9 @@ def test_given_valid_row_when_pkg_redirect_then_returns_pkg_path():
         "package": "http://host/app/data/pkg/game/UP0000-CUSA00001_00-ABCDEFGHIJKLMNOP.pkg",
     }
 
-    assert pkg_redirect_path(entry) == "/pkg/game/UP0000-CUSA00001_00-ABCDEFGHIJKLMNOP.pkg"
+    assert (
+        pkg_redirect_path(entry) == "/pkg/game/UP0000-CUSA00001_00-ABCDEFGHIJKLMNOP.pkg"
+    )
 
 
 def test_given_invalid_content_id_when_pkg_redirect_then_falls_back_to_package():
@@ -106,7 +106,10 @@ def test_given_invalid_content_id_when_pkg_redirect_then_falls_back_to_package()
         "package": "http://host/app/data/pkg/update/UP0000-CUSA22222_00-ABCDEFGHIJKLMNOP.pkg",
     }
 
-    assert pkg_redirect_path(entry) == "/pkg/update/UP0000-CUSA22222_00-ABCDEFGHIJKLMNOP.pkg"
+    assert (
+        pkg_redirect_path(entry)
+        == "/pkg/update/UP0000-CUSA22222_00-ABCDEFGHIJKLMNOP.pkg"
+    )
 
 
 def test_given_valid_row_when_pkg_internal_path_then_returns_internal_alias_path():
@@ -168,7 +171,9 @@ def test_given_unknown_content_id_when_increment_downloads_then_returns_none(tmp
     assert updated is None
 
 
-def test_given_pkg_url_when_pkg_file_path_then_returns_sanitized_disk_path(temp_globals):
+def test_given_pkg_url_when_pkg_file_path_then_returns_sanitized_disk_path(
+    temp_globals,
+):
     entry = {
         "apptype": "unknown",
         "content_id": "BAD-CONTENT-ID",
@@ -177,4 +182,9 @@ def test_given_pkg_url_when_pkg_file_path_then_returns_sanitized_disk_path(temp_
 
     path = pkg_file_path(entry)
 
-    assert path == temp_globals.PKG_DIR_PATH / "game" / "UP0000-CUSA12345_00-ABCDEFGHIJKLMNOP.pkg"
+    assert (
+        path
+        == temp_globals.PKG_DIR_PATH
+        / "game"
+        / "UP0000-CUSA12345_00-ABCDEFGHIJKLMNOP.pkg"
+    )

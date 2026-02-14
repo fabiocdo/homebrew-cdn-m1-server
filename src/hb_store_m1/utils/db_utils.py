@@ -30,8 +30,12 @@ def _generate_upsert_params(pkg: PKG) -> dict[str, object]:
         "id": pkg.title_id,
         "name": pkg.title,
         "desc": None,
-        "image": URLUtils.canonical_media_url(pkg.content_id, "icon0", pkg.icon0_png_path),
-        "package": URLUtils.canonical_pkg_url(pkg.content_id, str(pkg.app_type), pkg.pkg_path),
+        "image": URLUtils.canonical_media_url(
+            pkg.content_id, "icon0", pkg.icon0_png_path
+        ),
+        "package": URLUtils.canonical_pkg_url(
+            pkg.content_id, str(pkg.app_type), pkg.pkg_path
+        ),
         "version": pkg.version,
         "picpath": None,
         "desc_1": None,
@@ -143,11 +147,7 @@ class DBUtils:
             cursor.execute("SELECT content_id FROM homebrews")
             return Output(
                 Status.OK,
-                [
-                    row[0]
-                    for row in cursor.fetchall()
-                    if row and row[0]
-                ],
+                [row[0] for row in cursor.fetchall() if row and row[0]],
             )
         except Exception as e:
             log.log_error(f"Failed to list content_ids from STORE.DB: {e}")
@@ -239,12 +239,16 @@ class DBUtils:
                     current.get(StoreDB.Column.IMAGE.value)
                 )
                 updated[StoreDB.Column.MAIN_ICON_PATH.value] = (
-                    URLUtils.to_public_url(current.get(StoreDB.Column.MAIN_ICON_PATH.value))
+                    URLUtils.to_public_url(
+                        current.get(StoreDB.Column.MAIN_ICON_PATH.value)
+                    )
                     if current.get(StoreDB.Column.MAIN_ICON_PATH.value)
                     else None
                 )
                 updated[StoreDB.Column.MAIN_MENU_PIC.value] = (
-                    URLUtils.to_public_url(current.get(StoreDB.Column.MAIN_MENU_PIC.value))
+                    URLUtils.to_public_url(
+                        current.get(StoreDB.Column.MAIN_MENU_PIC.value)
+                    )
                     if current.get(StoreDB.Column.MAIN_MENU_PIC.value)
                     else None
                 )

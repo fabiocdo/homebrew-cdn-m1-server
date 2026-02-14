@@ -42,7 +42,9 @@ def store_db_hash(db_path: Path | None = None) -> str | None:
     return digest.hexdigest()
 
 
-def lookup_pkg_by_tid(tid: str, db_path: Path | None = None) -> dict[str, object] | None:
+def lookup_pkg_by_tid(
+    tid: str, db_path: Path | None = None
+) -> dict[str, object] | None:
     value = (tid or "").strip().upper()
     if not value:
         return None
@@ -136,7 +138,7 @@ def increment_downloads_by_content_id(
         cursor = conn.execute(
             """
             UPDATE homebrews
-            SET number_of_downloads = COALESCE(number_of_downloads, 0) + 1
+            SET number_of_downloads = number_of_downloads + 1
             WHERE UPPER(content_id) = ?
             """,
             (value,),
@@ -191,7 +193,9 @@ class _StoreApiHandler(BaseHTTPRequestHandler):
 
         self._send_json(404, {"error": "not_found"}, head_only)
 
-    def _send_json(self, status_code: int, payload: dict[str, object], head_only: bool) -> None:
+    def _send_json(
+        self, status_code: int, payload: dict[str, object], head_only: bool
+    ) -> None:
         body = _json_bytes(payload)
         self.send_response(status_code)
         self.send_header("Content-Type", "application/json")
@@ -282,9 +286,13 @@ def ensure_http_api_started() -> bool:
             return True
 
         try:
-            server = ThreadingHTTPServer((_API_BIND_HOST, _API_BIND_PORT), _StoreApiHandler)
+            server = ThreadingHTTPServer(
+                (_API_BIND_HOST, _API_BIND_PORT), _StoreApiHandler
+            )
         except OSError as exc:
-            log.log_error(f"Failed to bind HTTP API on {_API_BIND_HOST}:{_API_BIND_PORT}: {exc}")
+            log.log_error(
+                f"Failed to bind HTTP API on {_API_BIND_HOST}:{_API_BIND_PORT}: {exc}"
+            )
             return False
 
         thread = threading.Thread(

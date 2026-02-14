@@ -82,7 +82,9 @@ class CacheUtils:
         }
 
     @staticmethod
-    def _section_changes(current_section: CacheSection, cached_section: CacheSection) -> tuple[list[str], list[str], list[str]]:
+    def _section_changes(
+        current_section: CacheSection, cached_section: CacheSection
+    ) -> tuple[list[str], list[str], list[str]]:
         current_keys = set(current_section.content)
         cached_keys = set(cached_section.content)
         added = sorted(current_keys - cached_keys)
@@ -95,7 +97,9 @@ class CacheUtils:
         return added, removed, updated
 
     @staticmethod
-    def _section_summary(section_name: str, added: int, updated: int, removed: int) -> str:
+    def _section_summary(
+        section_name: str, added: int, updated: int, removed: int
+    ) -> str:
         return (
             f"{section_name.upper()}: "
             f"{LogColor.BRIGHT_GREEN if added != 0 else LogColor.RESET}+{added}{LogColor.RESET} "
@@ -188,7 +192,9 @@ class CacheUtils:
                         and cached_entry[2] == mtime_str
                     ):
                         cache_key = cached_entry[0] or pkg_path.stem
-                        if cached_entry[0] and CacheUtils._is_content_id(cached_entry[0]):
+                        if cached_entry[0] and CacheUtils._is_content_id(
+                            cached_entry[0]
+                        ):
                             valid_content_ids.add(cached_entry[0])
                     else:
                         # Keep cache generation lightweight: avoid calling pkgtool here.
@@ -244,8 +250,8 @@ class CacheUtils:
                 current_meta = current_section.meta
                 cached_meta = cached_section.meta
 
-                section_added, section_removed, section_updated = CacheUtils._section_changes(
-                    current_section, cached_section
+                section_added, section_removed, section_updated = (
+                    CacheUtils._section_changes(current_section, cached_section)
                 )
                 added[section_name] = section_added
                 removed[section_name] = section_removed

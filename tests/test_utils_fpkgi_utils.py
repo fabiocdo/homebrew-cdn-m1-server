@@ -55,10 +55,12 @@ def test_given_pkg_when_upsert_then_writes_json_per_app_type(init_paths):
         Globals.ENVS.SERVER_URL, "/pkg/game/UP0000-TEST00000_00-TEST000000000000.pkg"
     )
     expected_icon_url = urljoin(
-        Globals.ENVS.SERVER_URL, "/pkg/_media/UP0000-TEST00000_00-TEST000000000000_icon0.png"
+        Globals.ENVS.SERVER_URL,
+        "/pkg/_media/UP0000-TEST00000_00-TEST000000000000_icon0.png",
     )
     expected_pic1_url = urljoin(
-        Globals.ENVS.SERVER_URL, "/pkg/_media/UP0000-TEST00000_00-TEST000000000000_pic1.png"
+        Globals.ENVS.SERVER_URL,
+        "/pkg/_media/UP0000-TEST00000_00-TEST000000000000_pic1.png",
     )
 
     assert game_entry[FPKGI.Column.ID.value] == game_pkg.content_id

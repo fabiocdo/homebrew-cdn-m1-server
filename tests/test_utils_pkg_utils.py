@@ -4,8 +4,8 @@ from pathlib import Path
 from hb_store_m1.helpers import pkgtool as pkgtool_module
 from hb_store_m1.models.output import Output
 from hb_store_m1.models.output import Status
-from hb_store_m1.models.pkg.metadata.param_sfo import ParamSFOKey
 from hb_store_m1.models.pkg.metadata.param_sfo import ParamSFO
+from hb_store_m1.models.pkg.metadata.param_sfo import ParamSFOKey
 from hb_store_m1.models.pkg.metadata.pkg_entry import PKGEntryKey
 from hb_store_m1.utils.pkg_utils import PkgUtils
 
@@ -223,7 +223,9 @@ def test_given_read_content_id_when_validate_fails_then_returns_none(monkeypatch
 
 def test_given_read_content_id_when_extract_fails_then_returns_none(monkeypatch):
     monkeypatch.setattr(PkgUtils, "validate", lambda _pkg: Output(Status.OK, None))
-    monkeypatch.setattr(PkgUtils, "extract_pkg_data", lambda _pkg: Output(Status.ERROR, None))
+    monkeypatch.setattr(
+        PkgUtils, "extract_pkg_data", lambda _pkg: Output(Status.ERROR, None)
+    )
 
     assert PkgUtils.read_content_id(Path("x.pkg")) is None
 
@@ -231,7 +233,9 @@ def test_given_read_content_id_when_extract_fails_then_returns_none(monkeypatch)
 def test_given_read_content_id_when_validate_warn_then_extracts(monkeypatch):
     sfo = ParamSFO({ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000"})
     monkeypatch.setattr(PkgUtils, "validate", lambda _pkg: Output(Status.WARN, None))
-    monkeypatch.setattr(PkgUtils, "extract_pkg_data", lambda _pkg: Output(Status.OK, sfo))
+    monkeypatch.setattr(
+        PkgUtils, "extract_pkg_data", lambda _pkg: Output(Status.OK, sfo)
+    )
 
     content_id = PkgUtils.read_content_id(Path("x.pkg"))
 
@@ -253,7 +257,9 @@ def test_given_missing_pkg_when_extract_data_then_returns_not_found():
     assert result.status is Status.NOT_FOUND
 
 
-def test_given_pkgtool_exception_when_extract_data_then_returns_error(init_paths, monkeypatch):
+def test_given_pkgtool_exception_when_extract_data_then_returns_error(
+    init_paths, monkeypatch
+):
     pkg_path = init_paths.GAME_DIR_PATH / "sample.pkg"
     pkg_path.write_text("pkg", encoding="utf-8")
 
@@ -301,7 +307,9 @@ def test_given_missing_critical_media_entry_when_extract_medias_then_returns_err
 
     monkeypatch.setattr(pkgtool_module.PKGTool, "list_pkg_entries", fake_list_entries)
 
-    result = PkgUtils.extract_pkg_medias(pkg_path, "UP0000-TEST00000_00-TEST000000000000")
+    result = PkgUtils.extract_pkg_medias(
+        pkg_path, "UP0000-TEST00000_00-TEST000000000000"
+    )
 
     assert result.status is Status.ERROR
 
@@ -330,7 +338,9 @@ def test_given_optional_media_missing_when_extract_medias_then_sets_none(
     monkeypatch.setattr(pkgtool_module.PKGTool, "list_pkg_entries", fake_list_entries)
     monkeypatch.setattr(pkgtool_module.PKGTool, "extract_pkg_entry", fake_extract)
 
-    result = PkgUtils.extract_pkg_medias(pkg_path, "UP0000-TEST00000_00-TEST000000000000")
+    result = PkgUtils.extract_pkg_medias(
+        pkg_path, "UP0000-TEST00000_00-TEST000000000000"
+    )
 
     assert result.status is Status.OK
     assert result.content[PKGEntryKey.PIC0_PNG] is None
@@ -367,7 +377,9 @@ def test_given_existing_media_files_when_extract_medias_then_reuses_paths(
     assert result.content[PKGEntryKey.ICON0_PNG].exists()
 
 
-def test_given_pkgtool_exception_when_extract_medias_then_returns_error(init_paths, monkeypatch):
+def test_given_pkgtool_exception_when_extract_medias_then_returns_error(
+    init_paths, monkeypatch
+):
     pkg_path = init_paths.GAME_DIR_PATH / "sample.pkg"
     pkg_path.write_text("pkg", encoding="utf-8")
 
@@ -377,7 +389,9 @@ def test_given_pkgtool_exception_when_extract_medias_then_returns_error(init_pat
         lambda _pkg: (_ for _ in ()).throw(RuntimeError("boom")),
     )
 
-    result = PkgUtils.extract_pkg_medias(pkg_path, "UP0000-TEST00000_00-TEST000000000000")
+    result = PkgUtils.extract_pkg_medias(
+        pkg_path, "UP0000-TEST00000_00-TEST000000000000"
+    )
 
     assert result.status is Status.ERROR
 

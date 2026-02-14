@@ -26,7 +26,9 @@ def test_given_pkg_path_when_validate_pkg_then_calls_pkgtool_with_expected_args(
     assert captured["kwargs"]["check"] is True
     assert captured["kwargs"]["capture_output"] is True
     assert captured["kwargs"]["text"] is True
-    assert captured["kwargs"]["timeout"] == Globals.ENVS.PKGTOOL_VALIDATE_TIMEOUT_SECONDS
+    assert (
+        captured["kwargs"]["timeout"] == Globals.ENVS.PKGTOOL_VALIDATE_TIMEOUT_SECONDS
+    )
     assert captured["kwargs"]["env"] == {"DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1"}
 
 
