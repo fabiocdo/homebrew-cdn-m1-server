@@ -13,7 +13,7 @@ class PKGTool:
             capture_output=True,
             text=True,
             env={"DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1"},
-            timeout=120,
+            timeout=300,
         )
 
     @staticmethod
