@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 from urllib.parse import urljoin
 
 from hb_store_m1.models.fpkgi import FPKGI
@@ -336,3 +337,242 @@ def test_given_legacy_json_list_and_lowercase_file_when_refresh_then_migrates(in
     assert not legacy_path.exists()
     assert expected_pkg_url in data
     assert data[expected_pkg_url][FPKGI.Column.NAME.value] == "Legacy"
+
+
+def test_given_helper_inputs_when_normalizing_then_handles_edge_cases(init_paths):
+    assert FPKGIUtils._to_int("abc", 7) == 7
+    assert FPKGIUtils._normalize_region("") is None
+    assert FPKGIUtils._normalize_region("br") is None
+    assert FPKGIUtils._normalize_release("2026-02-14") == "02-14-2026"
+    assert FPKGIUtils._normalize_release("14/02/2026") == "14/02/2026"
+
+    assert FPKGIUtils._content_id_from_pkg_url("") is None
+    assert FPKGIUtils._content_id_from_pkg_url("https://x/y/file.txt") is None
+    assert FPKGIUtils._region_from_content_id("U") is None
+
+    assert FPKGIUtils._rewrite_public_url(None) is None
+    assert FPKGIUtils._rewrite_public_url("http://legacy-host") is None
+    assert (
+        FPKGIUtils._rewrite_public_url("legacy/path/without/pkg-marker")
+        == "legacy/path/without/pkg-marker"
+    )
+
+
+def test_given_legacy_file_when_cleanup_fails_then_logs_warning(init_paths, monkeypatch):
+    json_path = FPKGIUtils.json_path_for_app_type("game")
+    legacy_path = Globals.PATHS.DATA_DIR_PATH / "game.json"
+    legacy_path.write_text("[]", encoding="utf-8")
+
+    original_unlink = Path.unlink
+
+    def fake_unlink(path_obj, *args, **kwargs):
+        if path_obj == legacy_path:
+            raise OSError("nope")
+        return original_unlink(path_obj, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", fake_unlink)
+    FPKGIUtils._cleanup_legacy_json(json_path, legacy_path)
+
+    assert legacy_path.exists()
+
+
+def test_given_read_json_edge_cases_when_parsing_then_handles_variants(init_paths):
+    path = FPKGIUtils.json_path_for_app_type("game")
+
+    data, migrated = FPKGIUtils._read_json(path, "game")
+    assert data == {}
+    assert migrated is False
+
+    path.write_text(json.dumps({FPKGI.Root.DATA.value: []}), encoding="utf-8")
+    data, migrated = FPKGIUtils._read_json(path, "game")
+    assert data is None
+    assert migrated is False
+
+    path.write_text(
+        json.dumps(
+            {
+                FPKGI.Root.DATA.value: {
+                    "": {},
+                    "http://x/not-dict.pkg": "bad",
+                    "http://x/pkg/game/UP0000-TEST00000_00-TEST000000000000.pkg": {
+                        FPKGI.Column.NAME.value: "X",
+                        FPKGI.Column.SIZE.value: "10",
+                        FPKGI.Column.REGION.value: "usa",
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    data, migrated = FPKGIUtils._read_json(path, "game")
+    assert migrated is False
+    assert len(data) == 1
+    entry = next(iter(data.values()))
+    assert entry[FPKGI.Column.SIZE.value] == 10
+    assert entry[FPKGI.Column.REGION.value] == "USA"
+
+    path.write_text(
+        json.dumps(
+            {
+                "http://x/pkg/game/UP0000-TEST00000_00-TEST000000000000.pkg": {
+                    FPKGI.Column.NAME.value: "Y"
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    data, migrated = FPKGIUtils._read_json(path, "game")
+    assert migrated is True
+    assert len(data) == 1
+
+    path.write_text(json.dumps({"bad": []}), encoding="utf-8")
+    data, migrated = FPKGIUtils._read_json(path, "game")
+    assert data is None
+    assert migrated is False
+
+
+def test_given_upsert_with_invalid_and_stale_entries_when_run_then_keeps_only_canonical(
+    init_paths,
+):
+    content_id = "UP0000-TEST00000_00-TEST000000000000"
+    legacy_path = Globals.PATHS.DATA_DIR_PATH / "game.json"
+    legacy_path.write_text(
+        json.dumps(
+            [
+                {
+                    FPKGI.LegacyColumn.ID.value: content_id,
+                    FPKGI.LegacyColumn.NAME.value: "Legacy",
+                    FPKGI.LegacyColumn.VERSION.value: "01.00",
+                    FPKGI.LegacyColumn.PACKAGE.value: f"http://old.host/app/data/pkg/game/{content_id}.pkg",
+                    FPKGI.LegacyColumn.SIZE.value: 10,
+                    FPKGI.LegacyColumn.ICON.value: f"http://old.host/app/data/pkg/_media/{content_id}_icon0.png",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    invalid_pkg = PKG(
+        title="Invalid",
+        title_id="CUSA00000",
+        content_id="",
+        category="GD",
+        version="01.00",
+        pkg_path=None,
+    )
+    pkg_path = init_paths.GAME_DIR_PATH / "good.pkg"
+    pkg_path.write_text("data", encoding="utf-8")
+    valid_pkg = PKG(
+        title="Good",
+        title_id="CUSA00001",
+        content_id=content_id,
+        category="GD",
+        version="01.00",
+        pkg_path=pkg_path,
+    )
+
+    result = FPKGIUtils.upsert([invalid_pkg, valid_pkg])
+    assert result.status is Status.OK
+    assert not legacy_path.exists()
+
+    game_path = FPKGIUtils.json_path_for_app_type("game")
+    game_path.write_text(
+        json.dumps(
+            {
+                FPKGI.Root.DATA.value: {
+                    f"http://old.host/pkg/game/{content_id}.pkg": {
+                        FPKGI.Column.TITLE_ID.value: "CUSA00001",
+                        FPKGI.Column.REGION.value: "USA",
+                        FPKGI.Column.NAME.value: "Old Host",
+                        FPKGI.Column.VERSION.value: "01.00",
+                        FPKGI.Column.RELEASE.value: None,
+                        FPKGI.Column.SIZE.value: 1,
+                        FPKGI.Column.MIN_FW.value: None,
+                        FPKGI.Column.COVER_URL.value: None,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = FPKGIUtils.upsert([valid_pkg])
+    data = _read_data(game_path)
+    canonical_url = urljoin(Globals.ENVS.SERVER_URL, f"/pkg/game/{content_id}.pkg")
+
+    assert result.status is Status.OK
+    assert list(data.keys()) == [canonical_url]
+
+
+def test_given_delete_and_refresh_edge_branches_when_run_then_handles_migrations(init_paths):
+    legacy_save_path = Globals.PATHS.DATA_DIR_PATH / "save.json"
+    legacy_save_path.write_text("[]", encoding="utf-8")
+
+    delete_result = FPKGIUtils.delete_by_content_ids(["UP0000-TEST00000_00-TEST000000000000"])
+    assert delete_result.status is Status.OK
+    assert FPKGIUtils.json_path_for_app_type("save").exists()
+    assert not legacy_save_path.exists()
+
+    game_path = FPKGIUtils.json_path_for_app_type("game")
+    game_path.write_text("{bad", encoding="utf-8")
+    refresh_error = FPKGIUtils.refresh_urls()
+    assert refresh_error.status is Status.ERROR
+
+    game_path.unlink()
+    legacy_game_path = Globals.PATHS.DATA_DIR_PATH / "game.json"
+    legacy_game_path.write_text("[]", encoding="utf-8")
+    refresh_ok = FPKGIUtils.refresh_urls()
+    assert refresh_ok.status is Status.OK
+    assert FPKGIUtils.json_path_for_app_type("game").exists()
+    assert not legacy_game_path.exists()
+
+
+def test_given_refresh_with_duplicate_canonical_url_when_run_then_marks_changed(init_paths):
+    content_id = "UP0000-TEST00000_00-TEST000000000000"
+    canonical_url = urljoin(Globals.ENVS.SERVER_URL, f"/pkg/game/{content_id}.pkg")
+    game_path = FPKGIUtils.json_path_for_app_type("game")
+    game_path.write_text(
+        json.dumps(
+            {
+                FPKGI.Root.DATA.value: {
+                    "http://legacy-host": {
+                        FPKGI.Column.TITLE_ID.value: "CUSA00001",
+                        FPKGI.Column.REGION.value: "usa",
+                        FPKGI.Column.NAME.value: "Legacy Host",
+                        FPKGI.Column.VERSION.value: "01.00",
+                        FPKGI.Column.RELEASE.value: None,
+                        FPKGI.Column.SIZE.value: "1",
+                        FPKGI.Column.MIN_FW.value: None,
+                        FPKGI.Column.COVER_URL.value: None,
+                    },
+                    f"http://old.host/pkg/game/{content_id}.pkg": {
+                        FPKGI.Column.TITLE_ID.value: "CUSA00001",
+                        FPKGI.Column.REGION.value: "USA",
+                        FPKGI.Column.NAME.value: "A",
+                        FPKGI.Column.VERSION.value: "01.00",
+                        FPKGI.Column.RELEASE.value: None,
+                        FPKGI.Column.SIZE.value: 1,
+                        FPKGI.Column.MIN_FW.value: None,
+                        FPKGI.Column.COVER_URL.value: None,
+                    },
+                    canonical_url: {
+                        FPKGI.Column.TITLE_ID.value: "CUSA00001",
+                        FPKGI.Column.REGION.value: "USA",
+                        FPKGI.Column.NAME.value: "B",
+                        FPKGI.Column.VERSION.value: "01.00",
+                        FPKGI.Column.RELEASE.value: None,
+                        FPKGI.Column.SIZE.value: 1,
+                        FPKGI.Column.MIN_FW.value: None,
+                        FPKGI.Column.COVER_URL.value: None,
+                    },
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = FPKGIUtils.refresh_urls()
+    data = _read_data(game_path)
+
+    assert result.status is Status.OK
+    assert canonical_url in data
