@@ -8,6 +8,12 @@ from hb_store_m1.models.pkg.pkg import PKG
 from hb_store_m1.utils.fpkgi_utils import FPKGIUtils
 
 
+def test_given_app_type_when_json_path_requested_then_uses_uppercase_pattern(init_paths):
+    assert FPKGIUtils.json_path_for_app_type("game").name == "GAMES.json"
+    assert FPKGIUtils.json_path_for_app_type("dlc").name == "DLC.json"
+    assert FPKGIUtils.json_path_for_app_type("update").name == "UPDATES.json"
+
+
 def test_given_pkg_when_upsert_then_writes_json_per_app_type(init_paths):
     pkg_path = init_paths.GAME_DIR_PATH / "game.pkg"
     pkg_path.write_text("data", encoding="utf-8")
@@ -43,12 +49,15 @@ def test_given_pkg_when_upsert_then_writes_json_per_app_type(init_paths):
 
     result = FPKGIUtils.upsert([game_pkg, dlc_pkg])
 
-    assert result.status is Status.OK
-    assert (init_paths.DATA_DIR_PATH / "game.json").exists()
-    assert (init_paths.DATA_DIR_PATH / "dlc.json").exists()
+    game_path = FPKGIUtils.json_path_for_app_type("game")
+    dlc_path = FPKGIUtils.json_path_for_app_type("dlc")
 
-    game_data = json.loads((init_paths.DATA_DIR_PATH / "game.json").read_text("utf-8"))
-    dlc_data = json.loads((init_paths.DATA_DIR_PATH / "dlc.json").read_text("utf-8"))
+    assert result.status is Status.OK
+    assert game_path.exists()
+    assert dlc_path.exists()
+
+    game_data = json.loads(game_path.read_text("utf-8"))
+    dlc_data = json.loads(dlc_path.read_text("utf-8"))
 
     game_entry = game_data[0]
     expected_pkg_url = urljoin(
@@ -112,7 +121,9 @@ def test_given_content_ids_when_delete_then_removes_entries(init_paths):
     FPKGIUtils.upsert([pkg])
     delete_result = FPKGIUtils.delete_by_content_ids([pkg.content_id])
 
-    game_data = json.loads((init_paths.DATA_DIR_PATH / "game.json").read_text("utf-8"))
+    game_data = json.loads(
+        FPKGIUtils.json_path_for_app_type("game").read_text("utf-8")
+    )
 
     assert delete_result.status is Status.OK
     assert not game_data
@@ -135,7 +146,7 @@ def test_given_invalid_json_when_upsert_then_returns_error(init_paths):
         version="01.00",
         pkg_path=pkg_path,
     )
-    (init_paths.DATA_DIR_PATH / "game.json").write_text("{bad", encoding="utf-8")
+    FPKGIUtils.json_path_for_app_type("game").write_text("{bad", encoding="utf-8")
 
     result = FPKGIUtils.upsert([pkg])
 
@@ -143,7 +154,7 @@ def test_given_invalid_json_when_upsert_then_returns_error(init_paths):
 
 
 def test_given_invalid_json_when_delete_then_returns_error(init_paths):
-    (init_paths.DATA_DIR_PATH / "game.json").write_text("{bad", encoding="utf-8")
+    FPKGIUtils.json_path_for_app_type("game").write_text("{bad", encoding="utf-8")
 
     result = FPKGIUtils.delete_by_content_ids(["UP0000-TEST00000_00-TEST000000000000"])
 
@@ -161,7 +172,9 @@ def test_given_pkg_without_path_when_upsert_then_size_is_zero(init_paths):
     )
 
     result = FPKGIUtils.upsert([pkg])
-    game_data = json.loads((init_paths.DATA_DIR_PATH / "game.json").read_text("utf-8"))
+    game_data = json.loads(
+        FPKGIUtils.json_path_for_app_type("game").read_text("utf-8")
+    )
 
     assert result.status is Status.OK
     assert game_data[0][FPKGI.Column.SIZE.value] == 0
@@ -175,7 +188,7 @@ def test_given_empty_ids_when_delete_then_returns_skip():
 
 def test_given_existing_entry_when_upsert_then_replaces_in_place(init_paths):
     content_id = "UP0000-TEST00000_00-TEST000000000000"
-    path = init_paths.DATA_DIR_PATH / "game.json"
+    path = FPKGIUtils.json_path_for_app_type("game")
     path.write_text(
         json.dumps(
             [
@@ -232,7 +245,7 @@ def test_given_pkg_without_content_id_when_upsert_then_ignores_entry(init_paths)
 def test_given_old_json_urls_when_refresh_then_rewrites_base_and_pkg_path(init_paths):
     content_id = "UP0000-TEST00000_00-TEST000000000000"
     old_server = "http://10.0.0.10:8080"
-    path = init_paths.DATA_DIR_PATH / "game.json"
+    path = FPKGIUtils.json_path_for_app_type("game")
     path.write_text(
         json.dumps(
             [

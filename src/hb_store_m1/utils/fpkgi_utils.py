@@ -14,9 +14,74 @@ log = LogUtils(LogModule.FPKGI_UTIL)
 
 
 class FPKGIUtils:
+    _JSON_STEM_BY_APP_TYPE = {
+        "app": "APPS",
+        "demo": "DEMOS",
+        "dlc": "DLC",
+        "emulator": "EMULATORS",
+        "game": "GAMES",
+        "homebrew": "HOMEBREW",
+        "ps1": "PS1",
+        "ps2": "PS2",
+        "ps5": "PS5",
+        "psp": "PSP",
+        "theme": "THEMES",
+        "update": "UPDATES",
+        "save": "SAVES",
+        "unknown": "UNKNOWN",
+    }
+
+    @staticmethod
+    def _normalized_app_type(app_type: str | None) -> str:
+        return (app_type or "unknown").strip().lower() or "unknown"
+
+    @staticmethod
+    def _json_stem_for_app_type(app_type: str) -> str:
+        normalized = FPKGIUtils._normalized_app_type(app_type)
+        return FPKGIUtils._JSON_STEM_BY_APP_TYPE.get(normalized, normalized.upper())
+
     @staticmethod
     def _json_path(app_type: str) -> Path:
-        return Globals.PATHS.DATA_DIR_PATH / f"{app_type}.json"
+        stem = FPKGIUtils._json_stem_for_app_type(app_type)
+        return Globals.PATHS.DATA_DIR_PATH / f"{stem}.json"
+
+    @staticmethod
+    def _legacy_json_path(app_type: str) -> Path:
+        normalized = FPKGIUtils._normalized_app_type(app_type)
+        return Globals.PATHS.DATA_DIR_PATH / f"{normalized}.json"
+
+    @staticmethod
+    def json_path_for_app_type(app_type: str) -> Path:
+        return FPKGIUtils._json_path(app_type)
+
+    @staticmethod
+    def _read_entries_for_app_type(
+        app_type: str,
+    ) -> tuple[Path, Path, list[dict[str, object]] | None, bool]:
+        json_path = FPKGIUtils._json_path(app_type)
+        legacy_path = FPKGIUtils._legacy_json_path(app_type)
+
+        if json_path.exists():
+            return json_path, legacy_path, FPKGIUtils._read_json(json_path), False
+
+        if legacy_path.exists():
+            return (
+                json_path,
+                legacy_path,
+                FPKGIUtils._read_json(legacy_path),
+                legacy_path != json_path,
+            )
+
+        return json_path, legacy_path, [], False
+
+    @staticmethod
+    def _cleanup_legacy_json(json_path: Path, legacy_path: Path) -> None:
+        if legacy_path == json_path or not legacy_path.exists():
+            return
+        try:
+            legacy_path.unlink()
+        except OSError as exc:
+            log.log_warn(f"Failed to remove legacy FPKGI file {legacy_path.name}: {exc}")
 
     @staticmethod
     def _entry_md5(values_by_column: dict[str, object]) -> str:
@@ -90,13 +155,18 @@ class FPKGIUtils:
 
     @staticmethod
     def _app_type_names() -> list[str]:
-        return sorted({app_type.value for app_type in AppType})
+        return sorted(
+            {app_type.value for app_type in AppType}
+            | set(FPKGIUtils._JSON_STEM_BY_APP_TYPE.keys())
+        )
 
     @staticmethod
     def _group_pkgs_by_app_type(pkgs: list[PKG]) -> dict[str, list[PKG]]:
         pkgs_by_type: dict[str, list[PKG]] = {}
         for pkg in pkgs:
-            app_type = pkg.app_type.value if pkg.app_type else "unknown"
+            app_type = FPKGIUtils._normalized_app_type(
+                pkg.app_type.value if pkg.app_type else "unknown"
+            )
             pkgs_by_type.setdefault(app_type, []).append(pkg)
         return pkgs_by_type
 
@@ -125,10 +195,12 @@ class FPKGIUtils:
 
         updated_total = 0
         skipped_total = 0
+        renamed_total = 0
 
         for app_type, pkgs_for_type in pkgs_by_type.items():
-            json_path = FPKGIUtils._json_path(app_type)
-            entries = FPKGIUtils._read_json(json_path)
+            json_path, legacy_path, entries, migrated = FPKGIUtils._read_entries_for_app_type(
+                app_type
+            )
             if entries is None:
                 return Output(Status.ERROR, "Failed to read FPKGI JSON")
 
@@ -150,14 +222,19 @@ class FPKGIUtils:
                     entries.append(entry)
                 updated_for_type += 1
 
-            if updated_for_type:
+            if updated_for_type or migrated:
                 FPKGIUtils._write_json(json_path, entries)
+                FPKGIUtils._cleanup_legacy_json(json_path, legacy_path)
                 updated_total += updated_for_type
+                if migrated:
+                    renamed_total += 1
 
-        if skipped_total:
+        if skipped_total and updated_total == 0 and renamed_total == 0:
             log.log_info(f"Skipped {skipped_total} unchanged PKGs")
             return Output(Status.SKIP, None)
 
+        if renamed_total:
+            log.log_info(f"Renamed {renamed_total} legacy FPKGI JSON files")
         log.log_info(f"{updated_total} PKGs upserted successfully")
         return Output(Status.OK, updated_total)
 
@@ -170,11 +247,15 @@ class FPKGIUtils:
         target_ids = set(content_ids)
 
         for app_type in FPKGIUtils._app_type_names():
-            json_path = FPKGIUtils._json_path(app_type)
-            entries = FPKGIUtils._read_json(json_path)
+            json_path, legacy_path, entries, migrated = FPKGIUtils._read_entries_for_app_type(
+                app_type
+            )
             if entries is None:
                 return Output(Status.ERROR, "Failed to read FPKGI JSON")
             if not entries:
+                if migrated:
+                    FPKGIUtils._write_json(json_path, entries)
+                    FPKGIUtils._cleanup_legacy_json(json_path, legacy_path)
                 continue
 
             remaining = [
@@ -183,8 +264,9 @@ class FPKGIUtils:
                 if entry.get(FPKGI.Column.ID.value) not in target_ids
             ]
             removed = len(entries) - len(remaining)
-            if removed:
+            if removed or migrated:
                 FPKGIUtils._write_json(json_path, remaining)
+                FPKGIUtils._cleanup_legacy_json(json_path, legacy_path)
                 deleted_total += removed
 
         log.log_info(f"{deleted_total} PKGs deleted successfully")
@@ -196,14 +278,19 @@ class FPKGIUtils:
         app_types = FPKGIUtils._app_type_names()
 
         for app_type in app_types:
-            json_path = FPKGIUtils._json_path(app_type)
-            entries = FPKGIUtils._read_json(json_path)
+            json_path, legacy_path, entries, migrated = FPKGIUtils._read_entries_for_app_type(
+                app_type
+            )
             if entries is None:
                 return Output(Status.ERROR, "Failed to read FPKGI JSON")
             if not entries:
+                if migrated:
+                    FPKGIUtils._write_json(json_path, entries)
+                    FPKGIUtils._cleanup_legacy_json(json_path, legacy_path)
+                    updated_total += 1
                 continue
 
-            changed = False
+            changed = migrated
             for entry in entries:
                 content_id = str(entry.get(FPKGI.Column.ID.value) or "")
 
@@ -230,6 +317,7 @@ class FPKGIUtils:
 
             if changed:
                 FPKGIUtils._write_json(json_path, entries)
+                FPKGIUtils._cleanup_legacy_json(json_path, legacy_path)
                 updated_total += 1
 
         if updated_total:

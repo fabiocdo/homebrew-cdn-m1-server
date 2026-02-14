@@ -143,7 +143,7 @@ class Watcher:
 
     def _has_missing_fpkgi_json(self, sections: list[str]) -> bool:
         for section_name in sections:
-            json_path = self._paths.DATA_DIR_PATH / f"{section_name}.json"
+            json_path = self._fpkgi_utils.json_path_for_app_type(section_name)
             if not json_path.exists():
                 return True
         return False
