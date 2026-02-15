@@ -23,6 +23,9 @@ LOG_LEVEL=info
 WATCHER_ENABLED=true
 # Interval in seconds between directory scans. Value type: integer.
 WATCHER_PERIODIC_SCAN_SECONDS=30
+# Parallel workers for validate+PARAM.SFO preprocessing. Value type: integer.
+# Keep 1 to disable parallel preprocessing.
+WATCHER_PKG_PREPROCESS_WORKERS=1
 # Enable FPKGI format output. Value type: boolean.
 FPGKI_FORMAT_ENABLED=false
 # Generic timeout (seconds) for lightweight pkgtool commands.
@@ -52,6 +55,7 @@ fi
 : "${LOG_LEVEL:=info}"
 : "${WATCHER_ENABLED:=true}"
 : "${WATCHER_PERIODIC_SCAN_SECONDS:=30}"
+: "${WATCHER_PKG_PREPROCESS_WORKERS:=1}"
 : "${FPGKI_FORMAT_ENABLED:=false}"
 : "${PKGTOOL_TIMEOUT_SECONDS:=300}"
 : "${PKGTOOL_VALIDATE_TIMEOUT_SECONDS:=300}"
@@ -80,11 +84,48 @@ mkdir -p /app/data/_cache
 ENABLE_TLS_LC="$(printf "%s" "$ENABLE_TLS" | tr '[:upper:]' '[:lower:]')"
 
 GENERATED_AT="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+APP_NAME="hb-store-m1"
+APP_VERSION="unknown"
+if [ -f /app/pyproject.toml ] && command -v python3 >/dev/null 2>&1; then
+  APP_META="$(
+    python3 - <<'PY'
+import tomllib
+from pathlib import Path
+
+name = "hb-store-m1"
+version = "unknown"
+try:
+    project = tomllib.loads(Path("/app/pyproject.toml").read_text("utf-8")).get("project", {})
+    name = str(project.get("name") or name)
+    version = str(project.get("version") or version)
+except Exception:
+    pass
+print(name)
+print(version)
+PY
+  )"
+  APP_NAME="$(printf '%s\n' "$APP_META" | sed -n '1p')"
+  APP_VERSION="$(printf '%s\n' "$APP_META" | sed -n '2p')"
+fi
 
 # Build optional JSON endpoint rows dynamically (defaults + discovered files).
 JSON_ENDPOINTS="$(
   {
-    printf "%s\n" "app.json" "dlc.json" "game.json" "save.json" "unknown.json" "update.json"
+    printf "%s\n" \
+      "APPS.json" \
+      "DEMOS.json" \
+      "DLC.json" \
+      "EMULATORS.json" \
+      "GAMES.json" \
+      "HOMEBREW.json" \
+      "PS1.json" \
+      "PS2.json" \
+      "PS5.json" \
+      "PSP.json" \
+      "SAVES.json" \
+      "THEMES.json" \
+      "UNKNOWN.json" \
+      "UPDATES.json"
     for json_file in /app/data/*.json; do
       [ -e "$json_file" ] || continue
       basename "$json_file"
@@ -112,7 +153,7 @@ cat > /app/data/_cache/index.html <<EOF
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>HB-Store-M1 Status</title>
+  <title>${APP_NAME} Status</title>
   <style>
     :root { color-scheme: light; }
     body {
@@ -219,7 +260,7 @@ cat > /app/data/_cache/index.html <<EOF
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>HB-Store-M1</h1>
+      <h1>${APP_NAME}</h1>
       <div class="ok">Status: ONLINE</div>
 
       <h2>Health</h2>
@@ -283,6 +324,7 @@ ${JSON_HEALTH_ROWS}
       </table>
 
       <div class="meta">
+        Version ${APP_VERSION}<br>
         Generated at ${GENERATED_AT}
       </div>
     </div>

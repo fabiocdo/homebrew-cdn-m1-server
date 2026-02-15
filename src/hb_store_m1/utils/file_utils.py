@@ -63,6 +63,3 @@ class FileUtils:
 
         log.log_warn(f"Moved to errors ({reason}): {target_path.name}")
         return target_path
-
-
-FileUtils = FileUtils()

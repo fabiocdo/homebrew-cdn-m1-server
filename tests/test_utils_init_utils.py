@@ -84,20 +84,25 @@ def test_given_init_all_when_called_then_runs_all_init_steps(monkeypatch):
 
 
 def test_given_sync_runtime_urls_when_called_then_refreshes_db_and_json(monkeypatch):
-    called = {"db": 0, "json": 0}
+    called = {"db": 0, "json": 0, "sanity": 0}
 
     monkeypatch.setattr(
         "hb_store_m1.utils.db_utils.DBUtils.refresh_urls",
         lambda: called.__setitem__("db", called["db"] + 1) or Output(Status.OK, 1),
     )
     monkeypatch.setattr(
-        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.refresh_urls",
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.sync_from_store_db",
         lambda: called.__setitem__("json", called["json"] + 1) or Output(Status.OK, 1),
+    )
+    monkeypatch.setattr(
+        "hb_store_m1.utils.db_utils.DBUtils.sanity_check",
+        lambda: called.__setitem__("sanity", called["sanity"] + 1)
+        or Output(Status.OK, {}),
     )
 
     InitUtils.sync_runtime_urls()
 
-    assert called == {"db": 1, "json": 1}
+    assert called == {"db": 1, "json": 1, "sanity": 1}
 
 
 def test_given_existing_db_when_init_db_then_returns_early(init_paths):
@@ -134,8 +139,12 @@ def test_given_sync_runtime_urls_error_when_called_then_logs_warnings(monkeypatc
         lambda: Output(Status.ERROR, 0),
     )
     monkeypatch.setattr(
-        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.refresh_urls",
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.sync_from_store_db",
         lambda: Output(Status.ERROR, 0),
+    )
+    monkeypatch.setattr(
+        "hb_store_m1.utils.db_utils.DBUtils.sanity_check",
+        lambda: Output(Status.ERROR, {}),
     )
     monkeypatch.setattr(
         init_utils_module.log,
@@ -145,4 +154,37 @@ def test_given_sync_runtime_urls_error_when_called_then_logs_warnings(monkeypatc
 
     InitUtils.sync_runtime_urls()
 
-    assert called["warn"] == 2
+    assert called["warn"] == 3
+
+
+def test_given_sync_runtime_urls_when_sanity_warn_then_logs_warning(monkeypatch):
+    called = {"warn": 0}
+
+    monkeypatch.setattr(
+        "hb_store_m1.utils.db_utils.DBUtils.refresh_urls",
+        lambda: Output(Status.OK, 1),
+    )
+    monkeypatch.setattr(
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.sync_from_store_db",
+        lambda: Output(Status.OK, 1),
+    )
+    monkeypatch.setattr(
+        "hb_store_m1.utils.db_utils.DBUtils.sanity_check",
+        lambda: Output(
+            Status.WARN,
+            {
+                "app_type_counts": {"Game": 0, "Patch": 0},
+                "missing_by_type": {"Game": {"image": 1}},
+                "has_pid_gaps": False,
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        init_utils_module.log,
+        "log_warn",
+        lambda _msg: called.__setitem__("warn", called["warn"] + 1),
+    )
+
+    InitUtils.sync_runtime_urls()
+
+    assert called["warn"] == 1

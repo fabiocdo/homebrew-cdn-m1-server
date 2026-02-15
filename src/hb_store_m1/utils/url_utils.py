@@ -6,7 +6,29 @@ from hb_store_m1.models.globals import Globals
 
 
 class URLUtils:
-    _ALLOWED_APP_TYPES = {"app", "dlc", "game", "save", "update", "unknown"}
+    _PS4_STOREDATA_ROOT = "/user/app/NPXS39041/storedata"
+    _CACHE_KEY_SANITIZE = re.compile(r"[^A-Z0-9._-]")
+    _APP_TYPE_TO_SECTION = {
+        "app": "app",
+        "dlc": "dlc",
+        "game": "game",
+        "patch": "update",
+        "update": "update",
+        "save": "save",
+        "unknown": "unknown",
+    }
+    _APP_TYPE_TO_CLIENT_LABEL = {
+        "app": "App",
+        "dlc": "DLC",
+        "game": "Game",
+        "patch": "Patch",
+        "update": "Patch",
+        "save": "Other",
+        "unknown": "Unknown",
+        "other": "Other",
+        "theme": "Theme",
+        "media": "Media",
+    }
     _CONTENT_ID_PATTERN = re.compile(
         r"^[A-Z]{2}[A-Z0-9]{4}-[A-Z0-9]{9}_[0-9]{2}-[A-Z0-9]{16}$"
     )
@@ -76,14 +98,28 @@ class URLUtils:
         return bool(URLUtils._CONTENT_ID_PATTERN.match((value or "").strip().upper()))
 
     @staticmethod
+    def normalize_app_type_section(app_type: str | None) -> str | None:
+        key = (app_type or "").strip().lower()
+        if not key:
+            return None
+        return URLUtils._APP_TYPE_TO_SECTION.get(key)
+
+    @staticmethod
+    def to_client_app_type(app_type: str | None) -> str:
+        key = (app_type or "").strip().lower()
+        if not key:
+            return "Unknown"
+        return URLUtils._APP_TYPE_TO_CLIENT_LABEL.get(key, "Unknown")
+
+    @staticmethod
     def canonical_pkg_url(
         content_id: str | None, app_type: str | None, fallback: str | Path | None = None
     ) -> str | None:
         content = (content_id or "").strip().upper()
-        app = (app_type or "").strip().lower()
+        section = URLUtils.normalize_app_type_section(app_type)
 
-        if app in URLUtils._ALLOWED_APP_TYPES and URLUtils._is_content_id(content):
-            return urljoin(Globals.ENVS.SERVER_URL, f"/pkg/{app}/{content}.pkg")
+        if section and URLUtils._is_content_id(content):
+            return urljoin(Globals.ENVS.SERVER_URL, f"/pkg/{section}/{content}.pkg")
 
         return URLUtils.to_public_url(fallback)
 
@@ -102,5 +138,12 @@ class URLUtils:
             )
         return URLUtils.to_public_url(fallback)
 
-
-URLUtils = URLUtils()
+    @staticmethod
+    def ps4_store_icon_cache_path(content_id: str | None) -> str | None:
+        content = (content_id or "").strip().upper()
+        if not content:
+            return None
+        safe_key = URLUtils._CACHE_KEY_SANITIZE.sub("_", content).strip("._-")
+        if not safe_key:
+            return None
+        return f"{URLUtils._PS4_STOREDATA_ROOT}/{safe_key}_icon0.png"

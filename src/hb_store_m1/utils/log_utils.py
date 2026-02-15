@@ -3,7 +3,16 @@ import datetime
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogLevel, LogModule, LogColor
 
-CURRENT_LOG_PRIORITY: int = LogLevel[Globals.ENVS.LOG_LEVEL.upper()].priority()
+CURRENT_LOG_PRIORITY: int | None = None
+
+
+def _current_log_priority() -> int:
+    if isinstance(CURRENT_LOG_PRIORITY, int):
+        return CURRENT_LOG_PRIORITY
+    try:
+        return LogLevel[Globals.ENVS.LOG_LEVEL.upper()].priority()
+    except KeyError:
+        return LogLevel.DEBUG.priority()
 
 
 class LogUtils:
@@ -38,7 +47,7 @@ class LogUtils:
 
     @staticmethod
     def _can_log(log_level: LogLevel) -> bool:
-        return CURRENT_LOG_PRIORITY <= log_level.priority()
+        return _current_log_priority() <= log_level.priority()
 
     def _log(self, log_level: LogLevel, message=None):
         timestamp = self._timestamp()

@@ -5,7 +5,7 @@ from hb_store_m1.models.output import Output, Status
 from hb_store_m1.models.pkg.metadata.param_sfo import ParamSFO, ParamSFOKey
 from hb_store_m1.models.pkg.pkg import PKG
 from hb_store_m1.modules import auto_organizer as auto_organizer_module
-from hb_store_m1.modules.watcher import Watcher
+from hb_store_m1.modules.watcher import PreparedPkg, Watcher
 from hb_store_m1.utils import cache_utils as cache_utils_module
 from hb_store_m1.utils import db_utils as db_utils_module
 from hb_store_m1.utils import file_utils as file_utils_module
@@ -542,3 +542,97 @@ def test_given_no_changes_and_non_canonical_pkg_when_run_cycle_then_forces_proce
 
     assert pkg_path in processed["paths"]
     assert processed["persisted"] is True
+
+
+def test_given_parallel_preprocess_when_process_pkgs_then_finalizes_in_order(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    pkg_a = init_paths.GAME_DIR_PATH / "a.pkg"
+    pkg_b = init_paths.GAME_DIR_PATH / "b.pkg"
+    pkg_a.write_text("pkg", encoding="utf-8")
+    pkg_b.write_text("pkg", encoding="utf-8")
+
+    monkeypatch.setattr(
+        watcher._envs,
+        "WATCHER_PKG_PREPROCESS_WORKERS",
+        2,
+        raising=False,
+    )
+    sfo = ParamSFO(
+        {
+            ParamSFOKey.TITLE: "t",
+            ParamSFOKey.TITLE_ID: "CUSA00001",
+            ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000",
+            ParamSFOKey.CATEGORY: "GD",
+            ParamSFOKey.VERSION: "01.00",
+            ParamSFOKey.PUBTOOLINFO: "",
+        }
+    )
+
+    monkeypatch.setattr(
+        watcher,
+        "_preprocess_pkg",
+        lambda path: Output(Status.OK, PreparedPkg(path, sfo)),
+    )
+    finalized = {"order": []}
+    monkeypatch.setattr(
+        watcher,
+        "_finalize_preprocessed_pkg",
+        lambda prepared: finalized["order"].append(prepared.pkg_path.name)
+        or PKG(content_id=prepared.pkg_path.stem, category="GD"),
+    )
+
+    results = watcher._process_pkgs([pkg_a, pkg_b])
+
+    assert [pkg.content_id for pkg in results] == ["a", "b"]
+    assert finalized["order"] == ["a.pkg", "b.pkg"]
+
+
+def test_given_parallel_preprocess_failure_when_process_pkgs_then_moves_to_error_once(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    pkg_a = init_paths.GAME_DIR_PATH / "a.pkg"
+    pkg_b = init_paths.GAME_DIR_PATH / "b.pkg"
+    pkg_a.write_text("pkg", encoding="utf-8")
+    pkg_b.write_text("pkg", encoding="utf-8")
+    monkeypatch.setattr(
+        watcher._envs,
+        "WATCHER_PKG_PREPROCESS_WORKERS",
+        2,
+        raising=False,
+    )
+    sfo = ParamSFO(
+        {
+            ParamSFOKey.TITLE: "t",
+            ParamSFOKey.TITLE_ID: "CUSA00001",
+            ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000",
+            ParamSFOKey.CATEGORY: "GD",
+            ParamSFOKey.VERSION: "01.00",
+            ParamSFOKey.PUBTOOLINFO: "",
+        }
+    )
+
+    def fake_preprocess(path):
+        if path.name == "a.pkg":
+            return Output(Status.ERROR, "validation_failed")
+        return Output(Status.OK, PreparedPkg(path, sfo))
+
+    monkeypatch.setattr(watcher, "_preprocess_pkg", fake_preprocess)
+    moved = {"reasons": []}
+    monkeypatch.setattr(
+        watcher,
+        "_handle_preprocess_failure",
+        lambda _pkg_path, reason: moved["reasons"].append(reason),
+    )
+    monkeypatch.setattr(
+        watcher,
+        "_finalize_preprocessed_pkg",
+        lambda prepared: PKG(content_id=prepared.pkg_path.stem, category="GD"),
+    )
+
+    results = watcher._process_pkgs([pkg_a, pkg_b])
+
+    assert [pkg.content_id for pkg in results] == ["b"]
+    assert moved["reasons"] == ["validation_failed"]

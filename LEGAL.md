@@ -8,6 +8,7 @@ It does not include, bundle, or authorize distribution of proprietary content.
 - This document is not legal advice.
 - Policies below are intended to reduce misuse risk and clarify responsibilities.
 - Legal obligations may vary by country and by how each instance is operated.
+- This notice does not replace, override, or limit rights granted by `LICENSE` (GNU GPLv3).
 
 ## Operator and User Responsibility
 
@@ -42,7 +43,7 @@ To the maximum extent permitted by law:
 - Maintainers may refuse support or remove references to deployments associated with abuse.
 - Maintainers have no general duty to monitor third-party instances or user activity outside official project channels.
 
-For license terms and warranty disclaimer, see `LICENSE` (MIT).
+For license terms and warranty disclaimer, see `LICENSE` (GNU GPLv3).
 
 ## Abuse and Takedown
 

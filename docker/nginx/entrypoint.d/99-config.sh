@@ -61,3 +61,5 @@ EOF
 
   echo "[nginx] wrote $OUT_SERVERS (ENABLE_TLS=false)"
 fi
+
+exec nginx -g "daemon off;"

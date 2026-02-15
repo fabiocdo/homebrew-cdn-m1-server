@@ -51,6 +51,3 @@ class StoreAssetClient:
             tmp_path.write_bytes(response.read())
 
         tmp_path.replace(destination)
-
-
-StoreAssetClient = StoreAssetClient()

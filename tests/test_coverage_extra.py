@@ -187,7 +187,7 @@ def test_given_no_changes_when_run_cycle_then_skips_scan(init_paths, monkeypatch
     assert called["write"] is False
 
 
-def test_given_fpkgi_enabled_and_missing_json_when_run_cycle_then_runs(
+def test_given_fpkgi_bootstrap_error_when_missing_json_then_falls_back_to_scan(
     init_paths, monkeypatch
 ):
     watcher = Watcher()
@@ -211,6 +211,10 @@ def test_given_fpkgi_enabled_and_missing_json_when_run_cycle_then_runs(
     )
     monkeypatch.setattr(
         globals_module.Globals.ENVS, "FPGKI_FORMAT_ENABLED", True, raising=False
+    )
+    monkeypatch.setattr(
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.bootstrap_from_store_db",
+        lambda _sections: Output(Status.ERROR, "failed"),
     )
     monkeypatch.setattr(
         "hb_store_m1.utils.pkg_utils.PkgUtils.validate",
@@ -246,8 +250,8 @@ def test_given_fpkgi_enabled_and_missing_json_when_run_cycle_then_runs(
         lambda _pkgs: Output(Status.OK, 1),
     )
     monkeypatch.setattr(
-        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.upsert",
-        lambda _pkgs: Output(Status.OK, 1),
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.sync_from_store_db",
+        lambda: Output(Status.OK, 1),
     )
     called = {"write": False}
     monkeypatch.setattr(
@@ -259,6 +263,47 @@ def test_given_fpkgi_enabled_and_missing_json_when_run_cycle_then_runs(
     watcher._run_cycle()
 
     assert called["write"] is True
+
+
+def test_given_fpkgi_bootstrap_ok_when_missing_json_then_skips_heavy_processing(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    content_id = "UP0000-TEST00000_00-TEST000000000000"
+    pkg_path = init_paths.GAME_DIR_PATH / f"{content_id}.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+    cache = {"game": CacheSection(content={content_id: f"1|2|{pkg_path.name}"})}
+
+    monkeypatch.setattr(
+        cache_utils_module.CacheUtils,
+        "compare_pkg_cache",
+        lambda: Output(Status.SKIP, None),
+    )
+    monkeypatch.setattr(
+        cache_utils_module.CacheUtils,
+        "read_pkg_cache",
+        lambda: Output(Status.OK, cache),
+    )
+    monkeypatch.setattr(
+        globals_module.Globals.ENVS, "FPGKI_FORMAT_ENABLED", True, raising=False
+    )
+
+    called = {"sections": None, "processed": 0}
+    monkeypatch.setattr(
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.bootstrap_from_store_db",
+        lambda sections: called.__setitem__("sections", sections)
+        or Output(Status.OK, 1),
+    )
+    monkeypatch.setattr(
+        watcher,
+        "_process_pkg",
+        lambda _pkg_path: called.__setitem__("processed", called["processed"] + 1),
+    )
+
+    watcher._run_cycle()
+
+    assert called["sections"] == ["game"]
+    assert called["processed"] == 0
 
 
 def test_given_upsert_error_when_run_cycle_then_skips_cache_write(
@@ -316,8 +361,8 @@ def test_given_upsert_error_when_run_cycle_then_skips_cache_write(
         lambda _pkgs: Output(Status.ERROR, 1),
     )
     monkeypatch.setattr(
-        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.upsert",
-        lambda _pkgs: Output(Status.OK, 1),
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.sync_from_store_db",
+        lambda: Output(Status.OK, 1),
     )
     called = {"write": False}
     monkeypatch.setattr(
