@@ -564,7 +564,14 @@ class FPKGIUtils:
                 continue
             grouped_entries.setdefault(app_type, {})[package_url] = metadata
 
-        app_types = sorted(normalized_targets or grouped_entries.keys())
+        app_types = sorted(
+            normalized_targets
+            or {
+                app_type
+                for app_type in FPKGIUtils._DB_APP_TYPE_TO_APP_TYPE.values()
+                if app_type in FPKGIUtils._JSON_STEM_BY_APP_TYPE
+            }
+        )
         if not app_types:
             return Output(Status.SKIP, "Nothing to bootstrap")
 
@@ -587,6 +594,10 @@ class FPKGIUtils:
             return Output(Status.OK, updated_files)
 
         return Output(Status.SKIP, "FPKGI JSON already synced with STORE.DB")
+
+    @staticmethod
+    def sync_from_store_db() -> Output:
+        return FPKGIUtils.bootstrap_from_store_db(None)
 
     @staticmethod
     def upsert(pkgs: list[PKG]) -> Output:

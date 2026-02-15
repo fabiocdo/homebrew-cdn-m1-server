@@ -688,3 +688,65 @@ def test_given_store_db_rows_when_bootstrap_then_builds_fpkgi_json_fast(init_pat
 def test_given_missing_store_db_when_bootstrap_then_returns_not_found(init_paths):
     result = FPKGIUtils.bootstrap_from_store_db(["game"])
     assert result.status is Status.NOT_FOUND
+
+
+def test_given_stale_dlc_json_when_sync_from_db_then_clears_stale_entries(init_paths):
+    db_path = Globals.FILES.STORE_DB_FILE_PATH
+    init_sql_path = Path(__file__).resolve().parents[1] / "init" / "store_db.sql"
+    init_sql = init_sql_path.read_text("utf-8")
+
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.executescript(init_sql)
+        conn.execute(
+            """
+            INSERT INTO homebrews
+            (content_id, id, name, image, package, version, Size, apptype, releaseddate)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "UP0000-TEST00000_00-TEST000000000000",
+                "CUSA00001",
+                "Game",
+                "http://old.host/app/data/pkg/_media/UP0000-TEST00000_00-TEST000000000000_icon0.png",
+                "http://old.host/app/data/pkg/game/UP0000-TEST00000_00-TEST000000000000.pkg",
+                "01.23",
+                123,
+                "Game",
+                "2026-02-14",
+            ),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    dlc_json = FPKGIUtils.json_path_for_app_type("dlc")
+    stale_dlc_url = urljoin(
+        Globals.ENVS.SERVER_URL,
+        "/pkg/dlc/UP0000-TEST00000_00-DLC0000000000000.pkg",
+    )
+    dlc_json.write_text(
+        json.dumps(
+            {
+                FPKGI.Root.DATA.value: {
+                    stale_dlc_url: {
+                        FPKGI.Column.TITLE_ID.value: "CUSA99999",
+                        FPKGI.Column.REGION.value: "USA",
+                        FPKGI.Column.NAME.value: "Stale DLC",
+                        FPKGI.Column.VERSION.value: "01.00",
+                        FPKGI.Column.RELEASE.value: None,
+                        FPKGI.Column.SIZE.value: 1,
+                        FPKGI.Column.MIN_FW.value: None,
+                        FPKGI.Column.COVER_URL.value: None,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    result = FPKGIUtils.sync_from_store_db()
+    dlc_data = _read_data(dlc_json)
+
+    assert result.status is Status.OK
+    assert dlc_data == {}

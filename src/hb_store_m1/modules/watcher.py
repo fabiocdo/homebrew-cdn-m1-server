@@ -282,9 +282,12 @@ class Watcher:
             log.log_error("Failed to delete removed PKGs from STORE.DB")
 
         if self._envs.FPGKI_FORMAT_ENABLED:
-            fpkgi_delete = self._fpkgi_utils.delete_by_content_ids(unique_ids)
-            if fpkgi_delete.status is Status.ERROR:
-                log.log_error("Failed to delete removed PKGs from FPKGI JSON")
+            if delete_result.status is Status.ERROR:
+                fpkgi_sync = Output(Status.ERROR, "DB delete failed")
+            else:
+                fpkgi_sync = self._fpkgi_utils.sync_from_store_db()
+            if fpkgi_sync.status is Status.ERROR:
+                log.log_error("Failed to sync FPKGI JSON from STORE.DB")
 
         media_dir = self._paths.MEDIA_DIR_PATH
         for content_id in unique_ids:
@@ -520,7 +523,10 @@ class Watcher:
     ) -> None:
         upsert_result = self._db_utils.upsert(extracted_pkgs)
         if self._envs.FPGKI_FORMAT_ENABLED:
-            fpkgi_result = self._fpkgi_utils.upsert(extracted_pkgs)
+            if upsert_result.status is Status.ERROR:
+                fpkgi_result = Output(Status.ERROR, "STORE.DB update failed")
+            else:
+                fpkgi_result = self._fpkgi_utils.sync_from_store_db()
         else:
             fpkgi_result = Output(Status.SKIP, "FPKGI disabled")
 

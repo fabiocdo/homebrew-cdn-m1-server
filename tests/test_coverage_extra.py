@@ -250,8 +250,8 @@ def test_given_fpkgi_bootstrap_error_when_missing_json_then_falls_back_to_scan(
         lambda _pkgs: Output(Status.OK, 1),
     )
     monkeypatch.setattr(
-        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.upsert",
-        lambda _pkgs: Output(Status.OK, 1),
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.sync_from_store_db",
+        lambda: Output(Status.OK, 1),
     )
     called = {"write": False}
     monkeypatch.setattr(
@@ -361,8 +361,8 @@ def test_given_upsert_error_when_run_cycle_then_skips_cache_write(
         lambda _pkgs: Output(Status.ERROR, 1),
     )
     monkeypatch.setattr(
-        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.upsert",
-        lambda _pkgs: Output(Status.OK, 1),
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.sync_from_store_db",
+        lambda: Output(Status.OK, 1),
     )
     called = {"write": False}
     monkeypatch.setattr(

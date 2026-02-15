@@ -115,13 +115,13 @@ class InitUtils:
         else:
             log.log_debug("STORE.DB URLs already up to date")
 
-        fpkgi_result = FPKGIUtils.refresh_urls()
+        fpkgi_result = FPKGIUtils.sync_from_store_db()
         if fpkgi_result.status is Status.ERROR:
-            log.log_warn("Failed to refresh FPKGI JSON URLs at startup")
+            log.log_warn("Failed to sync FPKGI JSON from STORE.DB at startup")
         elif fpkgi_result.status is Status.OK:
-            log.log_info(f"FPKGI JSON URL sync applied ({fpkgi_result.content} files)")
+            log.log_info(f"FPKGI JSON mirror sync applied ({fpkgi_result.content} files)")
         else:
-            log.log_debug("FPKGI JSON URLs already up to date")
+            log.log_debug("FPKGI JSON already mirrored with STORE.DB")
 
         sanity = DBUtils.sanity_check()
         if sanity.status is Status.WARN:

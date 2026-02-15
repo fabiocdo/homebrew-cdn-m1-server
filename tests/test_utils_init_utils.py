@@ -91,7 +91,7 @@ def test_given_sync_runtime_urls_when_called_then_refreshes_db_and_json(monkeypa
         lambda: called.__setitem__("db", called["db"] + 1) or Output(Status.OK, 1),
     )
     monkeypatch.setattr(
-        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.refresh_urls",
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.sync_from_store_db",
         lambda: called.__setitem__("json", called["json"] + 1) or Output(Status.OK, 1),
     )
     monkeypatch.setattr(
@@ -139,7 +139,7 @@ def test_given_sync_runtime_urls_error_when_called_then_logs_warnings(monkeypatc
         lambda: Output(Status.ERROR, 0),
     )
     monkeypatch.setattr(
-        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.refresh_urls",
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.sync_from_store_db",
         lambda: Output(Status.ERROR, 0),
     )
     monkeypatch.setattr(
@@ -165,7 +165,7 @@ def test_given_sync_runtime_urls_when_sanity_warn_then_logs_warning(monkeypatch)
         lambda: Output(Status.OK, 1),
     )
     monkeypatch.setattr(
-        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.refresh_urls",
+        "hb_store_m1.utils.fpkgi_utils.FPKGIUtils.sync_from_store_db",
         lambda: Output(Status.OK, 1),
     )
     monkeypatch.setattr(
