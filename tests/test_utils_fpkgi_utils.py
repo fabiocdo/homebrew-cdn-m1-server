@@ -690,6 +690,34 @@ def test_given_missing_store_db_when_bootstrap_then_returns_not_found(init_paths
     assert result.status is Status.NOT_FOUND
 
 
+def test_given_samefile_case_variant_when_read_entries_then_not_marked_migrated(
+    init_paths, monkeypatch
+):
+    same_path = Globals.PATHS.DATA_DIR_PATH / "dlc.json"
+    same_path.write_text(json.dumps({FPKGI.Root.DATA.value: {}}), encoding="utf-8")
+
+    monkeypatch.setattr(
+        FPKGIUtils,
+        "_json_path",
+        staticmethod(lambda _app_type: same_path.with_name("DLC.json")),
+    )
+    monkeypatch.setattr(
+        FPKGIUtils,
+        "_legacy_json_path",
+        staticmethod(lambda _app_type: same_path),
+    )
+    monkeypatch.setattr(
+        FPKGIUtils,
+        "_is_same_file_path",
+        staticmethod(lambda _a, _b: True),
+    )
+
+    _, _, entries, migrated = FPKGIUtils._read_entries_for_app_type("dlc")
+
+    assert entries == {}
+    assert migrated is False
+
+
 def test_given_stale_dlc_json_when_sync_from_db_then_clears_stale_entries(init_paths):
     db_path = Globals.FILES.STORE_DB_FILE_PATH
     init_sql_path = Path(__file__).resolve().parents[1] / "init" / "store_db.sql"

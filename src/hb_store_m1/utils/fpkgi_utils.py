@@ -99,7 +99,11 @@ class FPKGIUtils:
     ) -> tuple[Path, Path, dict[str, dict[str, object]] | None, bool]:
         json_path = FPKGIUtils._json_path(app_type)
         legacy_path = FPKGIUtils._legacy_json_path(app_type)
-        has_legacy_file = legacy_path.exists() and legacy_path != json_path
+        has_legacy_file = (
+            legacy_path.exists()
+            and legacy_path != json_path
+            and not FPKGIUtils._is_same_file_path(json_path, legacy_path)
+        )
 
         if json_path.exists():
             entries, migrated = FPKGIUtils._read_json(json_path, app_type)
@@ -107,18 +111,35 @@ class FPKGIUtils:
 
         if legacy_path.exists():
             entries, migrated = FPKGIUtils._read_json(legacy_path, app_type)
+            has_distinct_legacy_file = (
+                legacy_path != json_path
+                and not FPKGIUtils._is_same_file_path(json_path, legacy_path)
+            )
             return (
                 json_path,
                 legacy_path,
                 entries,
-                migrated or (legacy_path != json_path),
+                migrated or has_distinct_legacy_file,
             )
 
         return json_path, legacy_path, {}, False
 
     @staticmethod
+    def _is_same_file_path(path_a: Path, path_b: Path) -> bool:
+        try:
+            if not path_a.exists() or not path_b.exists():
+                return False
+            return path_a.samefile(path_b)
+        except OSError:
+            return False
+
+    @staticmethod
     def _cleanup_legacy_json(json_path: Path, legacy_path: Path) -> None:
-        if legacy_path == json_path or not legacy_path.exists():
+        if (
+            legacy_path == json_path
+            or not legacy_path.exists()
+            or FPKGIUtils._is_same_file_path(json_path, legacy_path)
+        ):
             return
         try:
             legacy_path.unlink()
