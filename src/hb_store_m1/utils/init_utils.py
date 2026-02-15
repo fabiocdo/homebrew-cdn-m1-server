@@ -110,10 +110,31 @@ class InitUtils:
         db_result = DBUtils.refresh_urls()
         if db_result.status is Status.ERROR:
             log.log_warn("Failed to refresh STORE.DB URLs at startup")
+        elif db_result.status is Status.OK:
+            log.log_info(f"STORE.DB URL sync applied ({db_result.content} rows)")
+        else:
+            log.log_debug("STORE.DB URLs already up to date")
 
-        fpkgi_result = FPKGIUtils.refresh_urls()
+        fpkgi_result = FPKGIUtils.sync_from_store_db()
         if fpkgi_result.status is Status.ERROR:
-            log.log_warn("Failed to refresh FPKGI JSON URLs at startup")
+            log.log_warn("Failed to sync FPKGI JSON from STORE.DB at startup")
+        elif fpkgi_result.status is Status.OK:
+            log.log_info(f"FPKGI JSON mirror sync applied ({fpkgi_result.content} files)")
+        else:
+            log.log_debug("FPKGI JSON already mirrored with STORE.DB")
 
-
-InitUtils = InitUtils()
+        sanity = DBUtils.sanity_check()
+        if sanity.status is Status.WARN:
+            details = sanity.content or {}
+            log.log_warn(
+                "STORE.DB sanity check warnings: "
+                f"counts={details.get('app_type_counts')} "
+                f"missing={details.get('missing_by_type')} "
+                f"pid_gaps={details.get('has_pid_gaps')}"
+            )
+        elif sanity.status is Status.OK:
+            log.log_info("STORE.DB sanity check OK")
+        elif sanity.status is Status.NOT_FOUND:
+            log.log_warn("STORE.DB sanity check skipped: STORE.DB not found")
+        else:
+            log.log_warn("STORE.DB sanity check failed")

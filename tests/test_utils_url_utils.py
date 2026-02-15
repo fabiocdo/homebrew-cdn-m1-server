@@ -64,6 +64,38 @@ def test_given_valid_content_id_when_canonical_pkg_url_then_uses_content_id():
 
 
 def test_given_invalid_content_id_when_canonical_media_url_then_uses_fallback():
-    value = URLUtils.canonical_media_url("BAD", "icon0", "/app/data/pkg/_media/raw_icon0.png")
+    value = URLUtils.canonical_media_url(
+        "BAD", "icon0", "/app/data/pkg/_media/raw_icon0.png"
+    )
 
     assert value == urljoin(Globals.ENVS.SERVER_URL, "/pkg/_media/raw_icon0.png")
+
+
+def test_given_client_label_when_normalize_app_type_section_then_maps_to_pkg_section():
+    assert URLUtils.normalize_app_type_section("Patch") == "update"
+    assert URLUtils.normalize_app_type_section("DLC") == "dlc"
+    assert URLUtils.normalize_app_type_section("Game") == "game"
+
+
+def test_given_internal_app_type_when_to_client_app_type_then_returns_ps4_store_label():
+    assert URLUtils.to_client_app_type("game") == "Game"
+    assert URLUtils.to_client_app_type("update") == "Patch"
+    assert URLUtils.to_client_app_type("save") == "Other"
+
+
+def test_given_valid_content_id_when_ps4_store_icon_cache_path_then_returns_local_path():
+    value = URLUtils.ps4_store_icon_cache_path("UP0000-CUSA00001_00-ABCDEFGHIJKLMNOP")
+
+    assert (
+        value
+        == "/user/app/NPXS39041/storedata/UP0000-CUSA00001_00-ABCDEFGHIJKLMNOP_icon0.png"
+    )
+
+
+def test_given_non_standard_content_id_when_ps4_store_icon_cache_path_then_still_returns_local_path():
+    value = URLUtils.ps4_store_icon_cache_path("UP9000-CUSA01967_00-POBANUKTRAVPACK0")
+
+    assert (
+        value
+        == "/user/app/NPXS39041/storedata/UP9000-CUSA01967_00-POBANUKTRAVPACK0_icon0.png"
+    )

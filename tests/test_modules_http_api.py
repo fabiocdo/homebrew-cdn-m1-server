@@ -73,7 +73,7 @@ def test_given_content_id_when_lookup_then_returns_row(tmp_path):
         (
             "CUSA12345",
             "UP0000-CUSA12345_00-ABCDEFGHIJKLMNOP",
-            "dlc",
+            "DLC",
             "http://host/pkg/dlc/UP0000-CUSA12345_00-ABCDEFGHIJKLMNOP.pkg",
             0,
         ),
@@ -84,7 +84,7 @@ def test_given_content_id_when_lookup_then_returns_row(tmp_path):
     row = lookup_pkg_by_tid("UP0000-CUSA12345_00-ABCDEFGHIJKLMNOP", db_path)
 
     assert row is not None
-    assert row["apptype"] == "dlc"
+    assert row["apptype"] == "DLC"
 
 
 def test_given_valid_row_when_pkg_redirect_then_returns_pkg_path():
@@ -114,13 +114,25 @@ def test_given_invalid_content_id_when_pkg_redirect_then_falls_back_to_package()
 
 def test_given_valid_row_when_pkg_internal_path_then_returns_internal_alias_path():
     entry = {
-        "apptype": "dlc",
+        "apptype": "DLC",
         "content_id": "UP0000-CUSA99999_00-ABCDEFGHIJKLMNOP",
     }
 
     assert (
         pkg_internal_path(entry)
         == "/_internal_pkg/dlc/UP0000-CUSA99999_00-ABCDEFGHIJKLMNOP.pkg"
+    )
+
+
+def test_given_client_patch_label_when_pkg_redirect_then_maps_to_update_path():
+    entry = {
+        "apptype": "Patch",
+        "content_id": "UP0000-CUSA00010_00-ABCDEFGHIJKLMNOP",
+    }
+
+    assert (
+        pkg_redirect_path(entry)
+        == "/pkg/update/UP0000-CUSA00010_00-ABCDEFGHIJKLMNOP.pkg"
     )
 
 

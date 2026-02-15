@@ -12,35 +12,34 @@ log = LogUtils(LogModule.AUTO_ORGANIZER)
 
 
 class AutoOrganizer:
+    _INVALID_FILENAME_CHARS = set('<>:"/\\|?*')
+    _SECTIONS = {section.name: section for section in Section.ALL}
 
-    @staticmethod
-    def dry_run(pkg: PKG) -> Output[Path | None]:
+    @classmethod
+    def _target_path_for_pkg(cls, pkg: PKG) -> Path | None:
+        if not pkg.content_id:
+            return None
+        app_type = pkg.app_type.value if pkg.app_type else ""
+        section = cls._SECTIONS.get(app_type, Section.UNKNOWN)
+        return section.path / f"{pkg.content_id}.pkg"
 
-        # Step 1: Check PKG existence
+    @classmethod
+    def _has_invalid_filename(cls, file_name: str) -> bool:
+        if file_name in {os.curdir, os.pardir}:
+            return True
+        return any(ch in cls._INVALID_FILENAME_CHARS for ch in file_name)
+
+    @classmethod
+    def dry_run(cls, pkg: PKG) -> Output[Path | None]:
         if not pkg.pkg_path.is_file():
             return Output(Status.NOT_FOUND, None)
 
-        # Step 2: Check if the PKG filename is valid
-        invalid_chars = set('<>:"/\\|?*')
-        if pkg.pkg_path.name in {os.curdir, os.pardir} or any(
-            ch in invalid_chars for ch in pkg.pkg_path.name
-        ):
+        if cls._has_invalid_filename(pkg.pkg_path.name):
             return Output(Status.INVALID, None)
 
-        # Step 3: Check PKG CONTENT_ID
-        content_id = pkg.content_id
-
-        if not content_id:
+        target_path = cls._target_path_for_pkg(pkg)
+        if not target_path:
             return Output(Status.INVALID, None)
-
-        # Step 4: Plan the new path and filename
-        planned_name = f"{content_id}.pkg"
-        app_type = pkg.app_type
-        app_type_name = app_type.value if app_type else ""
-
-        section_by_name = {section.name: section for section in Section.ALL}
-        target_section = section_by_name.get(app_type_name, Section.UNKNOWN)
-        target_path = target_section.path / planned_name
 
         if pkg.pkg_path.resolve() == target_path.resolve():
             return Output(Status.SKIP, target_path)
@@ -50,9 +49,9 @@ class AutoOrganizer:
 
         return Output(Status.OK, target_path)
 
-    @staticmethod
-    def run(pkg: PKG) -> Path | None:
-        dry_run_output = AutoOrganizer.dry_run(pkg)
+    @classmethod
+    def run(cls, pkg: PKG) -> Path | None:
+        dry_run_output = cls.dry_run(pkg)
 
         plan_result = dry_run_output.status
         target_path = dry_run_output.content

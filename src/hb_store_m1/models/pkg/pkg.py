@@ -40,6 +40,7 @@ class PKG:
     category: str = ""
     version: str = ""
     pubtoolinfo: str = ""
+    system_ver: str = ""
     release_date: str = ""
     region: Region | None = None
     app_type: AppType | None = None

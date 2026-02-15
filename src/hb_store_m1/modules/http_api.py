@@ -10,13 +10,13 @@ from urllib.parse import parse_qs, urlparse
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogModule
 from hb_store_m1.utils.log_utils import LogUtils
+from hb_store_m1.utils.url_utils import URLUtils
 
 log = LogUtils(LogModule.HTTP_API)
 
 _API_BIND_HOST = "127.0.0.1"
 _API_BIND_PORT = 8765
 _TRUE_VALUES = {"1", "true", "yes", "on"}
-_ALLOWED_APP_TYPES = {"app", "dlc", "game", "save", "update", "unknown"}
 _CONTENT_ID_PATTERN = re.compile(
     r"^[A-Z]{2}[A-Z0-9]{4}-[A-Z0-9]{9}_[0-9]{2}-[A-Z0-9]{16}$"
 )
@@ -81,10 +81,10 @@ def lookup_pkg_by_tid(
 
 
 def pkg_redirect_path(entry: dict[str, object]) -> str | None:
-    app_type = str(entry.get("apptype") or "").strip().lower()
+    app_type = URLUtils.normalize_app_type_section(str(entry.get("apptype") or ""))
     content_id = str(entry.get("content_id") or "").strip().upper()
 
-    if app_type in _ALLOWED_APP_TYPES and _CONTENT_ID_PATTERN.match(content_id):
+    if app_type and _CONTENT_ID_PATTERN.match(content_id):
         return f"/pkg/{app_type}/{content_id}.pkg"
 
     package_url = str(entry.get("package") or "").strip()

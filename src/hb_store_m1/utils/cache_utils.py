@@ -2,6 +2,8 @@ import json
 import re
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from hb_store_m1.models.cache import CacheSection, CACHE_ADAPTER
 from hb_store_m1.models.globals import Globals
 from hb_store_m1.models.log import LogColor, LogModule
@@ -10,7 +12,6 @@ from hb_store_m1.models.pkg.section import Section
 from hb_store_m1.utils.log_utils import LogUtils
 
 log = LogUtils(LogModule.CACHE_UTIL)
-from pydantic import ValidationError
 
 
 class CacheUtils:
@@ -304,6 +305,3 @@ class CacheUtils:
                 "changed": sorted(changed_sections),
             },
         )
-
-
-CacheUtils = CacheUtils()

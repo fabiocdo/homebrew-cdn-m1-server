@@ -67,6 +67,3 @@ class PKGTool:
             str(pkg),
             timeout_seconds=PKGTool._validate_timeout_seconds(pkg),
         )
-
-
-PKGTool = PKGTool()

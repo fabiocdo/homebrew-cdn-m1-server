@@ -15,13 +15,16 @@ def welcome():
     ▀ ▀ ▀▀      ▀▀▀  ▀  ▀▀▀ ▀ ▀ ▀▀▀     ▀ ▀ ▀▀▀
     v{Globals.ENVS.APP_VERSION}"""
     print(app_banner)
-    rows = []
     items = [
         ("SERVER_URL", Globals.ENVS.SERVER_URL),
         ("ENABLE_TLS", Globals.ENVS.ENABLE_TLS),
         ("LOG_LEVEL", Globals.ENVS.LOG_LEVEL),
         ("WATCHER_ENABLED", Globals.ENVS.WATCHER_ENABLED),
         ("WATCHER_PERIODIC_SCAN_SECONDS", Globals.ENVS.WATCHER_PERIODIC_SCAN_SECONDS),
+        (
+            "WATCHER_PKG_PREPROCESS_WORKERS",
+            Globals.ENVS.WATCHER_PKG_PREPROCESS_WORKERS,
+        ),
         ("FPGKI_FORMAT_ENABLED", Globals.ENVS.FPGKI_FORMAT_ENABLED),
         ("PKGTOOL_TIMEOUT_SECONDS", Globals.ENVS.PKGTOOL_TIMEOUT_SECONDS),
         (
@@ -37,10 +40,7 @@ def welcome():
             Globals.ENVS.PKGTOOL_VALIDATE_TIMEOUT_MAX_SECONDS,
         ),
     ]
-    for key, value in items:
-        if isinstance(value, list):
-            value = ", ".join(str(v) for v in value)
-        rows.append([key, value])
+    rows = [[key, value] for key, value in items]
 
     print(tabulate(rows, tablefmt="fancy_outline"))
 
