@@ -395,18 +395,18 @@ class Watcher:
         if not self._is_pkg_stable(pkg_path):
             return Output(Status.SKIP, "file_in_transfer")
 
+        extract_output = self._pkg_utils.extract_pkg_data(pkg_path)
+        if extract_output.status is Status.OK and extract_output.content:
+            return Output(
+                Status.OK,
+                PreparedPkg(pkg_path=pkg_path, param_sfo=extract_output.content),
+            )
+
         validation = self._pkg_utils.validate(pkg_path)
         if validation.status not in (Status.OK, Status.WARN):
             return Output(Status.ERROR, "validation_failed")
 
-        extract_output = self._pkg_utils.extract_pkg_data(pkg_path)
-        if extract_output.status is not Status.OK or not extract_output.content:
-            return Output(Status.ERROR, "extract_data_failed")
-
-        return Output(
-            Status.OK,
-            PreparedPkg(pkg_path=pkg_path, param_sfo=extract_output.content),
-        )
+        return Output(Status.ERROR, "extract_data_failed")
 
     def _is_pkg_stable(self, pkg_path: Path) -> bool:
         if self._file_stable_seconds <= 0:

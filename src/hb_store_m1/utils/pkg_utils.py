@@ -131,12 +131,11 @@ class PkgUtils:
 
     @staticmethod
     def read_content_id(pkg: Path) -> str | None:
-        validation = PkgUtils.validate(pkg)
-        if validation.status not in (Status.OK, Status.WARN):
-            return None
-
         extract_output = PkgUtils.extract_pkg_data(pkg)
         if extract_output.status is not Status.OK or not extract_output.content:
+            validation = PkgUtils.validate(pkg)
+            if validation.status not in (Status.OK, Status.WARN):
+                return None
             return None
 
         param_sfo = extract_output.content

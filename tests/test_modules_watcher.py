@@ -665,6 +665,62 @@ def test_given_file_in_transfer_when_process_pkg_then_skips_without_error_move(
     assert validate_called["called"] is False
 
 
+def test_given_extract_success_when_preprocess_then_skips_validation(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    pkg_path = init_paths.GAME_DIR_PATH / "ok.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+
+    sfo = ParamSFO(
+        {
+            ParamSFOKey.TITLE: "t",
+            ParamSFOKey.TITLE_ID: "CUSA00001",
+            ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000",
+            ParamSFOKey.CATEGORY: "GD",
+            ParamSFOKey.VERSION: "01.00",
+            ParamSFOKey.PUBTOOLINFO: "",
+        }
+    )
+    monkeypatch.setattr(watcher, "_is_pkg_stable", lambda _p: True)
+    monkeypatch.setattr(
+        watcher._pkg_utils, "extract_pkg_data", lambda _p: Output(Status.OK, sfo)
+    )
+    validate_called = {"called": False}
+    monkeypatch.setattr(
+        watcher._pkg_utils,
+        "validate",
+        lambda _p: validate_called.__setitem__("called", True) or Output(Status.OK, _p),
+    )
+
+    result = watcher._preprocess_pkg(pkg_path)
+
+    assert result.status is Status.OK
+    assert isinstance(result.content, PreparedPkg)
+    assert validate_called["called"] is False
+
+
+def test_given_extract_failure_and_invalid_pkg_when_preprocess_then_returns_validation_failed(
+    init_paths, monkeypatch
+):
+    watcher = Watcher()
+    pkg_path = init_paths.GAME_DIR_PATH / "bad.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+
+    monkeypatch.setattr(watcher, "_is_pkg_stable", lambda _p: True)
+    monkeypatch.setattr(
+        watcher._pkg_utils, "extract_pkg_data", lambda _p: Output(Status.ERROR, None)
+    )
+    monkeypatch.setattr(
+        watcher._pkg_utils, "validate", lambda _p: Output(Status.ERROR, _p)
+    )
+
+    result = watcher._preprocess_pkg(pkg_path)
+
+    assert result.status is Status.ERROR
+    assert result.content == "validation_failed"
+
+
 def test_given_file_stable_seconds_when_is_pkg_stable_then_requires_unchanged_window(
     init_paths, monkeypatch
 ):

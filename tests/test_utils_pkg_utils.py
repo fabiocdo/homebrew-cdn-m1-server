@@ -242,6 +242,43 @@ def test_given_read_content_id_when_validate_warn_then_extracts(monkeypatch):
     assert content_id == "UP0000-TEST00000_00-TEST000000000000"
 
 
+def test_given_read_content_id_when_extract_succeeds_then_does_not_validate(monkeypatch):
+    sfo = ParamSFO({ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000"})
+    validate_called = {"called": False}
+    monkeypatch.setattr(
+        PkgUtils,
+        "validate",
+        lambda _pkg: validate_called.__setitem__("called", True)
+        or Output(Status.OK, None),
+    )
+    monkeypatch.setattr(
+        PkgUtils, "extract_pkg_data", lambda _pkg: Output(Status.OK, sfo)
+    )
+
+    content_id = PkgUtils.read_content_id(Path("x.pkg"))
+
+    assert content_id == "UP0000-TEST00000_00-TEST000000000000"
+    assert validate_called["called"] is False
+
+
+def test_given_read_content_id_when_extract_fails_then_validates_in_fallback(monkeypatch):
+    validate_called = {"called": False}
+    monkeypatch.setattr(
+        PkgUtils,
+        "validate",
+        lambda _pkg: validate_called.__setitem__("called", True)
+        or Output(Status.ERROR, None),
+    )
+    monkeypatch.setattr(
+        PkgUtils, "extract_pkg_data", lambda _pkg: Output(Status.ERROR, None)
+    )
+
+    content_id = PkgUtils.read_content_id(Path("x.pkg"))
+
+    assert content_id is None
+    assert validate_called["called"] is True
+
+
 def test_given_missing_section_root_when_scan_then_skips(init_paths):
     # "app" directory exists in fixture; remove to hit the skip branch.
     init_paths.APP_DIR_PATH.rmdir()
