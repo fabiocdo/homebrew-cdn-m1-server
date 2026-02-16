@@ -24,6 +24,13 @@ log = LogUtils(LogModule.PKG_UTIL)
 class PkgUtils:
     _PARAM_REGEX = re.compile(r"^(?P<name>[^:]+?)\s*:\s*[^=]*=\s*(?P<value>.*)$")
     _VERSION_PARTS_REGEX = re.compile(r"\d+")
+    _MARKER_SYMBOLS_REGEX = re.compile(r"[\u00A9\u00AE\u2120\u2122\u24B8\u24C7]")
+    _MARKER_IN_PARENS_REGEX = re.compile(
+        r"[\(\[\{]\s*(?:TM|R|C|SM)\s*[\)\]\}]",
+        re.IGNORECASE,
+    )
+    _MARKER_TM_TOKEN_REGEX = re.compile(r"(?<![A-Za-z0-9])TM(?![A-Za-z0-9])")
+    _SPACES_REGEX = re.compile(r"\s+")
     _TEXT_REPLACEMENTS = {
         "\u2018": "'",
         "\u2019": "'",
@@ -145,10 +152,18 @@ class PkgUtils:
         if not text:
             return ""
 
+        # Strip trademark/copyright markers up front to avoid NFKC converting
+        # symbols into plain ASCII tokens (e.g. ™ -> TM, Ⓡ -> R).
+        text = PkgUtils._MARKER_SYMBOLS_REGEX.sub(" ", text)
+
         # Convert compatibility glyphs (e.g. roman numeral Ⅻ -> XII).
         normalized = unicodedata.normalize("NFKC", text)
         for source, target in PkgUtils._TEXT_REPLACEMENTS.items():
             normalized = normalized.replace(source, target)
+        normalized = PkgUtils._MARKER_SYMBOLS_REGEX.sub(" ", normalized)
+        normalized = PkgUtils._MARKER_IN_PARENS_REGEX.sub(" ", normalized)
+        normalized = PkgUtils._MARKER_TM_TOKEN_REGEX.sub(" ", normalized)
+        normalized = PkgUtils._SPACES_REGEX.sub(" ", normalized)
         return normalized.strip()
 
     @staticmethod

@@ -470,6 +470,18 @@ def test_given_special_quotes_and_dashes_when_normalize_client_text_then_rewrite
     assert normalized == '"Game" - Collector\'s Edition'
 
 
+def test_given_trademark_symbols_when_normalize_client_text_then_removes_markers():
+    normalized = PkgUtils.normalize_client_text("My Game™ Deluxe Ⓡ Edition ©")
+
+    assert normalized == "My Game Deluxe Edition"
+
+
+def test_given_marker_tokens_in_parens_when_normalize_client_text_then_removes():
+    normalized = PkgUtils.normalize_client_text("Test (TM) Name [R] Pack {C}")
+
+    assert normalized == "Test Name Pack"
+
+
 def test_given_version_and_app_ver_when_resolve_pkg_version_then_uses_highest():
     assert (
         PkgUtils.resolve_pkg_version(
