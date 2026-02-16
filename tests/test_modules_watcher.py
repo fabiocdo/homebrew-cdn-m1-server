@@ -766,3 +766,26 @@ def test_given_app_ver_higher_when_build_pkg_model_then_uses_app_ver(init_paths)
     pkg = watcher._build_pkg_model(pkg_path, sfo)
 
     assert pkg.version == "01.10"
+
+
+def test_given_title_with_roman_numeral_when_build_pkg_model_then_normalizes_title(
+    init_paths,
+):
+    watcher = Watcher()
+    pkg_path = init_paths.GAME_DIR_PATH / "sample.pkg"
+    pkg_path.write_text("pkg", encoding="utf-8")
+
+    sfo = ParamSFO(
+        {
+            ParamSFOKey.TITLE: "FINAL FANTASY Ⅻ THE ZODIAC AGE",
+            ParamSFOKey.TITLE_ID: "CUSA00001",
+            ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000",
+            ParamSFOKey.CATEGORY: "GD",
+            ParamSFOKey.VERSION: "01.00",
+            ParamSFOKey.PUBTOOLINFO: "",
+        }
+    )
+
+    pkg = watcher._build_pkg_model(pkg_path, sfo)
+
+    assert pkg.title == "FINAL FANTASY XII THE ZODIAC AGE"

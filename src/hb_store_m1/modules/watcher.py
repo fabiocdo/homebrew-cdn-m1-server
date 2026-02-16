@@ -381,7 +381,7 @@ class Watcher:
     @staticmethod
     def _build_pkg_model(pkg_path: Path, param_sfo) -> PKG:
         return PKG(
-            title=param_sfo.data[ParamSFOKey.TITLE],
+            title=PkgUtils.normalize_client_text(param_sfo.data[ParamSFOKey.TITLE]),
             title_id=param_sfo.data[ParamSFOKey.TITLE_ID],
             content_id=param_sfo.data[ParamSFOKey.CONTENT_ID],
             category=param_sfo.data[ParamSFOKey.CATEGORY],

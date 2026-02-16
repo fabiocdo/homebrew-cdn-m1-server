@@ -458,6 +458,18 @@ def test_given_param_and_medias_when_build_pkg_then_returns_model():
     assert result.content.version == "01.01"
 
 
+def test_given_compatibility_chars_when_normalize_client_text_then_transliterates():
+    normalized = PkgUtils.normalize_client_text("FINAL FANTASY Ⅻ THE ZODIAC AGE")
+
+    assert normalized == "FINAL FANTASY XII THE ZODIAC AGE"
+
+
+def test_given_special_quotes_and_dashes_when_normalize_client_text_then_rewrites():
+    normalized = PkgUtils.normalize_client_text("“Game” – Collector’s Edition")
+
+    assert normalized == '"Game" - Collector\'s Edition'
+
+
 def test_given_version_and_app_ver_when_resolve_pkg_version_then_uses_highest():
     assert (
         PkgUtils.resolve_pkg_version(

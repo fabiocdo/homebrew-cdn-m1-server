@@ -1,6 +1,7 @@
 import re
 import subprocess
 import tempfile
+import unicodedata
 from pathlib import Path
 
 from hb_store_m1.helpers.pkgtool import PKGTool
@@ -23,6 +24,15 @@ log = LogUtils(LogModule.PKG_UTIL)
 class PkgUtils:
     _PARAM_REGEX = re.compile(r"^(?P<name>[^:]+?)\s*:\s*[^=]*=\s*(?P<value>.*)$")
     _VERSION_PARTS_REGEX = re.compile(r"\d+")
+    _TEXT_REPLACEMENTS = {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u00a0": " ",
+    }
 
     @staticmethod
     def _list_pkg_entries(pkg: Path) -> dict[PKGEntryKey, str]:
@@ -128,6 +138,18 @@ class PkgUtils:
         if not app_ver:
             return version
         return app_ver if PkgUtils._compare_versions(app_ver, version) > 0 else version
+
+    @staticmethod
+    def normalize_client_text(value: str) -> str:
+        text = str(value or "")
+        if not text:
+            return ""
+
+        # Convert compatibility glyphs (e.g. roman numeral Ⅻ -> XII).
+        normalized = unicodedata.normalize("NFKC", text)
+        for source, target in PkgUtils._TEXT_REPLACEMENTS.items():
+            normalized = normalized.replace(source, target)
+        return normalized.strip()
 
     @staticmethod
     def read_content_id(pkg: Path) -> str | None:
@@ -300,7 +322,7 @@ class PkgUtils:
     ) -> Output[PKG]:
 
         pkg = PKG(
-            title=param_sfo.data[ParamSFOKey.TITLE],
+            title=PkgUtils.normalize_client_text(param_sfo.data[ParamSFOKey.TITLE]),
             title_id=param_sfo.data[ParamSFOKey.TITLE_ID],
             content_id=param_sfo.data[ParamSFOKey.CONTENT_ID],
             category=param_sfo.data[ParamSFOKey.CATEGORY],
