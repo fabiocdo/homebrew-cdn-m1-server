@@ -35,6 +35,7 @@ def temp_globals(tmp_path, monkeypatch):
     )
     files = globals_module._GlobalFiles(paths)
     envs = globals_module._GlobalEnvs(files)
+    envs.WATCHER_FILE_STABLE_SECONDS = 0
     monkeypatch.setattr(globals_module.Globals, "PATHS", paths, raising=False)
     monkeypatch.setattr(globals_module.Globals, "FILES", files, raising=False)
     monkeypatch.setattr(globals_module.Globals, "ENVS", envs, raising=False)

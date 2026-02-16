@@ -26,6 +26,8 @@ WATCHER_PERIODIC_SCAN_SECONDS=30
 # Parallel workers for validate+PARAM.SFO preprocessing. Value type: integer.
 # Keep 1 to disable parallel preprocessing.
 WATCHER_PKG_PREPROCESS_WORKERS=1
+# Seconds a PKG file must remain unchanged before processing. Value type: integer.
+WATCHER_FILE_STABLE_SECONDS=15
 # Enable FPKGI format output. Value type: boolean.
 FPGKI_FORMAT_ENABLED=false
 # Generic timeout (seconds) for lightweight pkgtool commands.
@@ -56,6 +58,7 @@ fi
 : "${WATCHER_ENABLED:=true}"
 : "${WATCHER_PERIODIC_SCAN_SECONDS:=30}"
 : "${WATCHER_PKG_PREPROCESS_WORKERS:=1}"
+: "${WATCHER_FILE_STABLE_SECONDS:=15}"
 : "${FPGKI_FORMAT_ENABLED:=false}"
 : "${PKGTOOL_TIMEOUT_SECONDS:=300}"
 : "${PKGTOOL_VALIDATE_TIMEOUT_SECONDS:=300}"

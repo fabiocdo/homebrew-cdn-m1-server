@@ -18,6 +18,7 @@ from hb_store_m1.utils.file_utils import FileUtils
 from hb_store_m1.utils.fpkgi_utils import FPKGIUtils
 from hb_store_m1.utils.log_utils import LogUtils
 from hb_store_m1.utils.pkg_utils import PkgUtils
+from hb_store_m1.utils.url_utils import URLUtils
 
 log = LogUtils(LogModule.WATCHER)
 
@@ -90,6 +91,10 @@ class Watcher:
         self._envs = envs or Globals.ENVS
         self._paths = paths or Globals.PATHS
         self._interval = max(1, self._envs.WATCHER_PERIODIC_SCAN_SECONDS)
+        self._file_stable_seconds = max(
+            0, int(getattr(self._envs, "WATCHER_FILE_STABLE_SECONDS", 0))
+        )
+        self._inflight_pkg_state: dict[Path, tuple[int, float, float]] = {}
 
     @staticmethod
     def _iter_pkg_sections():
@@ -239,45 +244,47 @@ class Watcher:
         changes.cache_missing = cache_missing
         return changes
 
-    @staticmethod
-    def _collect_current_content_ids(
-        current_files: dict[str, dict[str, str]],
-    ) -> set[str]:
-        current_content_ids = set()
-        for file_map in current_files.values():
-            current_content_ids.update((file_map or {}).keys())
-        return current_content_ids
+    def _collect_current_content_keys(
+        self, current_files: dict[str, dict[str, str]]
+    ) -> set[tuple[str, str]]:
+        keys: set[tuple[str, str]] = set()
+        for section_name, file_map in current_files.items():
+            if section_name == self._MEDIA_SECTION_NAME:
+                continue
+            app_type = URLUtils.to_client_app_type(section_name)
+            for content_id in (file_map or {}).keys():
+                if content_id:
+                    keys.add((content_id, app_type))
+        return keys
 
-    def _collect_removed_content_ids(self, changes: WatchChanges) -> list[str]:
-        current_content_ids = self._collect_current_content_ids(changes.current_files)
-        removed_content_ids = []
+    def _collect_removed_keys_from_db_snapshot(
+        self, current_content_keys: set[tuple[str, str]]
+    ) -> list[tuple[str, str]]:
+        db_entries_output = self._db_utils.select_content_entries()
+        if db_entries_output.status not in (Status.OK, Status.SKIP):
+            return []
+        db_entries = db_entries_output.content or []
+        return [entry for entry in db_entries if entry not in current_content_keys]
+
+    def _removed_keys_from_changes(self, changes: WatchChanges) -> list[tuple[str, str]]:
+        removed_keys: list[tuple[str, str]] = []
         for section_name, content_ids in changes.removed.items():
             if section_name == self._MEDIA_SECTION_NAME:
                 continue
+            app_type = URLUtils.to_client_app_type(section_name)
             for content_id in content_ids or []:
-                if content_id and content_id not in current_content_ids:
-                    removed_content_ids.append(content_id)
-        return removed_content_ids
+                if content_id:
+                    removed_keys.append((content_id, app_type))
+        return removed_keys
 
-    def _collect_removed_ids_from_db_snapshot(
-        self, current_content_ids: set[str]
-    ) -> list[str]:
-        db_content_ids_output = self._db_utils.select_content_ids()
-        if db_content_ids_output.status not in (Status.OK, Status.SKIP):
-            return []
-        db_content_ids = db_content_ids_output.content or []
-        return [
-            content_id
-            for content_id in db_content_ids
-            if content_id not in current_content_ids
-        ]
-
-    def _handle_removed_content_ids(self, removed_content_ids: list[str]) -> None:
-        if not removed_content_ids:
+    def _handle_removed_content_keys(
+        self, removed_content_keys: list[tuple[str, str]]
+    ) -> None:
+        if not removed_content_keys:
             return
 
-        unique_ids = sorted(set(removed_content_ids))
-        delete_result = self._db_utils.delete_by_content_ids(unique_ids)
+        unique_keys = sorted(set(removed_content_keys))
+        delete_result = self._db_utils.delete_by_content_and_type(unique_keys)
         if delete_result.status is Status.ERROR:
             log.log_error("Failed to delete removed PKGs from STORE.DB")
 
@@ -290,7 +297,7 @@ class Watcher:
                 log.log_error("Failed to sync FPKGI JSON from STORE.DB")
 
         media_dir = self._paths.MEDIA_DIR_PATH
-        for content_id in unique_ids:
+        for content_id, _app_type in unique_keys:
             for suffix in self._MEDIA_SUFFIXES:
                 media_path = media_dir / f"{content_id}{suffix}.png"
                 try:
@@ -374,31 +381,70 @@ class Watcher:
     @staticmethod
     def _build_pkg_model(pkg_path: Path, param_sfo) -> PKG:
         return PKG(
-            title=param_sfo.data[ParamSFOKey.TITLE],
+            title=PkgUtils.normalize_client_text(param_sfo.data[ParamSFOKey.TITLE]),
             title_id=param_sfo.data[ParamSFOKey.TITLE_ID],
             content_id=param_sfo.data[ParamSFOKey.CONTENT_ID],
             category=param_sfo.data[ParamSFOKey.CATEGORY],
-            version=param_sfo.data[ParamSFOKey.VERSION],
+            version=PkgUtils.resolve_pkg_version(param_sfo.data),
             pubtoolinfo=param_sfo.data[ParamSFOKey.PUBTOOLINFO],
             system_ver=(param_sfo.data.get(ParamSFOKey.SYSTEM_VER) or ""),
             pkg_path=pkg_path,
         )
 
     def _preprocess_pkg(self, pkg_path: Path) -> Output:
+        if not self._is_pkg_stable(pkg_path):
+            return Output(Status.SKIP, "file_in_transfer")
+
+        extract_output = self._pkg_utils.extract_pkg_data(pkg_path)
+        if extract_output.status is Status.OK and extract_output.content:
+            return Output(
+                Status.OK,
+                PreparedPkg(pkg_path=pkg_path, param_sfo=extract_output.content),
+            )
+
         validation = self._pkg_utils.validate(pkg_path)
         if validation.status not in (Status.OK, Status.WARN):
             return Output(Status.ERROR, "validation_failed")
 
-        extract_output = self._pkg_utils.extract_pkg_data(pkg_path)
-        if extract_output.status is not Status.OK or not extract_output.content:
-            return Output(Status.ERROR, "extract_data_failed")
+        return Output(Status.ERROR, "extract_data_failed")
 
-        return Output(
-            Status.OK,
-            PreparedPkg(pkg_path=pkg_path, param_sfo=extract_output.content),
-        )
+    def _is_pkg_stable(self, pkg_path: Path) -> bool:
+        if self._file_stable_seconds <= 0:
+            return True
+
+        try:
+            stat = pkg_path.stat()
+        except OSError:
+            self._inflight_pkg_state.pop(pkg_path, None)
+            return False
+
+        size = int(stat.st_size)
+        mtime = float(stat.st_mtime)
+        if size <= 0:
+            return False
+
+        now = float(time.time())
+        previous = self._inflight_pkg_state.get(pkg_path)
+        age_seconds = max(0.0, now - mtime)
+
+        # If file is already older than the transfer window on first observation,
+        # accept immediately to avoid startup-wide false "in transfer" skips.
+        if previous is None and age_seconds >= float(self._file_stable_seconds):
+            self._inflight_pkg_state.pop(pkg_path, None)
+            return True
+
+        if previous is None or previous[0] != size or previous[1] != mtime:
+            self._inflight_pkg_state[pkg_path] = (size, mtime, now)
+            return False
+
+        stable_for = max(0.0, now - previous[2])
+        if stable_for >= float(self._file_stable_seconds):
+            self._inflight_pkg_state.pop(pkg_path, None)
+            return True
+        return False
 
     def _handle_preprocess_failure(self, pkg_path: Path, reason: str) -> None:
+        self._inflight_pkg_state.pop(pkg_path, None)
         self._file_utils.move_to_error(
             pkg_path,
             self._paths.ERRORS_DIR_PATH,
@@ -457,6 +503,14 @@ class Watcher:
     def _process_pkg(self, pkg_path: Path):
         preprocessed = self._preprocess_pkg(pkg_path)
         if preprocessed.status is not Status.OK or not preprocessed.content:
+            if (
+                preprocessed.status is Status.SKIP
+                and preprocessed.content == "file_in_transfer"
+            ):
+                log.log_debug(
+                    f"Skipping {pkg_path.name}. File is still in transfer window."
+                )
+                return None
             reason = (
                 preprocessed.content
                 if isinstance(preprocessed.content, str)
@@ -502,6 +556,11 @@ class Watcher:
             output = preprocess_outputs.get(pkg_path)
             if output is None:
                 self._handle_preprocess_failure(pkg_path, "extract_data_failed")
+                continue
+            if output.status is Status.SKIP and output.content == "file_in_transfer":
+                log.log_debug(
+                    f"Skipping {pkg_path.name}. File is still in transfer window."
+                )
                 continue
             if output.status is not Status.OK or not output.content:
                 reason = (
@@ -555,15 +614,13 @@ class Watcher:
             self._normalize_media_files()
             return
 
-        removed_content_ids = self._collect_removed_content_ids(changes)
+        removed_content_keys = self._removed_keys_from_changes(changes)
         if changes.cache_missing:
-            current_content_ids = self._collect_current_content_ids(
-                changes.current_files
+            current_content_keys = self._collect_current_content_keys(changes.current_files)
+            removed_content_keys.extend(
+                self._collect_removed_keys_from_db_snapshot(current_content_keys)
             )
-            removed_content_ids.extend(
-                self._collect_removed_ids_from_db_snapshot(current_content_ids)
-            )
-        self._handle_removed_content_ids(removed_content_ids)
+        self._handle_removed_content_keys(removed_content_keys)
 
         scanned_pkgs = self._collect_scanned_pkgs(changes)
         extracted_pkgs = self._process_pkgs(scanned_pkgs)

@@ -54,7 +54,7 @@ Main pipeline:
 
 1. Initialize directories, database, and base assets.
 2. Detect PKG/PNG changes via cache (`store-cache.json`).
-3. Validate PKG, extract `PARAM.SFO` and media (`ICON0/PIC0/PIC1`).
+3. Extract `PARAM.SFO` first; run validation only if extraction fails.
 4. Move/rename to canonical destination using `content_id`.
 5. Update `store.db` and optional `*.json` files by app type.
 
@@ -81,7 +81,7 @@ flowchart TD
     K -->|yes| L[Process changed PKGs]
     L --> M[AutoOrganizer + media extraction]
     M --> N[DBUtils.upsert]
-    M --> O[FPKGIUtils.upsert optional]
+    N --> O[FPKGIUtils.sync_from_store_db optional]
     N --> P[write store-cache.json]
     O --> P
 ```
@@ -95,7 +95,8 @@ flowchart TD
 - Extract:
   - `ICON0_PNG` (required)
   - `PIC0_PNG` and `PIC1_PNG` (optional)
-- Update `store.db` using `upsert` by `content_id`.
+- App version is resolved as the highest value between `VERSION` and `APP_VER` from `PARAM.SFO`.
+- Update `store.db` using `upsert` by `(content_id, apptype, version)`.
 - Generate app-type JSON files when `FPGKI_FORMAT_ENABLED=true`.
 - Keep incremental cache in `data/_cache/store-cache.json`.
 - Move invalid/conflicting files to `data/_errors`.
@@ -168,7 +169,8 @@ docker compose down
 | `LOG_LEVEL`                               | string | `info`                | `debug`, `info`, `warn`, `error`.                                                              |
 | `WATCHER_ENABLED`                         | bool   | `true`                | Enable/disable watcher loop.                                                                   |
 | `WATCHER_PERIODIC_SCAN_SECONDS`           | int    | `30`                  | Scan loop interval.                                                                            |
-| `WATCHER_PKG_PREPROCESS_WORKERS`          | int    | `1`                   | Parallel workers for validate + PARAM.SFO preprocessing (`1` disables parallel preprocessing). |
+| `WATCHER_PKG_PREPROCESS_WORKERS`          | int    | `1`                   | Parallel workers for extract-first preprocessing (`1` disables parallel preprocessing).          |
+| `WATCHER_FILE_STABLE_SECONDS`             | int    | `15`                  | Minimum file age before processing to avoid moving files still in transfer.                    |
 | `FPGKI_FORMAT_ENABLED`                    | bool   | `false`               | Generate/update per-type FPKGi JSON output (`GAMES.json`, `DLC.json`, etc.).                   |
 | `PKGTOOL_TIMEOUT_SECONDS`                 | int    | `300`                 | Generic timeout for lightweight `pkgtool` commands.                                            |
 | `PKGTOOL_VALIDATE_TIMEOUT_SECONDS`        | int    | `300`                 | Base timeout for `pkg_validate`.                                                               |
@@ -262,11 +264,15 @@ sequenceDiagram
 
     W->>C: compare_pkg_cache()
     C-->>W: changed sections + current files
-    W->>P: validate(pkg)
-    alt Status ERROR
-        W->>W: move_to_error(validation_failed)
-    else Status OK/WARN
-        W->>P: extract_pkg_data(pkg)
+    W->>P: extract_pkg_data(pkg)
+    alt extract failed
+        W->>P: validate(pkg) fallback
+        alt validate failed
+            W->>W: move_to_error(validation_failed)
+        else validate ok/warn
+            W->>W: move_to_error(extract_data_failed)
+        end
+    else extract ok
         W->>A: run(pkg)
         alt organizer failure
             W->>W: move_to_error(organizer_failed)
@@ -275,7 +281,7 @@ sequenceDiagram
             W->>P: build_pkg(...)
             W->>D: upsert(pkgs)
             opt FPGKI_FORMAT_ENABLED=true
-                W->>F: upsert(pkgs)
+                W->>F: sync_from_store_db()
             end
             W->>C: write_pkg_cache()
         end
@@ -374,8 +380,8 @@ Tests:
 
 - Check `data/_logs/app_errors.log`.
 - Common reasons:
-  - critical validation failure
   - `PARAM.SFO` extraction failure
+  - fallback validation failure (only after extraction failed)
   - missing `ICON0_PNG`
   - destination conflict (`content_id.pkg` already exists)
 
@@ -386,6 +392,7 @@ Tests:
 
 ### Large PKGs (`>20GB`) timing out in `pkg_validate`
 
+- Validation is now fallback-only (called when extraction fails), so this should happen less frequently.
 - Increase timeout knobs in `configs/settings.env`, for example:
 
 ```env

@@ -242,6 +242,43 @@ def test_given_read_content_id_when_validate_warn_then_extracts(monkeypatch):
     assert content_id == "UP0000-TEST00000_00-TEST000000000000"
 
 
+def test_given_read_content_id_when_extract_succeeds_then_does_not_validate(monkeypatch):
+    sfo = ParamSFO({ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000"})
+    validate_called = {"called": False}
+    monkeypatch.setattr(
+        PkgUtils,
+        "validate",
+        lambda _pkg: validate_called.__setitem__("called", True)
+        or Output(Status.OK, None),
+    )
+    monkeypatch.setattr(
+        PkgUtils, "extract_pkg_data", lambda _pkg: Output(Status.OK, sfo)
+    )
+
+    content_id = PkgUtils.read_content_id(Path("x.pkg"))
+
+    assert content_id == "UP0000-TEST00000_00-TEST000000000000"
+    assert validate_called["called"] is False
+
+
+def test_given_read_content_id_when_extract_fails_then_validates_in_fallback(monkeypatch):
+    validate_called = {"called": False}
+    monkeypatch.setattr(
+        PkgUtils,
+        "validate",
+        lambda _pkg: validate_called.__setitem__("called", True)
+        or Output(Status.ERROR, None),
+    )
+    monkeypatch.setattr(
+        PkgUtils, "extract_pkg_data", lambda _pkg: Output(Status.ERROR, None)
+    )
+
+    content_id = PkgUtils.read_content_id(Path("x.pkg"))
+
+    assert content_id is None
+    assert validate_called["called"] is True
+
+
 def test_given_missing_section_root_when_scan_then_skips(init_paths):
     # "app" directory exists in fixture; remove to hit the skip branch.
     init_paths.APP_DIR_PATH.rmdir()
@@ -404,6 +441,7 @@ def test_given_param_and_medias_when_build_pkg_then_returns_model():
             ParamSFOKey.CONTENT_ID: "UP0000-TEST00000_00-TEST000000000000",
             ParamSFOKey.CATEGORY: "GD",
             ParamSFOKey.VERSION: "01.00",
+            ParamSFOKey.APP_VER: "01.01",
             ParamSFOKey.PUBTOOLINFO: "",
         }
     )
@@ -417,3 +455,64 @@ def test_given_param_and_medias_when_build_pkg_then_returns_model():
 
     assert result.status is Status.OK
     assert result.content.content_id == "UP0000-TEST00000_00-TEST000000000000"
+    assert result.content.version == "01.01"
+
+
+def test_given_compatibility_chars_when_normalize_client_text_then_transliterates():
+    normalized = PkgUtils.normalize_client_text("FINAL FANTASY Ⅻ THE ZODIAC AGE")
+
+    assert normalized == "FINAL FANTASY XII THE ZODIAC AGE"
+
+
+def test_given_special_quotes_and_dashes_when_normalize_client_text_then_rewrites():
+    normalized = PkgUtils.normalize_client_text("“Game” – Collector’s Edition")
+
+    assert normalized == '"Game" - Collector\'s Edition'
+
+
+def test_given_trademark_symbols_when_normalize_client_text_then_removes_markers():
+    normalized = PkgUtils.normalize_client_text("My Game™ Deluxe Ⓡ Edition ©")
+
+    assert normalized == "My Game Deluxe Edition"
+
+
+def test_given_marker_tokens_in_parens_when_normalize_client_text_then_removes():
+    normalized = PkgUtils.normalize_client_text("Test (TM) Name [R] Pack {C}")
+
+    assert normalized == "Test Name Pack"
+
+
+def test_given_version_and_app_ver_when_resolve_pkg_version_then_uses_highest():
+    assert (
+        PkgUtils.resolve_pkg_version(
+            {ParamSFOKey.VERSION: "01.00", ParamSFOKey.APP_VER: "01.23"}
+        )
+        == "01.23"
+    )
+    assert (
+        PkgUtils.resolve_pkg_version(
+            {ParamSFOKey.VERSION: "02.00", ParamSFOKey.APP_VER: "01.99"}
+        )
+        == "02.00"
+    )
+
+
+def test_given_missing_or_invalid_versions_when_resolve_pkg_version_then_fallbacks():
+    assert (
+        PkgUtils.resolve_pkg_version(
+            {ParamSFOKey.VERSION: "", ParamSFOKey.APP_VER: "01.05"}
+        )
+        == "01.05"
+    )
+    assert (
+        PkgUtils.resolve_pkg_version(
+            {ParamSFOKey.VERSION: "01.00", ParamSFOKey.APP_VER: ""}
+        )
+        == "01.00"
+    )
+    assert (
+        PkgUtils.resolve_pkg_version(
+            {ParamSFOKey.VERSION: "foo", ParamSFOKey.APP_VER: "01.02"}
+        )
+        == "01.02"
+    )

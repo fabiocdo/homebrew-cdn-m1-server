@@ -25,6 +25,10 @@ def welcome():
             "WATCHER_PKG_PREPROCESS_WORKERS",
             Globals.ENVS.WATCHER_PKG_PREPROCESS_WORKERS,
         ),
+        (
+            "WATCHER_FILE_STABLE_SECONDS",
+            Globals.ENVS.WATCHER_FILE_STABLE_SECONDS,
+        ),
         ("FPGKI_FORMAT_ENABLED", Globals.ENVS.FPGKI_FORMAT_ENABLED),
         ("PKGTOOL_TIMEOUT_SECONDS", Globals.ENVS.PKGTOOL_TIMEOUT_SECONDS),
         (

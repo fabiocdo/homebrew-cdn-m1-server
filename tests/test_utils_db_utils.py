@@ -242,6 +242,56 @@ def test_given_pkg_categories_when_upsert_then_maps_apptype_to_ps4_store_labels(
     assert by_content_id[save_pkg.content_id][1] == "Other"
 
 
+def test_given_same_content_id_for_game_and_patch_when_upsert_then_keeps_both_rows(
+    init_paths,
+):
+    init_sql = (
+        Path(__file__).resolve().parents[1] / "init" / "store_db.sql"
+    ).read_text("utf-8")
+    (init_paths.INIT_DIR_PATH / "store_db.sql").write_text(init_sql, encoding="utf-8")
+    InitUtils.init_db()
+
+    content_id = "UP0000-TEST99999_00-TEST000000009999"
+    game_pkg_path = init_paths.GAME_DIR_PATH / f"{content_id}.pkg"
+    game_pkg_path.write_text("data", encoding="utf-8")
+    patch_pkg_path = init_paths.UPDATE_DIR_PATH / f"{content_id}.pkg"
+    patch_pkg_path.write_text("data", encoding="utf-8")
+
+    game_pkg = PKG(
+        title="Game",
+        title_id="CUSA99999",
+        content_id=content_id,
+        category="GD",
+        version="01.00",
+        pkg_path=game_pkg_path,
+    )
+    patch_pkg = PKG(
+        title="Patch",
+        title_id="CUSA99999",
+        content_id=content_id,
+        category="GP",
+        version="01.01",
+        pkg_path=patch_pkg_path,
+    )
+
+    result = DBUtils.upsert([game_pkg, patch_pkg])
+    assert result.status is Status.OK
+
+    conn = sqlite3.connect(str(Globals.FILES.STORE_DB_FILE_PATH))
+    try:
+        rows = conn.execute(
+            "SELECT content_id, apptype, version FROM homebrews WHERE content_id = ? ORDER BY apptype",
+            (content_id,),
+        ).fetchall()
+    finally:
+        conn.close()
+
+    assert rows == [
+        (content_id, "Game", "01.00"),
+        (content_id, "Patch", "01.01"),
+    ]
+
+
 def test_given_existing_rows_when_select_content_ids_then_returns_values(init_paths):
     init_sql = (
         Path(__file__).resolve().parents[1] / "init" / "store_db.sql"

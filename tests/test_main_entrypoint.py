@@ -19,7 +19,7 @@ def test_given_welcome_when_called_then_prints_banner_and_table(monkeypatch):
 
     assert len(printed) == 2
     assert "v" in printed[0]
-    assert any("fancy_outline:11" in line for line in printed)
+    assert any("fancy_outline:12" in line for line in printed)
 
 
 def test_given_watcher_enabled_when_main_then_starts_watcher(monkeypatch):

@@ -168,6 +168,9 @@ class _GlobalEnvs:
         self.WATCHER_PKG_PREPROCESS_WORKERS: int = _env(
             "WATCHER_PKG_PREPROCESS_WORKERS", 1, int
         )
+        self.WATCHER_FILE_STABLE_SECONDS: int = _env(
+            "WATCHER_FILE_STABLE_SECONDS", 15, int
+        )
         self.FPGKI_FORMAT_ENABLED: bool = _env("FPGKI_FORMAT_ENABLED", False, bool)
         self.PKGTOOL_TIMEOUT_SECONDS: int = _env("PKGTOOL_TIMEOUT_SECONDS", 300, int)
         self.PKGTOOL_VALIDATE_TIMEOUT_SECONDS: int = _env(
