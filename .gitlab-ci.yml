@@ -33,7 +33,7 @@ test:
         path: coverage.xml
   script:
     - python -m pip install -U pip
-    - python -m pip install .
+    - python -m pip install '.[test]'
     - python -m pytest --cov=homebrew_cdn_m1_server --cov-report=term-missing --cov-report=xml --cov-fail-under=90
 
 mirror_to_github:
