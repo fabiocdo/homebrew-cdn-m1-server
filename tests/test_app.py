@@ -11,6 +11,9 @@ import pytest
 
 from homebrew_cdn_m1_server.application import app as app_module
 from homebrew_cdn_m1_server.application.app import WorkerApp
+from homebrew_cdn_m1_server.application.gateways.github_assets_gateway import (
+    GithubAssetsGateway,
+)
 from homebrew_cdn_m1_server.config.settings_loader import SettingsLoader
 from homebrew_cdn_m1_server.domain.models.app_config import AppConfig
 from homebrew_cdn_m1_server.domain.models.output_target import OutputTarget
@@ -55,6 +58,22 @@ class _FakeReconcile:
     def __call__(self) -> ReconcileResult:
         self.calls += 1
         return ReconcileResult(added=0, updated=0, removed=0, failed=0, exported_files=tuple())
+
+
+class _FakeGithubAssetsGateway:
+    def __init__(self) -> None:
+        self.calls: list[list[Path]] = []
+        self.to_download: list[Path] = []
+        self.to_missing: list[Path] = []
+        self.should_raise: bool = False
+
+    def download_latest_release_assets(
+        self, destinations: list[Path]
+    ) -> tuple[list[Path], list[Path]]:
+        self.calls.append(destinations)
+        if self.should_raise:
+            raise RuntimeError("upstream failed")
+        return self.to_download, self.to_missing
 
 
 def test_worker_app_read_init_sql_given_missing_when_called_then_raises(
@@ -151,8 +170,12 @@ def test_worker_app_build_reconcile_use_case_given_config_when_called_then_wires
     assert "reconcile" in captures
     reconcile_kwargs = captures["reconcile"]
     assert isinstance(reconcile_kwargs, dict)
-    assert reconcile_kwargs["worker_count"] == config.user.reconcile_pkg_preprocess_workers
-    assert reconcile_kwargs["output_targets"] == config.user.output_targets
+    assert reconcile_kwargs["worker_count"] == (
+        config.user.reconcile_pkg_preprocess_workers
+        if config.user.reconcile_pkg_preprocess_workers is not None
+        else 1
+    )
+    assert reconcile_kwargs["output_targets"] == (config.user.output_targets or tuple())
 
 
 def test_worker_app_start_given_cron_expression_when_called_then_schedules_cron(
@@ -172,6 +195,7 @@ def test_worker_app_start_given_cron_expression_when_called_then_schedules_cron(
 
     monkeypatch.setattr(app_module, "APSchedulerRunner", _scheduler_factory)
     monkeypatch.setattr(app, "_initialize_layout_and_schema", lambda: None)
+    monkeypatch.setattr(app, "_sync_hb_store_assets_on_startup", lambda: None)
     monkeypatch.setattr(app, "_build_reconcile_use_case", _build_reconcile)
 
     app.start()
@@ -208,6 +232,7 @@ def test_worker_app_start_given_empty_cron_when_called_then_schedules_interval(
 
     monkeypatch.setattr(app_module, "APSchedulerRunner", _scheduler_factory)
     monkeypatch.setattr(app, "_initialize_layout_and_schema", lambda: None)
+    monkeypatch.setattr(app, "_sync_hb_store_assets_on_startup", lambda: None)
     monkeypatch.setattr(app, "_build_reconcile_use_case", _build_reconcile)
 
     app.start()
@@ -271,7 +296,7 @@ def test_worker_app_run_from_env_given_settings_file_when_called_then_loads_and_
         observed["settings_path"] = path
         return config
 
-    def _fake_configure(level: str, error_log_path: Path) -> None:
+    def _fake_configure(level: str | None, error_log_path: Path) -> None:
         observed["log_level"] = level
         observed["error_log_path"] = error_log_path
 
@@ -307,7 +332,7 @@ def test_worker_app_run_from_env_given_default_path_when_called_then_uses_none(
         observed["settings_path"] = path
         return config
 
-    def _fake_configure(level: str, error_log_path: Path) -> None:
+    def _fake_configure(level: str | None, error_log_path: Path) -> None:
         _ = (level, error_log_path)
 
     def _fake_run(_self: WorkerApp) -> int:
@@ -366,3 +391,67 @@ def test_worker_app_build_reconcile_use_case_given_targets_when_passed_then_pres
 
     _ = app._build_reconcile_use_case()
     assert captures["output_targets"] == (OutputTarget.FPKGI, OutputTarget.HB_STORE)
+
+
+def test_worker_app_sync_hb_store_assets_given_target_disabled_when_called_then_skips_download(
+    temp_workspace: Path,
+) -> None:
+    config = _load_config(temp_workspace)
+    config = AppConfig(
+        user=config.user.model_copy(update={"output_targets": (OutputTarget.FPKGI,)}),
+        paths=config.paths,
+        reconcile_interval_seconds=config.reconcile_interval_seconds,
+        reconcile_file_stable_seconds=config.reconcile_file_stable_seconds,
+    )
+    app = WorkerApp(config)
+    fake_gateway = _FakeGithubAssetsGateway()
+    app._github_assets = cast(GithubAssetsGateway, cast(object, fake_gateway))
+
+    app._sync_hb_store_assets_on_startup()
+
+    assert fake_gateway.calls == []
+
+
+def test_worker_app_sync_hb_store_assets_given_target_enabled_when_called_then_downloads_expected_assets(
+    temp_workspace: Path,
+) -> None:
+    config = _load_config(temp_workspace)
+    config = AppConfig(
+        user=config.user.model_copy(update={"output_targets": (OutputTarget.HB_STORE,)}),
+        paths=config.paths,
+        reconcile_interval_seconds=config.reconcile_interval_seconds,
+        reconcile_file_stable_seconds=config.reconcile_file_stable_seconds,
+    )
+    app = WorkerApp(config)
+    fake_gateway = _FakeGithubAssetsGateway()
+    app._github_assets = cast(GithubAssetsGateway, cast(object, fake_gateway))
+
+    app._sync_hb_store_assets_on_startup()
+
+    assert len(fake_gateway.calls) == 1
+    requested = fake_gateway.calls[0]
+    assert requested == [
+        config.paths.hb_store_update_dir / "remote.md5",
+        config.paths.hb_store_update_dir / "homebrew.elf",
+        config.paths.hb_store_update_dir / "homebrew.elf.sig",
+    ]
+
+
+def test_worker_app_sync_hb_store_assets_given_gateway_error_when_called_then_continues(
+    temp_workspace: Path,
+) -> None:
+    config = _load_config(temp_workspace)
+    config = AppConfig(
+        user=config.user.model_copy(update={"output_targets": (OutputTarget.HB_STORE,)}),
+        paths=config.paths,
+        reconcile_interval_seconds=config.reconcile_interval_seconds,
+        reconcile_file_stable_seconds=config.reconcile_file_stable_seconds,
+    )
+    app = WorkerApp(config)
+    fake_gateway = _FakeGithubAssetsGateway()
+    fake_gateway.should_raise = True
+    app._github_assets = cast(GithubAssetsGateway, cast(object, fake_gateway))
+
+    app._sync_hb_store_assets_on_startup()
+
+    assert len(fake_gateway.calls) == 1

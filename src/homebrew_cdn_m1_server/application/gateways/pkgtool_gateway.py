@@ -35,9 +35,17 @@ class PkgtoolGateway(PackageProbeProtocol):
     )
     _VERSION_PARTS_REGEX: ClassVar[re.Pattern[str]] = re.compile(r"\d+")
 
-    def __init__(self, pkgtool_bin: Path, timeout_seconds: int, media_dir: Path) -> None:
+    def __init__(
+        self,
+        pkgtool_bin: Path,
+        timeout_seconds: int | None,
+        media_dir: Path,
+    ) -> None:
         self._pkgtool_bin = pkgtool_bin
-        self._timeout_seconds = max(1, int(timeout_seconds))
+        if timeout_seconds is None:
+            self._timeout_seconds: int | None = None
+        else:
+            self._timeout_seconds = max(1, int(timeout_seconds))
         self._media_dir = media_dir
 
     @staticmethod
@@ -52,7 +60,7 @@ class PkgtoolGateway(PackageProbeProtocol):
             check=True,
             capture_output=True,
             text=True,
-            timeout=(timeout or self._timeout_seconds),
+            timeout=(timeout if timeout is not None else self._timeout_seconds),
             env={"DOTNET_SYSTEM_GLOBALIZATION_INVARIANT": "1"},
         )
 

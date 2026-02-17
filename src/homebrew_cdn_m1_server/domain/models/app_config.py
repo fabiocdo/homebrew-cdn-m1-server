@@ -47,8 +47,17 @@ class AppConfig:
 
     @property
     def base_url(self) -> str:
-        scheme = "https" if self.user.enable_tls else "http"
-        default_port = 443 if self.user.enable_tls else 80
-        if self.user.server_port == default_port:
-            return f"{scheme}://{self.user.server_ip}"
-        return f"{scheme}://{self.user.server_ip}:{self.user.server_port}"
+        tls_enabled = bool(self.user.enable_tls)
+        scheme = "https" if tls_enabled else "http"
+        host = str(self.user.server_ip or "").strip()
+        port = self.user.server_port
+
+        if not host:
+            return ""
+        if port is None:
+            return f"{scheme}://{host}"
+
+        default_port = 443 if tls_enabled else 80
+        if port == default_port:
+            return f"{scheme}://{host}"
+        return f"{scheme}://{host}:{port}"

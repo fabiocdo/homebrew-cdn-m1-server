@@ -9,12 +9,16 @@ from types import FrameType
 from typing import final
 
 from homebrew_cdn_m1_server.domain.models.app_config import AppConfig
+from homebrew_cdn_m1_server.domain.models.output_target import OutputTarget
 from homebrew_cdn_m1_server.domain.workflows.export_outputs import ExportOutputs
 from homebrew_cdn_m1_server.domain.workflows.ingest_package import IngestPackage
 from homebrew_cdn_m1_server.domain.workflows.reconcile_catalog import ReconcileCatalog
 from homebrew_cdn_m1_server.domain.protocols.scheduler_protocol import SchedulerProtocol
 from homebrew_cdn_m1_server.application.exporters.fpkgi_json_exporter import FpkgiJsonExporter
 from homebrew_cdn_m1_server.application.exporters.store_db_exporter import StoreDbExporter
+from homebrew_cdn_m1_server.application.gateways.github_assets_gateway import (
+    GithubAssetsGateway,
+)
 from homebrew_cdn_m1_server.application.gateways.pkgtool_gateway import PkgtoolGateway
 from homebrew_cdn_m1_server.application.repositories.filesystem_repository import (
     FilesystemRepository,
@@ -46,6 +50,7 @@ class WorkerApp:
             timeout_seconds=config.user.pkgtool_timeout_seconds,
             media_dir=config.paths.media_dir,
         )
+        self._github_assets = GithubAssetsGateway()
 
     @classmethod
     def run_from_env(cls) -> int:
@@ -110,17 +115,53 @@ class WorkerApp:
             lock_path=self._config.paths.cache_dir / "reconcile.lock",
             lock_timeout_seconds=0.0,
             logger=self._log,
-            worker_count=self._config.user.reconcile_pkg_preprocess_workers,
-            output_targets=self._config.user.output_targets,
+            worker_count=(
+                self._config.user.reconcile_pkg_preprocess_workers
+                if self._config.user.reconcile_pkg_preprocess_workers is not None
+                else 1
+            ),
+            output_targets=self._config.user.output_targets or tuple(),
         )
+
+    def _sync_hb_store_assets_on_startup(self) -> None:
+        output_targets = self._config.user.output_targets or tuple()
+        if OutputTarget.HB_STORE not in output_targets:
+            self._log.debug("HB-Store startup asset sync skipped: target disabled")
+            return
+
+        destinations = [
+            self._config.paths.hb_store_update_dir / "remote.md5",
+            self._config.paths.hb_store_update_dir / "homebrew.elf",
+            self._config.paths.hb_store_update_dir / "homebrew.elf.sig",
+        ]
+        try:
+            downloaded, missing = self._github_assets.download_latest_release_assets(
+                destinations
+            )
+        except Exception as exc:
+            self._log.warning("HB-Store startup asset sync failed: %s", exc)
+            return
+
+        if downloaded:
+            self._log.info("HB-Store startup assets downloaded: %d", len(downloaded))
+        else:
+            self._log.debug("HB-Store startup assets already available")
+
+        if missing:
+            missing_names = ", ".join(path.name for path in missing)
+            self._log.warning(
+                "HB-Store startup assets not found in GitHub release: %s",
+                missing_names,
+            )
 
     def start(self) -> None:
         self._initialize_layout_and_schema()
+        self._sync_hb_store_assets_on_startup()
         reconcile = self._build_reconcile_use_case()
         _ = reconcile()
 
         scheduler = APSchedulerRunner()
-        cron_expr = self._config.user.reconcile_cron_expression.strip()
+        cron_expr = str(self._config.user.reconcile_cron_expression or "").strip()
         if cron_expr:
             scheduler.schedule_cron("reconcile", cron_expr, reconcile)
             self._log.info("Scheduler configured with cron: '%s'", cron_expr)

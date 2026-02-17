@@ -43,7 +43,7 @@ def test_settings_loader_given_settings_ini_when_load_then_parses_expected_field
     assert str(config.paths.media_dir).endswith("data/share/pkg/media")
 
 
-def test_settings_loader_given_tls_enabled_and_empty_port_then_defaults_to_443(
+def test_settings_loader_given_tls_enabled_and_empty_port_then_uses_host_without_port(
     temp_workspace: Path,
 ):
     settings = temp_workspace / "configs" / "settings.ini"
@@ -60,11 +60,11 @@ def test_settings_loader_given_tls_enabled_and_empty_port_then_defaults_to_443(
 
     config = SettingsLoader.load(settings)
 
-    assert config.user.server_port == 443
+    assert config.user.server_port is None
     assert config.base_url == "https://127.0.0.5"
 
 
-def test_settings_loader_given_tls_disabled_and_empty_port_then_defaults_to_80(
+def test_settings_loader_given_tls_disabled_and_empty_port_then_uses_host_without_port(
     temp_workspace: Path,
 ):
     settings = temp_workspace / "configs" / "settings.ini"
@@ -81,5 +81,37 @@ def test_settings_loader_given_tls_disabled_and_empty_port_then_defaults_to_80(
 
     config = SettingsLoader.load(settings)
 
-    assert config.user.server_port == 80
+    assert config.user.server_port is None
     assert config.base_url == "http://127.0.0.5"
+
+
+def test_settings_loader_given_blank_values_when_load_then_maps_them_to_none(
+    temp_workspace: Path,
+):
+    settings = temp_workspace / "configs" / "settings.ini"
+    _ = settings.write_text(
+        "\n".join(
+            [
+                "SERVER_IP=",
+                "SERVER_PORT=",
+                "ENABLE_TLS=",
+                "LOG_LEVEL=",
+                "RECONCILE_PKG_PREPROCESS_WORKERS=",
+                "RECONCILE_CRON_EXPRESSION=",
+                "EXPORT_TARGETS=",
+                "PKGTOOL_TIMEOUT_SECONDS=",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    config = SettingsLoader.load(settings)
+
+    assert config.user.server_ip is None
+    assert config.user.server_port is None
+    assert config.user.enable_tls is None
+    assert config.user.log_level is None
+    assert config.user.reconcile_pkg_preprocess_workers is None
+    assert config.user.reconcile_cron_expression is None
+    assert config.user.output_targets is None
+    assert config.user.pkgtool_timeout_seconds is None

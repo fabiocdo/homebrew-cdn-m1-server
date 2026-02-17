@@ -50,25 +50,26 @@ class SettingsLoader:
             target = cls._KEY_MAP.get(key)
             if not target:
                 continue
+            text = str(value or "").strip()
+            if not text:
+                mapped[target] = None
+                continue
             if target in {
                 "server_port",
                 "reconcile_pkg_preprocess_workers",
                 "pkgtool_timeout_seconds",
             }:
-                text = str(value or "").strip()
-                if not text:
-                    continue
                 try:
                     mapped[target] = int(text)
                 except ValueError:
-                    continue
+                    mapped[target] = None
                 continue
             if target == "enable_tls":
                 mapped[target] = cls._parse_bool(value)
                 continue
             if target == "output_targets":
                 parsed_targets: list[OutputTarget] = []
-                for item in str(value or "").split(","):
+                for item in text.split(","):
                     normalized = item.strip().lower()
                     if not normalized:
                         continue
@@ -76,22 +77,17 @@ class SettingsLoader:
                         parsed_targets.append(OutputTarget(normalized))
                     except ValueError:
                         continue
-                if parsed_targets:
-                    seen: set[OutputTarget] = set()
-                    deduped: list[OutputTarget] = []
-                    for parsed in parsed_targets:
-                        if parsed in seen:
-                            continue
-                        seen.add(parsed)
-                        deduped.append(parsed)
-                    mapped[target] = tuple(deduped)
+                seen: set[OutputTarget] = set()
+                deduped: list[OutputTarget] = []
+                for parsed in parsed_targets:
+                    if parsed in seen:
+                        continue
+                    seen.add(parsed)
+                    deduped.append(parsed)
+                mapped[target] = tuple(deduped) if deduped else None
                 continue
 
-            mapped[target] = value
-
-        if "server_port" not in mapped:
-            tls_enabled = bool(mapped.get("enable_tls", False))
-            mapped["server_port"] = 443 if tls_enabled else 80
+            mapped[target] = text
 
         return UserSettings.model_validate(mapped)
 

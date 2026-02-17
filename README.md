@@ -28,9 +28,10 @@ cp init/settings.ini configs/settings.ini
 Edit `configs/settings.ini` as needed:
 
 ```ini
+# Leave any value empty to set it as null (no implicit default).
 # Host clients use to reach the service. Value type: string.
 SERVER_IP=127.0.0.1
-# Port that nginx listens on inside the container. Leave empty to use default (80 for HTTP, 443 for HTTPS). Value type: integer.
+# Port that nginx listens on inside the container. Leave empty to set null. Value type: integer.
 SERVER_PORT=80
 # Set true to serve TLS/HTTPS; If enabled, "tls.crt" and "tls.key" are required and must live under configs/certs/. Value type: boolean.
 ENABLE_TLS=false
@@ -66,7 +67,17 @@ docker compose up --build -d
 docker compose logs -f homebrew-cdn-m1-server
 ```
 
-### 4) Check outputs
+### 4) Validate service health in browser
+
+Open in your browser:
+
+- `http://<SERVER_IP>:<SERVER_PORT>/` when `ENABLE_TLS=false`
+- `https://<SERVER_IP>:<SERVER_PORT>/` when `ENABLE_TLS=true`
+- If `SERVER_PORT` is null/empty, omit `:<SERVER_PORT>`.
+
+The page must load and show the CDN health/status screen.
+
+### 5) Check outputs
 
 Public share root:
 
@@ -84,17 +95,3 @@ Internal (not public):
 - `data/internal/catalog/pkgs-snapshot.json`
 - `data/internal/errors/*`
 - `data/internal/logs/app_errors.log`
-
-## Local Python run (without Docker)
-
-```bash
-python -m pip install -e .[test]
-cp init/settings.ini configs/settings.ini
-python -m homebrew_cdn_m1_server
-```
-
-Requires:
-
-- Python 3.12+
-- `bin/pkgtool` available (or compatible path configured by runtime layout)
-- nginx if you want the same serving layer as container

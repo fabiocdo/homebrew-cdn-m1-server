@@ -18,11 +18,16 @@ class _DemoteApschedulerSchedulerInfoFilter(logging.Filter):
         return True
 
 
-def configure_logging(level: str, error_log_path: Path) -> None:
+def configure_logging(level: str | None, error_log_path: Path) -> None:
     error_log_path.parent.mkdir(parents=True, exist_ok=True)
 
+    normalized = str(level or "").strip().lower()
+    if normalized == "warn":
+        normalized = "warning"
+    resolved_level = getattr(logging, normalized.upper(), logging.INFO)
+
     root = logging.getLogger()
-    root.setLevel(getattr(logging, level.upper(), logging.INFO))
+    root.setLevel(resolved_level)
     root.handlers.clear()
 
     formatter = logging.Formatter(
@@ -32,7 +37,7 @@ def configure_logging(level: str, error_log_path: Path) -> None:
 
     console = logging.StreamHandler()
     console.setFormatter(formatter)
-    console.setLevel(getattr(logging, level.upper(), logging.INFO))
+    console.setLevel(resolved_level)
 
     error_file = RotatingFileHandler(
         error_log_path,
