@@ -1,0 +1,16 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Protocol
+
+
+class PackageStorePort(Protocol):
+    def ensure_layout(self) -> None: ...
+
+    def scan_pkg_files(self) -> list[Path]: ...
+
+    def stat(self, pkg_path: Path) -> tuple[int, int]: ...
+
+    def move_to_canonical(self, pkg_path: Path, app_type: str, content_id: str) -> Path: ...
+
+    def move_to_errors(self, pkg_path: Path, reason: str) -> Path: ...
