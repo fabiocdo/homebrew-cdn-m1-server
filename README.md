@@ -1,3 +1,9 @@
+[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A590%25-brightgreen)](https://github.com/fabiocdo/homebrew-cdn-m1-server)
+[![Docker Hub](https://img.shields.io/docker/v/fabiocdo/homebrew-cdn-m1-server?label=dockerhub&sort=semver)](https://hub.docker.com/repository/docker/fabiocdo/homebrew-cdn-m1-server)
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/V7V11U8HWX)
+
+![hb-store-m1](assets/512.png)
+
 # homebrew-cdn-m1-server
 
 PS4 static CDN pipeline for `hb-store` (`store.db`) and `fPKGi` (`*.json`).
