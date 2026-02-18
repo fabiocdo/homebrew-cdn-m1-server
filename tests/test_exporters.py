@@ -113,6 +113,65 @@ def test_exporters_given_catalog_items_when_export_then_generates_store_db_and_j
     assert item["cover_url"] == "http://127.0.0.1/pkg/media/UP0000-TEST00000_00-TEST000000000000_icon0.png"
 
 
+def test_store_db_exporter_given_pkg_sizes_when_export_then_writes_human_readable_size(
+    temp_workspace: Path,
+):
+    share_dir = temp_workspace / "data" / "share"
+    share_dir.mkdir(parents=True, exist_ok=True)
+
+    store_sql = (Path(__file__).resolve().parents[1] / "init" / "store_db.sql")
+    store_output = share_dir / "hb-store" / "store.db"
+
+    pkg_small = share_dir / "pkg" / "game" / "UP0000-TEST00000_00-TEST000000000101.pkg"
+    pkg_small.parent.mkdir(parents=True, exist_ok=True)
+    _ = pkg_small.write_bytes(b"a")
+
+    pkg_medium = share_dir / "pkg" / "game" / "UP0000-TEST00000_00-TEST000000000102.pkg"
+    _ = pkg_medium.write_bytes(b"b")
+
+    pkg_large = share_dir / "pkg" / "game" / "UP0000-TEST00000_00-TEST000000000103.pkg"
+    _ = pkg_large.write_bytes(b"c")
+
+    items = [
+        _item(
+            pkg_small,
+            "UP0000-TEST00000_00-TEST000000000101",
+            AppType.GAME,
+            pkg_size=512,
+        ),
+        _item(
+            pkg_medium,
+            "UP0000-TEST00000_00-TEST000000000102",
+            AppType.GAME,
+            pkg_size=20 * 1024 * 1024,
+        ),
+        _item(
+            pkg_large,
+            "UP0000-TEST00000_00-TEST000000000103",
+            AppType.GAME,
+            pkg_size=3 * 1024 * 1024 * 1024,
+        ),
+    ]
+
+    exporter = StoreDbExporter(store_output, store_sql, "http://127.0.0.1")
+    _ = exporter.export(items)
+
+    conn = sqlite3.connect(str(store_output))
+    rows = cast(
+        list[tuple[str, str]],
+        conn.execute(
+            "SELECT content_id, Size FROM homebrews ORDER BY content_id"
+        ).fetchall(),
+    )
+    conn.close()
+
+    assert rows == [
+        ("UP0000-TEST00000_00-TEST000000000101", "512 B"),
+        ("UP0000-TEST00000_00-TEST000000000102", "20.00 MB"),
+        ("UP0000-TEST00000_00-TEST000000000103", "3.00 GB"),
+    ]
+
+
 def test_fpkgi_exporter_given_single_game_when_export_then_generates_all_json_stems(
     temp_workspace: Path,
 ):

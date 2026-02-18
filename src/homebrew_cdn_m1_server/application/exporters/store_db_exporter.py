@@ -13,6 +13,8 @@ from homebrew_cdn_m1_server.domain.models.catalog_item import CatalogItem
 @final
 class StoreDbExporter(OutputExporterProtocol):
     target: OutputTarget = OutputTarget.HB_STORE
+    _BYTES_PER_MB: int = 1024 * 1024
+    _BYTES_PER_GB: int = 1024 * 1024 * 1024
 
     def __init__(self, output_db_path: Path, init_sql_path: Path, base_url: str) -> None:
         self._output_db_path = output_db_path
@@ -24,6 +26,15 @@ class StoreDbExporter(OutputExporterProtocol):
 
     def _canonical_media_url(self, item: CatalogItem, suffix: str) -> str:
         return f"{self._base_url}/pkg/media/{item.content_id.value}_{suffix}.png"
+
+    @classmethod
+    def _format_store_size(cls, size_bytes: int) -> str:
+        normalized = max(0, int(size_bytes))
+        if normalized >= cls._BYTES_PER_GB:
+            return f"{normalized / cls._BYTES_PER_GB:.2f} GB"
+        if normalized >= cls._BYTES_PER_MB:
+            return f"{normalized / cls._BYTES_PER_MB:.2f} MB"
+        return f"{normalized} B"
 
     def _row(self, item: CatalogItem) -> tuple[object, ...]:
         row = {
@@ -38,7 +49,7 @@ class StoreDbExporter(OutputExporterProtocol):
             "desc_1": None,
             "desc_2": None,
             "ReviewStars": None,
-            "Size": int(item.pkg_size),
+            "Size": self._format_store_size(item.pkg_size),
             "Author": None,
             "apptype": item.app_type.store_db_label,
             "pv": None,
