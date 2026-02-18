@@ -24,6 +24,9 @@ class StoreDbExporter(OutputExporterProtocol):
     def _canonical_pkg_url(self, item: CatalogItem) -> str:
         return f"{self._base_url}/pkg/{item.app_type.value}/{item.content_id.value}.pkg"
 
+    def _download_url(self, item: CatalogItem) -> str:
+        return f"{self._base_url}/download.php?tid={item.title_id}"
+
     def _canonical_media_url(self, item: CatalogItem, suffix: str) -> str:
         return f"{self._base_url}/pkg/media/{item.content_id.value}_{suffix}.png"
 
@@ -43,7 +46,7 @@ class StoreDbExporter(OutputExporterProtocol):
             "name": item.title,
             "desc": None,
             "image": self._canonical_media_url(item, "icon0"),
-            "package": self._canonical_pkg_url(item),
+            "package": self._download_url(item),
             "version": item.version,
             "picpath": f"/user/app/NPXS39041/storedata/{item.content_id.value}.png",
             "desc_1": None,

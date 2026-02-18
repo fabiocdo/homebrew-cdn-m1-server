@@ -216,6 +216,29 @@ def test_hb_store_api_resolver_given_missing_catalog_entry_when_resolve_then_fal
     )
 
 
+def test_hb_store_api_resolver_given_store_self_download_url_when_resolve_then_avoids_loop(
+    temp_workspace: Path,
+) -> None:
+    catalog_db = temp_workspace / "data" / "internal" / "catalog" / "catalog.db"
+    store_db = temp_workspace / "data" / "share" / "hb-store" / "store.db"
+    _init_catalog_db(catalog_db)
+    _init_store_db(store_db)
+    _insert_store_row(
+        store_db,
+        content_id="UP0000-TEST00000_00-TEST000000000888",
+        title_id="CUSA00088",
+        package_url="http://127.0.0.1/download.php?tid=CUSA00088",
+    )
+
+    resolver = HbStoreApiResolver(
+        catalog_db_path=catalog_db,
+        store_db_path=store_db,
+        base_url="http://127.0.0.1",
+    )
+
+    assert resolver.resolve_download_url("CUSA00088") is None
+
+
 def test_hb_store_api_server_given_requests_when_called_then_returns_compatible_responses(
     temp_workspace: Path,
 ) -> None:
@@ -235,7 +258,7 @@ def test_hb_store_api_server_given_requests_when_called_then_returns_compatible_
         store_db,
         content_id="UP0000-TEST00000_00-TEST000000000100",
         title_id="CUSA00100",
-        package_url="http://127.0.0.1/pkg/game/UP0000-TEST00000_00-TEST000000000100.pkg",
+        package_url="http://127.0.0.1/download.php?tid=CUSA00100",
         number_of_downloads=42,
     )
 

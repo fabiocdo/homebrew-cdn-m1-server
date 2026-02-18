@@ -245,10 +245,14 @@ class HbStoreApiResolver:
         package_url = str(row[0] or "").strip()
         if not package_url:
             return None
+        parsed = urlparse(package_url)
+        path = str(parsed.path or "").strip().lower()
+        if path in {"download.php", "/download.php"} or path.endswith("/download.php"):
+            return None
         return package_url
 
     def resolve_download_url(self, title_id: str) -> str | None:
-        return self._package_url_from_store_db(title_id) or self._package_url_from_catalog(
+        return self._package_url_from_catalog(title_id) or self._package_url_from_store_db(
             title_id
         )
 

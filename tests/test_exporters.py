@@ -88,14 +88,15 @@ def test_exporters_given_catalog_items_when_export_then_generates_store_db_and_j
     conn = sqlite3.connect(str(store_output))
     row_obj = cast(
         object,
-        conn.execute("SELECT content_id, apptype, image FROM homebrews").fetchone(),
+        conn.execute("SELECT content_id, apptype, image, package FROM homebrews").fetchone(),
     )
     conn.close()
-    row = cast(tuple[str, str, str] | None, row_obj)
+    row = cast(tuple[str, str, str, str] | None, row_obj)
     assert row == (
         "UP0000-TEST00000_00-TEST000000000000",
         "Game",
         "http://127.0.0.1/pkg/media/UP0000-TEST00000_00-TEST000000000000_icon0.png",
+        "http://127.0.0.1/download.php?tid=CUSA00001",
     )
 
     json_exporter = FpkgiJsonExporter(
