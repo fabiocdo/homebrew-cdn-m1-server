@@ -25,7 +25,10 @@ class StoreDbExporter(OutputExporterProtocol):
         return f"{self._base_url}/pkg/{item.app_type.value}/{item.content_id.value}.pkg"
 
     def _download_url(self, item: CatalogItem) -> str:
-        return f"{self._base_url}/download.php?tid={item.title_id}"
+        return (
+            f"{self._base_url}/download.php?"
+            f"tid={item.title_id}&cid={item.content_id.value}&ver={item.version}"
+        )
 
     def _canonical_media_url(self, item: CatalogItem, suffix: str) -> str:
         return f"{self._base_url}/pkg/media/{item.content_id.value}_{suffix}.png"

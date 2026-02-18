@@ -214,6 +214,7 @@ def test_hb_store_api_resolver_given_missing_catalog_entry_when_resolve_then_fal
         resolver.resolve_download_url("CUSA00009")
         == "http://127.0.0.1/pkg/game/UP0000-TEST00000_00-TEST000000000999.pkg"
     )
+    assert resolver.resolve_download_pkg_path("CUSA00009") == "/pkg/game/UP0000-TEST00000_00-TEST000000000999.pkg"
 
 
 def test_hb_store_api_resolver_given_store_self_download_url_when_resolve_then_avoids_loop(
@@ -237,6 +238,7 @@ def test_hb_store_api_resolver_given_store_self_download_url_when_resolve_then_a
     )
 
     assert resolver.resolve_download_url("CUSA00088") is None
+    assert resolver.resolve_download_pkg_path("CUSA00088") is None
 
 
 def test_hb_store_api_server_given_requests_when_called_then_returns_compatible_responses(
@@ -258,7 +260,7 @@ def test_hb_store_api_server_given_requests_when_called_then_returns_compatible_
         store_db,
         content_id="UP0000-TEST00000_00-TEST000000000100",
         title_id="CUSA00100",
-        package_url="http://127.0.0.1/download.php?tid=CUSA00100",
+        package_url="http://127.0.0.1/download.php?tid=CUSA00100&cid=UP0000-TEST00000_00-TEST000000000100&ver=02.00",
         number_of_downloads=42,
     )
 
@@ -292,21 +294,27 @@ def test_hb_store_api_server_given_requests_when_called_then_returns_compatible_
         payload = _decode_json_dict(body)
         assert payload["number_of_downloads"] == "42"
 
-        conn.request("GET", "/download.php?tid=CUSA00100")
+        conn.request(
+            "GET",
+            "/download.php?tid=CUSA00100&cid=UP0000-TEST00000_00-TEST000000000100&ver=02.00",
+        )
         response = conn.getresponse()
         _ = response.read()
-        assert response.status == 302
+        assert response.status == 200
         assert (
-            response.getheader("Location")
-            == "http://127.0.0.1/pkg/game/UP0000-TEST00000_00-TEST000000000100.pkg"
+            response.getheader("X-Accel-Redirect")
+            == "/pkg/game/UP0000-TEST00000_00-TEST000000000100.pkg"
         )
 
-        conn.request("GET", "/download.php?tid=CUSA00100&check=true")
+        conn.request(
+            "GET",
+            "/download.php?tid=CUSA00100&cid=UP0000-TEST00000_00-TEST000000000100&ver=02.00&check=true",
+        )
         response = conn.getresponse()
         body = response.read()
         assert response.status == 200
         payload = _decode_json_dict(body)
-        assert payload["number_of_downloads"] == "43"
+        assert payload["number_of_downloads"] == "1"
 
         conn.request("GET", "/download.php?tid=UNKNOWN")
         response = conn.getresponse()
@@ -429,10 +437,17 @@ def test_hb_store_api_server_given_head_and_restart_when_called_then_stays_stabl
 
     try:
         conn = http.client.HTTPConnection("127.0.0.1", running_port, timeout=3)
-        conn.request("HEAD", "/download.php?tid=CUSA00200")
+        conn.request(
+            "HEAD",
+            "/download.php?tid=CUSA00200&cid=UP0000-TEST00000_00-TEST000000000200&ver=01.00",
+        )
         response = conn.getresponse()
         body = response.read()
-        assert response.status == 302
+        assert response.status == 200
+        assert (
+            response.getheader("X-Accel-Redirect")
+            == "/pkg/game/UP0000-TEST00000_00-TEST000000000200.pkg"
+        )
         assert body == b""
         conn.request("HEAD", "/unknown")
         response = conn.getresponse()
@@ -442,4 +457,139 @@ def test_hb_store_api_server_given_head_and_restart_when_called_then_stays_stabl
         conn.close()
     finally:
         server.stop()
+        server.stop()
+
+
+def test_hb_store_api_server_given_same_title_different_content_when_download_then_counts_are_isolated(
+    temp_workspace: Path,
+) -> None:
+    catalog_db = temp_workspace / "data" / "internal" / "catalog" / "catalog.db"
+    store_db = temp_workspace / "data" / "share" / "hb-store" / "store.db"
+    _init_catalog_db(catalog_db)
+    _init_store_db(store_db)
+
+    cid_one = "UP0000-TEST00000_00-TEST000000000301"
+    cid_two = "UP0000-TEST00000_00-TEST000000000302"
+    _insert_catalog_row(
+        catalog_db,
+        content_id=cid_one,
+        title_id="CUSA00300",
+        app_type="dlc",
+        version="01.00",
+        updated_at="2025-01-01T00:00:00+00:00",
+    )
+    _insert_catalog_row(
+        catalog_db,
+        content_id=cid_two,
+        title_id="CUSA00300",
+        app_type="dlc",
+        version="01.00",
+        updated_at="2025-01-01T00:00:00+00:00",
+    )
+
+    resolver = HbStoreApiResolver(
+        catalog_db_path=catalog_db,
+        store_db_path=store_db,
+        base_url="http://127.0.0.1",
+    )
+    server = HbStoreApiServer(
+        resolver=resolver,
+        logger=logging.getLogger("tests.hb_store_api"),
+        host="127.0.0.1",
+        port=0,
+    )
+    server.start()
+
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", server.port, timeout=3)
+
+        conn.request("GET", f"/download.php?tid=CUSA00300&cid={cid_one}&ver=01.00")
+        response = conn.getresponse()
+        _ = response.read()
+        assert response.status == 200
+        assert response.getheader("X-Accel-Redirect") == f"/pkg/dlc/{cid_one}.pkg"
+
+        conn.request("GET", f"/download.php?tid=CUSA00300&cid={cid_one}&ver=01.00&check=true")
+        response = conn.getresponse()
+        body = response.read()
+        assert response.status == 200
+        payload = _decode_json_dict(body)
+        assert payload["number_of_downloads"] == "1"
+
+        conn.request("GET", f"/download.php?tid=CUSA00300&cid={cid_two}&ver=01.00&check=true")
+        response = conn.getresponse()
+        body = response.read()
+        assert response.status == 200
+        payload = _decode_json_dict(body)
+        assert payload["number_of_downloads"] == "0"
+
+        conn.close()
+    finally:
+        server.stop()
+
+
+def test_hb_store_api_server_given_same_content_different_version_when_download_then_counts_are_isolated(
+    temp_workspace: Path,
+) -> None:
+    catalog_db = temp_workspace / "data" / "internal" / "catalog" / "catalog.db"
+    store_db = temp_workspace / "data" / "share" / "hb-store" / "store.db"
+    _init_catalog_db(catalog_db)
+    _init_store_db(store_db)
+
+    cid = "UP0000-TEST00000_00-TEST000000000401"
+    _insert_catalog_row(
+        catalog_db,
+        content_id=cid,
+        title_id="CUSA00400",
+        app_type="game",
+        version="01.00",
+        updated_at="2025-01-01T00:00:00+00:00",
+    )
+    _insert_catalog_row(
+        catalog_db,
+        content_id=cid,
+        title_id="CUSA00400",
+        app_type="game",
+        version="02.00",
+        updated_at="2025-01-02T00:00:00+00:00",
+    )
+
+    resolver = HbStoreApiResolver(
+        catalog_db_path=catalog_db,
+        store_db_path=store_db,
+        base_url="http://127.0.0.1",
+    )
+    server = HbStoreApiServer(
+        resolver=resolver,
+        logger=logging.getLogger("tests.hb_store_api"),
+        host="127.0.0.1",
+        port=0,
+    )
+    server.start()
+
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", server.port, timeout=3)
+
+        conn.request("GET", f"/download.php?tid=CUSA00400&cid={cid}&ver=01.00")
+        response = conn.getresponse()
+        _ = response.read()
+        assert response.status == 200
+        assert response.getheader("X-Accel-Redirect") == f"/pkg/game/{cid}.pkg"
+
+        conn.request("GET", f"/download.php?tid=CUSA00400&cid={cid}&ver=01.00&check=true")
+        response = conn.getresponse()
+        body = response.read()
+        assert response.status == 200
+        payload = _decode_json_dict(body)
+        assert payload["number_of_downloads"] == "1"
+
+        conn.request("GET", f"/download.php?tid=CUSA00400&cid={cid}&ver=02.00&check=true")
+        response = conn.getresponse()
+        body = response.read()
+        assert response.status == 200
+        payload = _decode_json_dict(body)
+        assert payload["number_of_downloads"] == "0"
+
+        conn.close()
+    finally:
         server.stop()

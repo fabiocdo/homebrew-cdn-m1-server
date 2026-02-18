@@ -280,10 +280,14 @@ class SqliteCatalogRepository:
                 ci.sfo_json,
                 ci.sfo_raw,
                 ci.sfo_hash,
-                COALESCE(dc.downloads, 0) AS downloads
+                COALESCE(dc_pkg.downloads, dc_content.downloads, dc_title.downloads, 0) AS downloads
             FROM catalog_items AS ci
-            LEFT JOIN download_counters AS dc
-                ON dc.title_id = ci.title_id
+            LEFT JOIN download_counters AS dc_pkg
+                ON dc_pkg.title_id = ci.content_id || '@' || ci.version
+            LEFT JOIN download_counters AS dc_content
+                ON dc_content.title_id = ci.content_id
+            LEFT JOIN download_counters AS dc_title
+                ON dc_title.title_id = ci.title_id
             ORDER BY ci.app_type, ci.content_id, ci.version
             """
             ).fetchall(),

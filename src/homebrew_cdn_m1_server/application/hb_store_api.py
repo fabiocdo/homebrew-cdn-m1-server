@@ -58,6 +58,15 @@ class HbStoreApiResolver:
         FROM catalog_items
         WHERE title_id = ?
     """
+    _CATALOG_BY_CONTENT_ROW_SQL: ClassVar[str] = """
+        SELECT
+            COALESCE(content_id, ''),
+            COALESCE(app_type, '')
+        FROM catalog_items
+        WHERE content_id = ?
+        ORDER BY COALESCE(updated_at, '') DESC
+        LIMIT 1
+    """
     _PACKAGE_ROW_SQL: ClassVar[str] = """
         SELECT COALESCE(package, '')
         FROM homebrews
@@ -70,6 +79,14 @@ class HbStoreApiResolver:
         self._catalog_db_path = catalog_db_path
         self._store_db_path = store_db_path
         self._base_url = base_url.rstrip("/")
+
+    @staticmethod
+    def _normalize_content_id(value: str | None) -> str:
+        return str(value or "").strip().upper()
+
+    @staticmethod
+    def _normalize_version(value: str | None) -> str:
+        return str(value or "").strip()
 
     def store_db_hash(self) -> str:
         if not self._store_db_path.exists():
@@ -149,8 +166,21 @@ class HbStoreApiResolver:
             return None
         return max(0, parsed)
 
-    def download_count(self, title_id: str) -> str:
-        key = str(title_id or "").strip()
+    def _counter_key(
+        self, title_id: str, content_id: str | None = None, version: str | None = None
+    ) -> str:
+        cid = self._normalize_content_id(content_id)
+        ver = self._normalize_version(version)
+        if cid and ver:
+            return f"{cid}@{ver}"
+        if cid:
+            return cid
+        return str(title_id or "").strip()
+
+    def download_count(
+        self, title_id: str, content_id: str | None = None, version: str | None = None
+    ) -> str:
+        key = self._counter_key(title_id, content_id, version)
         if not key:
             return "0"
 
@@ -163,12 +193,17 @@ class HbStoreApiResolver:
             return str(from_store)
         return "0"
 
-    def increment_download_count(self, title_id: str) -> int:
-        key = str(title_id or "").strip()
+    def increment_download_count(
+        self, title_id: str, content_id: str | None = None, version: str | None = None
+    ) -> int:
+        key = self._counter_key(title_id, content_id, version)
         if not key or not self._catalog_db_path.exists():
             return 0
 
-        seed = self._store_download_count(key) or 0
+        if self._normalize_content_id(content_id):
+            seed = 0
+        else:
+            seed = self._store_download_count(key) or 0
         now = datetime.now(UTC).replace(microsecond=0).isoformat()
         try:
             with sqlite3.connect(str(self._catalog_db_path)) as conn:
@@ -228,6 +263,32 @@ class HbStoreApiResolver:
             return f"{self._base_url}{route}"
         return route
 
+    def _package_url_from_catalog_content_id(self, content_id: str | None) -> str | None:
+        cid = self._normalize_content_id(content_id)
+        if not cid or not self._catalog_db_path.exists():
+            return None
+
+        try:
+            with sqlite3.connect(str(self._catalog_db_path)) as conn:
+                row_obj = cast(
+                    object,
+                    conn.execute(self._CATALOG_BY_CONTENT_ROW_SQL, (cid,)).fetchone(),
+                )
+        except sqlite3.Error:
+            return None
+
+        row = cast(tuple[object, object] | None, row_obj)
+        if row is None:
+            return None
+        content_value = str(row[0] or "").strip()
+        app_type = str(row[1] or "").strip().lower()
+        if not content_value or not app_type:
+            return None
+        route = f"/pkg/{app_type}/{content_value}.pkg"
+        if self._base_url:
+            return f"{self._base_url}{route}"
+        return route
+
     def _package_url_from_store_db(self, title_id: str) -> str | None:
         if not title_id or not self._store_db_path.exists():
             return None
@@ -251,10 +312,25 @@ class HbStoreApiResolver:
             return None
         return package_url
 
-    def resolve_download_url(self, title_id: str) -> str | None:
-        return self._package_url_from_catalog(title_id) or self._package_url_from_store_db(
-            title_id
+    def resolve_download_url(self, title_id: str, content_id: str | None = None) -> str | None:
+        return (
+            self._package_url_from_catalog_content_id(content_id)
+            or self._package_url_from_catalog(title_id)
+            or self._package_url_from_store_db(title_id)
         )
+
+    def resolve_download_pkg_path(self, title_id: str, content_id: str | None = None) -> str | None:
+        destination = self.resolve_download_url(title_id, content_id)
+        if not destination:
+            return None
+        parsed = urlparse(destination)
+        path = str(parsed.path or "").strip()
+        if not path:
+            return None
+        normalized = path.lower()
+        if not normalized.startswith("/pkg/") or not normalized.endswith(".pkg"):
+            return None
+        return path
 
 
 @final
@@ -338,17 +414,19 @@ class HbStoreApiServer:
 
                 if parsed.path == "/download.php":
                     title_id = str(params.get("tid", [""])[0] or "").strip()
+                    content_id = str(params.get("cid", [""])[0] or "").strip()
+                    version = str(params.get("ver", [""])[0] or "").strip()
                     check = str(params.get("check", [""])[0] or "").strip().lower()
                     if check in {"1", "true", "yes", "on"}:
-                        count = resolver.download_count(title_id)
+                        count = resolver.download_count(title_id, content_id, version)
                         self._write_json(
                             {"number_of_downloads": count},
                             send_body=send_body,
                         )
                         return
 
-                    destination = resolver.resolve_download_url(title_id)
-                    if not destination:
+                    pkg_path = resolver.resolve_download_pkg_path(title_id, content_id)
+                    if not pkg_path:
                         self._write_json(
                             {"error": "title_id_not_found"},
                             status=404,
@@ -357,12 +435,14 @@ class HbStoreApiServer:
                         return
 
                     if send_body:
-                        _ = resolver.increment_download_count(title_id)
+                        _ = resolver.increment_download_count(title_id, content_id, version)
 
-                    self.send_response(302)
-                    self.send_header("Location", destination)
+                    # Use internal redirect so clients receive a direct file response (200)
+                    # while keeping download counter logic centralized in this endpoint.
+                    self.send_response(200)
+                    self.send_header("X-Accel-Redirect", pkg_path)
+                    self.send_header("Content-Type", "application/octet-stream")
                     self.send_header("Cache-Control", "no-store")
-                    self.send_header("Content-Length", "0")
                     self.end_headers()
                     return
 

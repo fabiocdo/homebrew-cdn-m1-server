@@ -96,7 +96,7 @@ def test_exporters_given_catalog_items_when_export_then_generates_store_db_and_j
         "UP0000-TEST00000_00-TEST000000000000",
         "Game",
         "http://127.0.0.1/pkg/media/UP0000-TEST00000_00-TEST000000000000_icon0.png",
-        "http://127.0.0.1/download.php?tid=CUSA00001",
+        "http://127.0.0.1/download.php?tid=CUSA00001&cid=UP0000-TEST00000_00-TEST000000000000&ver=01.00",
     )
 
     json_exporter = FpkgiJsonExporter(
