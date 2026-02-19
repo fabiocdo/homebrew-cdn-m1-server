@@ -140,6 +140,7 @@ class PkgtoolGateway(PackageProbeProtocol):
         pkg_path: Path,
         entries: dict[str, str],
         content_id: str,
+        app_type: AppType,
     ) -> tuple[Path | None, Path | None, Path | None]:
         self._media_dir.mkdir(parents=True, exist_ok=True)
 
@@ -147,8 +148,9 @@ class PkgtoolGateway(PackageProbeProtocol):
         pic0_path = self._media_dir / self._media_name(content_id, "pic0")
         pic1_path = self._media_dir / self._media_name(content_id, "pic1")
 
+        icon0_required = app_type != AppType.UPDATE
         targets = [
-            ("ICON0_PNG", icon0_path, True),
+            ("ICON0_PNG", icon0_path, icon0_required),
             ("PIC0_PNG", pic0_path, False),
             ("PIC1_PNG", pic1_path, False),
         ]
@@ -200,7 +202,7 @@ class PkgtoolGateway(PackageProbeProtocol):
         sfo_json = json.dumps(fields, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
         sfo_hash = hashlib.md5(sfo_json.encode("utf-8")).hexdigest()
 
-        icon0, pic0, pic1 = self._extract_media(pkg_path, entries, content_id.value)
+        icon0, pic0, pic1 = self._extract_media(pkg_path, entries, content_id.value, app_type)
 
         return ProbeResult(
             content_id=content_id,
