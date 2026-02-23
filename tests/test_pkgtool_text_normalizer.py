@@ -22,5 +22,17 @@ def test_parse_sfo_entries_given_roman_numeral_title_then_stores_normalized_valu
     assert "Entry Name" not in parsed
 
 
-def test_normalize_text_given_trademark_symbol_then_preserves_symbol() -> None:
-    assert normalize_text("Game™ Edition") == "Game™ Edition"
+def test_normalize_text_given_trademark_and_registered_symbols_then_removes_markers() -> None:
+    assert normalize_text("Game™ Edition®") == "Game Edition"
+
+
+def test_normalize_text_given_en_dash_then_rewrites_to_hyphen() -> None:
+    assert normalize_text("Resident Evil – Gold Edition") == "Resident Evil - Gold Edition"
+
+
+def test_normalize_text_given_o_umlaut_then_rewrites_to_plain_o() -> None:
+    assert normalize_text("Brötal Legend Ömega") == "Brotal Legend Omega"
+
+
+def test_normalize_text_given_private_use_markers_then_removes_garbage_wrappers() -> None:
+    assert normalize_text("Grand Theft Auto V") == "Grand Theft Auto V"

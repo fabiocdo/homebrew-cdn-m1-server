@@ -7,13 +7,13 @@ import urllib.request
 from http.client import HTTPResponse
 from typing import ClassVar, cast, final, override
 
-from homebrew_cdn_m1_server.domain.protocols.publisher_lookup_protocol import (
-    PublisherLookupProtocol,
+from homebrew_cdn_m1_server.domain.protocols.title_metadata_lookup_protocol import (
+    TitleMetadataLookupProtocol,
 )
 
 
 @final
-class OrbisPatchesPublisherGateway(PublisherLookupProtocol):
+class OrbisPatchesGateway(TitleMetadataLookupProtocol):
     _TITLE_ID_RE: ClassVar[re.Pattern[str]] = re.compile(r"^[A-Z0-9]{9}$")
     _PUBLISHER_RE: ClassVar[re.Pattern[str]] = re.compile(
         r"<strong[^>]*>\s*Publisher(?!\s*ID)\b(?:\s*<small.*?</small>)?\s*</strong>\s*(?P<publisher>.*?)\s*</li>",
@@ -39,19 +39,22 @@ class OrbisPatchesPublisherGateway(PublisherLookupProtocol):
         return normalized
 
     @classmethod
-    def _extract_publisher(cls, payload: str) -> str | None:
-        match = cls._PUBLISHER_RE.search(payload)
+    def _extract_field(cls, payload: str, pattern: re.Pattern[str], group_name: str) -> str | None:
+        match = pattern.search(payload)
         if match is None:
             return None
 
-        body = match.group("publisher")
+        body = match.group(group_name)
         without_tags = cls._TAG_RE.sub(" ", body)
         plain = html.unescape(without_tags)
         compact = cls._SPACE_RE.sub(" ", plain).strip()
         return compact or None
 
-    @override
-    def lookup_by_title_id(self, title_id: str) -> str | None:
+    @classmethod
+    def _extract_publisher(cls, payload: str) -> str | None:
+        return cls._extract_field(payload, cls._PUBLISHER_RE, "publisher")
+
+    def _lookup_cached_publisher(self, title_id: str) -> str | None:
         key = self._normalize_title_id(title_id)
         if not key:
             return None
@@ -72,12 +75,16 @@ class OrbisPatchesPublisherGateway(PublisherLookupProtocol):
             with response_obj as response:
                 if int(response.status) >= 400:
                     self._cache[key] = None
-                    return None
+                    return self._cache[key]
                 payload = response.read().decode("utf-8", errors="ignore")
         except Exception:
             self._cache[key] = None
-            return None
+            return self._cache[key]
 
         publisher = self._extract_publisher(payload)
         self._cache[key] = publisher
-        return publisher
+        return self._cache[key]
+
+    @override
+    def lookup_by_title_id(self, title_id: str) -> str | None:
+        return self._lookup_cached_publisher(title_id)

@@ -34,6 +34,7 @@ class RuntimePaths:
     catalog_db_path: Path
     store_db_path: Path
     snapshot_path: Path
+    settings_snapshot_path: Path
     settings_path: Path
     pkgtool_bin_path: Path
 

@@ -38,6 +38,9 @@ def test_settings_loader_given_settings_ini_when_load_then_parses_expected_field
     assert config.user.pkgtool_timeout_seconds == 900
     assert str(config.paths.catalog_db_path).endswith("data/internal/catalog/catalog.db")
     assert str(config.paths.snapshot_path).endswith("data/internal/catalog/pkgs-snapshot.json")
+    assert str(config.paths.settings_snapshot_path).endswith(
+        "data/internal/catalog/settings-snapshot.json"
+    )
     assert str(config.paths.store_db_path).endswith("data/share/hb-store/store.db")
     assert str(config.paths.fpkgi_share_dir).endswith("data/share/fpkgi")
     assert str(config.paths.media_dir).endswith("data/share/pkg/media")

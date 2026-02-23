@@ -88,6 +88,9 @@ class HbStoreApiResolver:
         self._store_db_path = store_db_path
         self._base_url = base_url.rstrip("/")
 
+    def set_base_url(self, base_url: str) -> None:
+        self._base_url = str(base_url or "").rstrip("/")
+
     @staticmethod
     def _normalize_content_id(value: str | None) -> str:
         return str(value or "").strip().upper()

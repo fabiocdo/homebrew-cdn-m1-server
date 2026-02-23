@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import final, override
 
 from homebrew_cdn_m1_server.domain.protocols.output_exporter_protocol import OutputExporterProtocol
-from homebrew_cdn_m1_server.domain.protocols.publisher_lookup_protocol import (
-    PublisherLookupProtocol,
+from homebrew_cdn_m1_server.domain.protocols.title_metadata_lookup_protocol import (
+    TitleMetadataLookupProtocol,
 )
 from homebrew_cdn_m1_server.domain.models.output_target import OutputTarget
 from homebrew_cdn_m1_server.domain.models.catalog_item import CatalogItem
@@ -24,12 +24,12 @@ class StoreDbExporter(OutputExporterProtocol):
         output_db_path: Path,
         init_sql_path: Path,
         base_url: str,
-        publisher_lookup: PublisherLookupProtocol | None = None,
+        metadata_lookup: TitleMetadataLookupProtocol | None = None,
     ) -> None:
         self._output_db_path = output_db_path
         self._init_sql_path = init_sql_path
         self._base_url = base_url.rstrip("/")
-        self._publisher_lookup = publisher_lookup
+        self._metadata_lookup = metadata_lookup
 
     def _download_url(self, item: CatalogItem) -> str:
         return (
@@ -52,10 +52,10 @@ class StoreDbExporter(OutputExporterProtocol):
     def _resolve_publisher(self, item: CatalogItem) -> str | None:
         if item.publisher:
             return item.publisher
-        if self._publisher_lookup is None:
+        if self._metadata_lookup is None:
             return None
         try:
-            return self._publisher_lookup.lookup_by_title_id(item.title_id)
+            return self._metadata_lookup.lookup_by_title_id(item.title_id)
         except Exception:
             return None
 

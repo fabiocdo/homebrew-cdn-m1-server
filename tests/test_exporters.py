@@ -13,8 +13,8 @@ from homebrew_cdn_m1_server.domain.models.app_type import AppType
 from homebrew_cdn_m1_server.domain.models.content_id import ContentId
 from homebrew_cdn_m1_server.application.exporters.fpkgi_json_exporter import FpkgiJsonExporter
 from homebrew_cdn_m1_server.application.exporters.store_db_exporter import StoreDbExporter
-from homebrew_cdn_m1_server.domain.protocols.publisher_lookup_protocol import (
-    PublisherLookupProtocol,
+from homebrew_cdn_m1_server.domain.protocols.title_metadata_lookup_protocol import (
+    TitleMetadataLookupProtocol,
 )
 
 FPKGI_SCHEMA = Path(__file__).resolve().parents[1] / "init" / "fpkgi.schema.json"
@@ -214,7 +214,7 @@ def test_store_db_exporter_given_missing_item_publisher_when_export_then_uses_lo
         store_output,
         store_sql,
         "http://127.0.0.1",
-        publisher_lookup=cast(PublisherLookupProtocol, cast(object, _FakePublisherLookup())),
+        metadata_lookup=cast(TitleMetadataLookupProtocol, cast(object, _FakePublisherLookup())),
     )
     _ = exporter.export([item])
 

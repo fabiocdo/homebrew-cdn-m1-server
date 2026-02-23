@@ -18,8 +18,8 @@ from homebrew_cdn_m1_server.domain.models.results import ProbeResult
 from homebrew_cdn_m1_server.domain.protocols.package_probe_protocol import (
     PackageProbeProtocol,
 )
-from homebrew_cdn_m1_server.domain.protocols.publisher_lookup_protocol import (
-    PublisherLookupProtocol,
+from homebrew_cdn_m1_server.domain.protocols.title_metadata_lookup_protocol import (
+    TitleMetadataLookupProtocol,
 )
 from homebrew_cdn_m1_server.domain.workflows.ingest_package import IngestPackage
 
@@ -77,7 +77,11 @@ class _FakeStore:
 
 
 class _FakePublisherLookup:
-    def __init__(self, publisher: str | None = None, fail: bool = False) -> None:
+    def __init__(
+        self,
+        publisher: str | None = None,
+        fail: bool = False,
+    ) -> None:
         self.publisher: str | None = publisher
         self.fail: bool = fail
         self.lookups: list[str] = []
@@ -209,14 +213,14 @@ def test_ingest_package_given_valid_pkg_when_called_then_upserts_and_commits(
         def probe(self, _pkg_path: Path) -> ProbeResult:
             return _probe_result()
 
-    publisher_lookup = _FakePublisherLookup("Mojang")
+    metadata_lookup = _FakePublisherLookup("Mojang")
     ingest = IngestPackage(
         uow_factory=lambda: cast(SqliteUnitOfWork, cast(object, uow)),
         package_probe=cast(PackageProbeProtocol, cast(object, _Probe())),
         package_store=cast(FilesystemRepository, cast(object, store)),
         logger=logging.getLogger("test"),
-        publisher_lookup=cast(
-            PublisherLookupProtocol, cast(object, publisher_lookup)
+        metadata_lookup=cast(
+            TitleMetadataLookupProtocol, cast(object, metadata_lookup)
         ),
     )
 
@@ -227,11 +231,12 @@ def test_ingest_package_given_valid_pkg_when_called_then_upserts_and_commits(
     assert result.item is not None
     assert result.created is True
     assert result.item.publisher == "Mojang"
+    assert result.item.release_date == "2025-01-01"
     assert len(uow.catalog.items) == 1
     assert uow.committed is True
 
 
-def test_ingest_package_given_publisher_lookup_failure_when_called_then_keeps_ingestion(
+def test_ingest_package_given_metadata_lookup_failure_when_called_then_keeps_ingestion(
     temp_workspace: Path,
 ) -> None:
     canonical = temp_workspace / "data" / "share" / "pkg" / "game" / "A.pkg"
@@ -244,14 +249,14 @@ def test_ingest_package_given_publisher_lookup_failure_when_called_then_keeps_in
         def probe(self, _pkg_path: Path) -> ProbeResult:
             return _probe_result()
 
-    publisher_lookup = _FakePublisherLookup(fail=True)
+    metadata_lookup = _FakePublisherLookup(fail=True)
     ingest = IngestPackage(
         uow_factory=lambda: cast(SqliteUnitOfWork, cast(object, uow)),
         package_probe=cast(PackageProbeProtocol, cast(object, _Probe())),
         package_store=cast(FilesystemRepository, cast(object, store)),
         logger=logging.getLogger("test"),
-        publisher_lookup=cast(
-            PublisherLookupProtocol, cast(object, publisher_lookup)
+        metadata_lookup=cast(
+            TitleMetadataLookupProtocol, cast(object, metadata_lookup)
         ),
     )
 

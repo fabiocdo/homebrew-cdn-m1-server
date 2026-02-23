@@ -19,8 +19,8 @@ from homebrew_cdn_m1_server.application.exporters.store_db_exporter import Store
 from homebrew_cdn_m1_server.application.gateways.github_assets_gateway import (
     GithubAssetsGateway,
 )
-from homebrew_cdn_m1_server.application.gateways.orbispatches_publisher_gateway import (
-    OrbisPatchesPublisherGateway,
+from homebrew_cdn_m1_server.application.gateways.orbispatches_gateway import (
+    OrbisPatchesGateway,
 )
 from homebrew_cdn_m1_server.application.gateways.pkgtool_gateway import PkgtoolGateway
 from homebrew_cdn_m1_server.application.repositories.filesystem_repository import (
@@ -28,6 +28,9 @@ from homebrew_cdn_m1_server.application.repositories.filesystem_repository impor
 )
 from homebrew_cdn_m1_server.application.repositories.json_snapshot_repository import (
     JsonSnapshotRepository,
+)
+from homebrew_cdn_m1_server.application.repositories.settings_snapshot_repository import (
+    SettingsSnapshotRepository,
 )
 from homebrew_cdn_m1_server.application.hb_store_api import (
     HbStoreApiResolver,
@@ -52,19 +55,24 @@ class WorkerApp:
             snapshot_path=config.paths.snapshot_path,
             schema_path=config.paths.init_dir / "snapshot.schema.json",
         )
+        self._settings_snapshot_store = SettingsSnapshotRepository(
+            snapshot_path=config.paths.settings_snapshot_path,
+            settings_path=config.paths.settings_path,
+        )
         self._pkgtool = PkgtoolGateway(
             pkgtool_bin=config.paths.pkgtool_bin_path,
             timeout_seconds=config.user.pkgtool_timeout_seconds,
             media_dir=config.paths.media_dir,
         )
         self._github_assets = GithubAssetsGateway()
-        self._publisher_lookup = OrbisPatchesPublisherGateway()
+        self._metadata_lookup = OrbisPatchesGateway()
+        self._hb_store_resolver = HbStoreApiResolver(
+            catalog_db_path=config.paths.catalog_db_path,
+            store_db_path=config.paths.store_db_path,
+            base_url=config.base_url,
+        )
         self._hb_store_api = HbStoreApiServer(
-            resolver=HbStoreApiResolver(
-                catalog_db_path=config.paths.catalog_db_path,
-                store_db_path=config.paths.store_db_path,
-                base_url=config.base_url,
-            ),
+            resolver=self._hb_store_resolver,
             logger=self._log,
         )
 
@@ -101,7 +109,7 @@ class WorkerApp:
             package_probe=self._pkgtool,
             package_store=self._package_store,
             logger=self._log,
-            publisher_lookup=self._publisher_lookup,
+            metadata_lookup=self._metadata_lookup,
         )
 
         exporters = [
@@ -109,7 +117,7 @@ class WorkerApp:
                 output_db_path=self._config.paths.store_db_path,
                 init_sql_path=self._config.paths.init_dir / "store_db.sql",
                 base_url=self._config.base_url,
-                publisher_lookup=self._publisher_lookup,
+                metadata_lookup=self._metadata_lookup,
             ),
             FpkgiJsonExporter(
                 output_dir=self._config.paths.fpkgi_share_dir,
@@ -139,7 +147,42 @@ class WorkerApp:
                 else 1
             ),
             output_targets=self._config.user.output_targets or tuple(),
+            settings_snapshot_store=self._settings_snapshot_store,
         )
+
+    def _reload_runtime_settings(self) -> None:
+        current = self._config
+        try:
+            loaded = SettingsLoader.load(current.paths.settings_path)
+        except Exception as exc:
+            self._log.warning("Runtime settings reload failed: %s", exc)
+            return
+
+        old_base_url = current.base_url
+        self._config = AppConfig(
+            user=loaded.user,
+            paths=loaded.paths,
+            reconcile_interval_seconds=current.reconcile_interval_seconds,
+            reconcile_file_stable_seconds=current.reconcile_file_stable_seconds,
+        )
+        self._pkgtool = PkgtoolGateway(
+            pkgtool_bin=self._config.paths.pkgtool_bin_path,
+            timeout_seconds=self._config.user.pkgtool_timeout_seconds,
+            media_dir=self._config.paths.media_dir,
+        )
+        self._hb_store_resolver.set_base_url(self._config.base_url)
+
+        if self._config.base_url != old_base_url:
+            self._log.info(
+                "Base URL updated from settings.ini: '%s' -> '%s'",
+                old_base_url,
+                self._config.base_url,
+            )
+
+    def _run_reconcile_cycle(self) -> None:
+        self._reload_runtime_settings()
+        reconcile = self._build_reconcile_use_case()
+        _ = reconcile()
 
     def _sync_hb_store_assets_on_startup(self) -> None:
         output_targets = self._config.user.output_targets or tuple()
@@ -176,17 +219,16 @@ class WorkerApp:
         self._initialize_layout_and_schema()
         self._start_hb_store_api()
         self._sync_hb_store_assets_on_startup()
-        reconcile = self._build_reconcile_use_case()
-        _ = reconcile()
+        self._run_reconcile_cycle()
 
         scheduler = APSchedulerRunner()
         cron_expr = str(self._config.user.reconcile_cron_expression or "").strip()
         if cron_expr:
-            scheduler.schedule_cron("reconcile", cron_expr, reconcile)
+            scheduler.schedule_cron("reconcile", cron_expr, self._run_reconcile_cycle)
             self._log.info("Scheduler configured with cron: '%s'", cron_expr)
         else:
             scheduler.schedule_interval(
-                "reconcile", self._config.reconcile_interval_seconds, reconcile
+                "reconcile", self._config.reconcile_interval_seconds, self._run_reconcile_cycle
             )
             self._log.info(
                 "Scheduler configured with %ss interval",

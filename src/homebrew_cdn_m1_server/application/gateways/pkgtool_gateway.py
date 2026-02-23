@@ -21,10 +21,20 @@ _CONTROL_CHARACTERS.add(chr(0x7F))
 
 def normalize_text(value: str) -> str:
     raw = str(value or "")
-    # Keep trademark symbol as-is; NFKC would convert it to "TM".
-    normalized = "™".join(unicodedata.normalize("NFKC", part) for part in raw.split("™"))
+    sanitized = raw.replace("®", "").replace("™", "")
+    normalized = (
+        unicodedata.normalize("NFKC", sanitized)
+        .replace("–", "-")
+        .replace("ö", "o")
+        .replace("Ö", "O")
+    )
     cleaned = "".join(
-        ch for ch in normalized if ch not in _CONTROL_CHARACTERS or ch in {"\t", "\n", "\r"}
+        ch
+        for ch in normalized
+        if (
+            (ch not in _CONTROL_CHARACTERS or ch in {"\t", "\n", "\r"})
+            and unicodedata.category(ch) != "Co"
+        )
     )
     return cleaned.strip()
 

@@ -10,8 +10,8 @@ from homebrew_cdn_m1_server.application.repositories.filesystem_repository impor
 )
 from homebrew_cdn_m1_server.application.repositories.sqlite_unit_of_work import SqliteUnitOfWork
 from homebrew_cdn_m1_server.domain.protocols.package_probe_protocol import PackageProbeProtocol
-from homebrew_cdn_m1_server.domain.protocols.publisher_lookup_protocol import (
-    PublisherLookupProtocol,
+from homebrew_cdn_m1_server.domain.protocols.title_metadata_lookup_protocol import (
+    TitleMetadataLookupProtocol,
 )
 from homebrew_cdn_m1_server.domain.models.catalog_item import CatalogItem
 from homebrew_cdn_m1_server.domain.models.param_sfo_snapshot import ParamSfoSnapshot
@@ -42,13 +42,13 @@ class IngestPackage:
         package_probe: PackageProbeProtocol,
         package_store: FilesystemRepository,
         logger: logging.Logger,
-        publisher_lookup: PublisherLookupProtocol | None = None,
+        metadata_lookup: TitleMetadataLookupProtocol | None = None,
     ) -> None:
         self._uow_factory = uow_factory
         self._package_probe = package_probe
         self._package_store = package_store
         self._logger = logger
-        self._publisher_lookup = publisher_lookup
+        self._metadata_lookup = metadata_lookup
 
     def __call__(self, pkg_path: Path) -> IngestResult:
         try:
@@ -78,9 +78,9 @@ class IngestPackage:
             return IngestResult(item=None, created=False, updated=False)
 
         publisher: str | None = None
-        if self._publisher_lookup is not None:
+        if self._metadata_lookup is not None:
             try:
-                publisher = self._publisher_lookup.lookup_by_title_id(probe.title_id)
+                publisher = self._metadata_lookup.lookup_by_title_id(probe.title_id)
             except Exception as exc:
                 self._logger.warning(
                     "Publisher lookup failed for title_id: %s, error: %s",

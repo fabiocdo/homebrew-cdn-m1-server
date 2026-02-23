@@ -178,6 +178,30 @@ def test_worker_app_build_reconcile_use_case_given_config_when_called_then_wires
     assert reconcile_kwargs["output_targets"] == (config.user.output_targets or tuple())
 
 
+def test_worker_app_run_reconcile_cycle_given_settings_changed_when_called_then_reload_base_url(
+    temp_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = _load_config(temp_workspace, "SERVER_IP=127.0.0.1\nSERVER_PORT=80\nENABLE_TLS=false\n")
+    app = WorkerApp(config)
+    fake_reconcile = _FakeReconcile()
+
+    def _build_reconcile() -> _FakeReconcile:
+        return fake_reconcile
+
+    monkeypatch.setattr(app, "_build_reconcile_use_case", _build_reconcile)
+    _ = config.paths.settings_path.write_text(
+        "SERVER_IP=10.0.0.20\nSERVER_PORT=8080\nENABLE_TLS=false\n",
+        encoding="utf-8",
+    )
+
+    app._run_reconcile_cycle()
+
+    assert fake_reconcile.calls == 1
+    assert app._config.base_url == "http://10.0.0.20:8080"
+    assert app._hb_store_resolver._base_url == "http://10.0.0.20:8080"
+
+
 def test_worker_app_start_given_cron_expression_when_called_then_schedules_cron(
     temp_workspace: Path,
     monkeypatch: pytest.MonkeyPatch,

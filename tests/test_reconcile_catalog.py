@@ -14,6 +14,9 @@ from homebrew_cdn_m1_server.application.repositories.filesystem_repository impor
 from homebrew_cdn_m1_server.application.repositories.json_snapshot_repository import (
     JsonSnapshotRepository,
 )
+from homebrew_cdn_m1_server.application.repositories.settings_snapshot_repository import (
+    SettingsSnapshotRepository,
+)
 from homebrew_cdn_m1_server.application.repositories.sqlite_unit_of_work import (
     SqliteUnitOfWork,
 )
@@ -78,6 +81,22 @@ class _FakeSnapshotRepository:
 
     def save(self, snapshot: dict[str, tuple[int, int]]) -> None:
         self.saved = dict(snapshot)
+
+
+class _FakeSettingsSnapshotRepository:
+    def __init__(self, previous_hash: str, current_hash: str) -> None:
+        self._previous_hash = previous_hash
+        self._current_hash = current_hash
+        self.saved_hash: str | None = None
+
+    def load(self) -> str:
+        return self._previous_hash
+
+    def current_hash(self) -> str:
+        return self._current_hash
+
+    def save(self, hash_value: str) -> None:
+        self.saved_hash = str(hash_value)
 
 
 class _FakeCatalog:
@@ -179,9 +198,19 @@ def _build_reconcile(
     removed: int = 0,
     worker_count: int = 1,
     failing_stats: set[Path] | None = None,
-) -> tuple[ReconcileCatalog, _FakeSnapshotRepository, _FakeExportOutputs, _FakeUow]:
+) -> tuple[
+    ReconcileCatalog,
+    _FakeSnapshotRepository,
+    _FakeSettingsSnapshotRepository,
+    _FakeExportOutputs,
+    _FakeUow,
+]:
     package_store = _FakePackageStore(package_snapshot, failing=failing_stats)
     snapshot_store = _FakeSnapshotRepository(previous_snapshot)
+    settings_snapshot_store = _FakeSettingsSnapshotRepository(
+        previous_hash="hash-a",
+        current_hash="hash-a",
+    )
     exported = (
         temp_workspace / "data" / "share" / "hb-store" / "store.db",
         temp_workspace / "data" / "share" / "fpkgi" / "GAMES.json",
@@ -193,6 +222,9 @@ def _build_reconcile(
         uow_factory=lambda: cast(SqliteUnitOfWork, cast(object, uow)),
         package_store=cast(FilesystemRepository, cast(object, package_store)),
         snapshot_store=cast(JsonSnapshotRepository, cast(object, snapshot_store)),
+        settings_snapshot_store=cast(
+            SettingsSnapshotRepository, cast(object, settings_snapshot_store)
+        ),
         ingest_package=cast(IngestPackage, cast(object, ingest)),
         export_outputs=cast(ExportOutputs, cast(object, export_outputs)),
         lock_path=temp_workspace / "data" / "internal" / "snapshot" / "reconcile.lock",
@@ -201,7 +233,7 @@ def _build_reconcile(
         worker_count=worker_count,
         output_targets=(OutputTarget.HB_STORE, OutputTarget.FPKGI),
     )
-    return reconcile, snapshot_store, export_outputs, uow
+    return reconcile, snapshot_store, settings_snapshot_store, export_outputs, uow
 
 
 def test_build_delta_given_previous_and_current_when_called_then_returns_expected_sets() -> None:
@@ -221,7 +253,7 @@ def test_reconcile_catalog_given_lock_timeout_when_called_then_skips(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(module, "FileLock", _TimeoutLock)
-    reconcile, _, export_outputs, _ = _build_reconcile(
+    reconcile, _, _, export_outputs, _ = _build_reconcile(
         temp_workspace,
         package_snapshot={},
         previous_snapshot={},
@@ -248,7 +280,7 @@ def test_reconcile_catalog_given_stat_failure_when_called_then_ignores_bad_entry
     _ = ok.write_bytes(b"ok")
     _ = bad.write_bytes(b"bad")
 
-    reconcile, snapshot_store, _, _ = _build_reconcile(
+    reconcile, snapshot_store, settings_snapshot_store, _, _ = _build_reconcile(
         temp_workspace,
         package_snapshot={ok: (1, 2), bad: (3, 4)},
         previous_snapshot={},
@@ -261,6 +293,7 @@ def test_reconcile_catalog_given_stat_failure_when_called_then_ignores_bad_entry
     assert result.added == 1
     assert result.failed == 0
     assert snapshot_store.saved == {str(ok): (1, 2)}
+    assert settings_snapshot_store.saved_hash == "hash-a"
 
 
 def test_reconcile_catalog_given_worker_failure_when_called_then_counts_failed(
@@ -274,7 +307,7 @@ def test_reconcile_catalog_given_worker_failure_when_called_then_counts_failed(
     _ = p2.write_bytes(b"b")
 
     ingest = _FakeIngest(failing_paths={p2})
-    reconcile, _, export_outputs, _ = _build_reconcile(
+    reconcile, _, _, export_outputs, _ = _build_reconcile(
         temp_workspace,
         package_snapshot={p1: (1, 10), p2: (2, 20)},
         previous_snapshot={},
@@ -299,7 +332,7 @@ def test_reconcile_catalog_given_changes_when_called_then_reconciles_and_exports
     pkg.parent.mkdir(parents=True, exist_ok=True)
     _ = pkg.write_bytes(b"x")
 
-    reconcile, _, export_outputs, uow = _build_reconcile(
+    reconcile, _, _, export_outputs, uow = _build_reconcile(
         temp_workspace,
         package_snapshot={pkg: (1, 100)},
         previous_snapshot={"old.pkg": (1, 1)},
@@ -316,3 +349,35 @@ def test_reconcile_catalog_given_changes_when_called_then_reconciles_and_exports
     assert len(result.exported_files) == 2
     assert len(export_outputs.calls) == 1
     assert uow.committed is True
+
+
+def test_reconcile_catalog_given_settings_hash_changed_when_called_then_reprocesses_all_pkgs(
+    temp_workspace: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(module, "FileLock", _NoopLock)
+    p1 = temp_workspace / "data" / "share" / "pkg" / "game" / "A.pkg"
+    p2 = temp_workspace / "data" / "share" / "pkg" / "game" / "B.pkg"
+    p1.parent.mkdir(parents=True, exist_ok=True)
+    _ = p1.write_bytes(b"a")
+    _ = p2.write_bytes(b"b")
+
+    previous = {
+        str(p1): (1, 10),
+        str(p2): (2, 20),
+    }
+    ingest = _FakeIngest()
+    reconcile, _, settings_snapshot_store, _, _ = _build_reconcile(
+        temp_workspace,
+        package_snapshot={p1: (1, 10), p2: (2, 20)},
+        previous_snapshot=previous,
+        ingest=ingest,
+    )
+    settings_snapshot_store._previous_hash = "hash-old"
+    settings_snapshot_store._current_hash = "hash-new"
+
+    result = reconcile()
+
+    assert result.added == 2
+    assert result.failed == 0
+    assert set(ingest.calls) == {p1, p2}

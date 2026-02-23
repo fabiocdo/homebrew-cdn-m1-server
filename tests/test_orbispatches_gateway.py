@@ -6,8 +6,8 @@ from typing import cast
 
 import pytest
 
-from homebrew_cdn_m1_server.application.gateways.orbispatches_publisher_gateway import (
-    OrbisPatchesPublisherGateway,
+from homebrew_cdn_m1_server.application.gateways.orbispatches_gateway import (
+    OrbisPatchesGateway,
 )
 
 
@@ -48,7 +48,7 @@ def test_orbispatches_gateway_given_title_html_when_lookup_then_returns_publishe
       UP4433
     </li>
     """
-    gateway = OrbisPatchesPublisherGateway()
+    gateway = OrbisPatchesGateway()
 
     def _fake_urlopen(_request: object, timeout: object | None = None) -> _FakeResponse:
         _ = timeout
@@ -62,7 +62,7 @@ def test_orbispatches_gateway_given_title_html_when_lookup_then_returns_publishe
 def test_orbispatches_gateway_given_same_title_id_when_lookup_twice_then_uses_cache(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    gateway = OrbisPatchesPublisherGateway()
+    gateway = OrbisPatchesGateway()
     calls: list[str] = []
 
     def _fake_urlopen(request: object, timeout: object | None = None) -> _FakeResponse:
@@ -87,5 +87,5 @@ def test_orbispatches_gateway_given_same_title_id_when_lookup_twice_then_uses_ca
 
 
 def test_orbispatches_gateway_given_invalid_title_id_when_lookup_then_returns_none() -> None:
-    gateway = OrbisPatchesPublisherGateway()
+    gateway = OrbisPatchesGateway()
     assert gateway.lookup_by_title_id("not_a_title_id") is None

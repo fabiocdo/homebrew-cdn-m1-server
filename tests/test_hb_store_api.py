@@ -217,6 +217,35 @@ def test_hb_store_api_resolver_given_missing_catalog_entry_when_resolve_then_fal
     assert resolver.resolve_download_pkg_path("CUSA00009") == "/pkg/game/UP0000-TEST00000_00-TEST000000000999.pkg"
 
 
+def test_hb_store_api_resolver_given_base_url_updated_when_resolve_then_uses_latest_value(
+    temp_workspace: Path,
+) -> None:
+    catalog_db = temp_workspace / "data" / "internal" / "catalog" / "catalog.db"
+    store_db = temp_workspace / "data" / "share" / "hb-store" / "store.db"
+    _init_catalog_db(catalog_db)
+    _init_store_db(store_db)
+    _insert_catalog_row(
+        catalog_db,
+        content_id="UP0000-TEST00000_00-TEST000000000333",
+        title_id="CUSA00333",
+        app_type="game",
+        version="01.00",
+        updated_at="2025-01-03T00:00:00+00:00",
+    )
+
+    resolver = HbStoreApiResolver(
+        catalog_db_path=catalog_db,
+        store_db_path=store_db,
+        base_url="http://127.0.0.1",
+    )
+    resolver.set_base_url("https://games.example.com")
+
+    assert (
+        resolver.resolve_download_url("CUSA00333")
+        == "https://games.example.com/pkg/game/UP0000-TEST00000_00-TEST000000000333.pkg"
+    )
+
+
 def test_hb_store_api_resolver_given_store_self_download_url_when_resolve_then_avoids_loop(
     temp_workspace: Path,
 ) -> None:

@@ -125,6 +125,7 @@ class SettingsLoader:
             catalog_db_path=catalog_dir / "catalog.db",
             store_db_path=hb_store_share_dir / "store.db",
             snapshot_path=catalog_dir / "pkgs-snapshot.json",
+            settings_snapshot_path=catalog_dir / "settings-snapshot.json",
             settings_path=settings_path,
             pkgtool_bin_path=app_root / "bin" / "pkgtool",
         )

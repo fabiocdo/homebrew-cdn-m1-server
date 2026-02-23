@@ -13,6 +13,9 @@ from homebrew_cdn_m1_server.application.repositories.filesystem_repository impor
 from homebrew_cdn_m1_server.application.repositories.json_snapshot_repository import (
     JsonSnapshotRepository,
 )
+from homebrew_cdn_m1_server.application.repositories.settings_snapshot_repository import (
+    SettingsSnapshotRepository,
+)
 from homebrew_cdn_m1_server.application.repositories.sqlite_unit_of_work import SqliteUnitOfWork
 from homebrew_cdn_m1_server.domain.workflows.export_outputs import ExportOutputs
 from homebrew_cdn_m1_server.domain.workflows.ingest_package import IngestPackage
@@ -43,6 +46,7 @@ class ReconcileCatalog:
         uow_factory: Callable[[], SqliteUnitOfWork],
         package_store: FilesystemRepository,
         snapshot_store: JsonSnapshotRepository,
+        settings_snapshot_store: SettingsSnapshotRepository,
         ingest_package: IngestPackage,
         export_outputs: ExportOutputs,
         lock_path: Path,
@@ -54,6 +58,7 @@ class ReconcileCatalog:
         self._uow_factory = uow_factory
         self._package_store = package_store
         self._snapshot_store = snapshot_store
+        self._settings_snapshot_store = settings_snapshot_store
         self._ingest_package = ingest_package
         self._export_outputs = export_outputs
         self._lock = FileLock(str(lock_path))
@@ -114,8 +119,14 @@ class ReconcileCatalog:
             previous = dict(self._snapshot_store.load())
             current = self._build_snapshot()
             delta = build_delta(previous, current)
+            previous_settings_hash = self._settings_snapshot_store.load()
+            current_settings_hash = self._settings_snapshot_store.current_hash()
+            settings_changed = previous_settings_hash != current_settings_hash
 
-            candidates = [Path(path) for path in (*delta.added, *delta.updated)]
+            if settings_changed:
+                candidates = [Path(path) for path in sorted(current)]
+            else:
+                candidates = [Path(path) for path in (*delta.added, *delta.updated)]
             added, updated, failed = self._ingest_candidates(candidates)
 
             final_snapshot = self._build_snapshot()
@@ -127,6 +138,7 @@ class ReconcileCatalog:
 
             exported_files = self._export_outputs(self._output_targets)
             self._snapshot_store.save(final_snapshot)
+            self._settings_snapshot_store.save(current_settings_hash)
 
             has_changes = bool(added or updated or removed or failed)
             log_fn = self._logger.info if has_changes else self._logger.debug
