@@ -47,6 +47,7 @@ class FpkgiJsonExporter(OutputExporterProtocol):
 
     _REGION_BY_PREFIX: ClassVar[dict[str, str]] = {
         "UP": "USA",
+        "UB": "USA",
         "EP": "EUR",
         "JP": "JAP",
         "HP": "ASIA",
